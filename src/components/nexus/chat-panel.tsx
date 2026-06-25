@@ -17,6 +17,12 @@ import {
   MessageSquare,
   ExternalLink,
   Loader2,
+  MoreVertical,
+  Download,
+  FileJson,
+  FileText,
+  Trash2,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,6 +35,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useChatStore, type Message } from '@/stores/chat-store';
 import { useModelStore } from '@/stores/model-store';
 import { useUIStore } from '@/stores/ui-store';
@@ -37,6 +55,54 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { motion, AnimatePresence } from 'framer-motion';
+
+/* ───────── System Prompt Personas ───────── */
+
+interface Persona {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  prefix: string;
+  description: string;
+}
+
+const PERSONAS: Persona[] = [
+  {
+    id: 'default',
+    name: 'Default',
+    icon: <Bot className="h-3 w-3" />,
+    prefix: '',
+    description: 'General-purpose AI assistant',
+  },
+  {
+    id: 'planner',
+    name: 'Planner',
+    icon: <Sparkles className="h-3 w-3" />,
+    prefix: 'You are a strategic planner. Break down complex tasks into clear, actionable steps. Focus on architecture decisions, project structure, and implementation roadmaps. Always think about edge cases and dependencies.',
+    description: 'Strategic planning & architecture',
+  },
+  {
+    id: 'builder',
+    name: 'Builder',
+    icon: <Code className="h-3 w-3" />,
+    prefix: 'You are a code builder. Focus on writing clean, efficient, production-ready code. Prioritize working implementations over perfect designs. Include error handling, type safety, and follow best practices.',
+    description: 'Production-ready code implementation',
+  },
+  {
+    id: 'reviewer',
+    name: 'Reviewer',
+    icon: <Check className="h-3 w-3" />,
+    prefix: 'You are a code reviewer. Analyze code for bugs, performance issues, security vulnerabilities, and maintainability. Suggest specific improvements with explanations. Be thorough but constructive.',
+    description: 'Code review & quality analysis',
+  },
+  {
+    id: 'iterator',
+    name: 'Iterator',
+    icon: <RefreshCw className="h-3 w-3" />,
+    prefix: 'You are an iteration specialist. Take existing code and improve it incrementally. Focus on refactoring, optimization, and enhancing functionality step by step. Preserve existing behavior while improving code quality.',
+    description: 'Incremental improvement & refactoring',
+  },
+];
 
 /* ───────── Code block with copy ───────── */
 
@@ -110,9 +176,26 @@ function BlinkingCursor() {
   );
 }
 
+/* ───────── Token Counter ───────── */
+
+function estimateTokens(text: string): number {
+  // Rough estimation: ~4 chars per token for English text
+  return Math.ceil(text.length / 4);
+}
+
 /* ───────── Message component ───────── */
 
-function ChatMessage({ message, isStreaming }: { message: Message; isStreaming?: boolean }) {
+function ChatMessage({
+  message,
+  isStreaming,
+  isLastAssistant,
+  onRegenerate,
+}: {
+  message: Message;
+  isStreaming?: boolean;
+  isLastAssistant?: boolean;
+  onRegenerate?: () => void;
+}) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
 
@@ -241,6 +324,18 @@ function ChatMessage({ message, isStreaming }: { message: Message; isStreaming?:
                 {(message.duration / 1000).toFixed(1)}s
               </span>
             )}
+            {/* Regenerate button for last assistant message */}
+            {isLastAssistant && onRegenerate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground"
+                onClick={onRegenerate}
+              >
+                <RefreshCw className="h-3 w-3 mr-0.5" />
+                Regenerate
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -316,17 +411,20 @@ export function ChatPanel() {
   const [input, setInput] = useState('');
   const [webGrounding, setWebGrounding] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [activePersona, setActivePersona] = useState<string>('default');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const { chats, activeChatId, isStreaming, createChat, addMessage, updateMessage, setStreaming } =
+  const { chats, activeChatId, isStreaming, createChat, addMessage, updateMessage, setStreaming, clearChats } =
     useChatStore();
   const { selectedModel } = useModelStore();
   const { addToast } = useUIStore();
 
   const activeChat = chats.find((c) => c.id === activeChatId);
+  const tokenCount = estimateTokens(input);
+  const currentPersona = PERSONAS.find((p) => p.id === activePersona) || PERSONAS[0];
 
   // Auto-scroll
   useEffect(() => {
@@ -367,9 +465,8 @@ export function ChatPanel() {
     streamingMsgIdRef.current = null;
   }, [updateMessage, setStreaming]);
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim();
-    if (!text || isStreaming) return;
+  const sendMessage = useCallback(async (text: string, personaPrefix?: string) => {
+    if (!text.trim() || isStreaming) return;
 
     let chatId = activeChatId;
     if (!chatId) {
@@ -399,11 +496,6 @@ export function ChatPanel() {
     streamingMsgIdRef.current = assistantMsgId;
     setStreaming(true);
 
-    setInput('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-
     // Create abort controller for this request
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -414,6 +506,12 @@ export function ChatPanel() {
         role: m.role,
         content: m.content,
       }));
+
+      // Add persona prefix as system message if present
+      const systemPrefix = personaPrefix || currentPersona.prefix;
+      if (systemPrefix) {
+        allMessages.unshift({ role: 'system', content: systemPrefix });
+      }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -459,11 +557,11 @@ export function ChatPanel() {
       addToast('Chat: Using fallback mode. Configure API keys in Settings.', 'info');
     }
   }, [
-    input,
     isStreaming,
     activeChatId,
     selectedModel,
     activeChat,
+    currentPersona,
     createChat,
     addMessage,
     updateMessage,
@@ -471,6 +569,16 @@ export function ChatPanel() {
     simulateStreaming,
     addToast,
   ]);
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim();
+    if (!text) return;
+    setInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+    await sendMessage(text);
+  }, [input, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -484,8 +592,113 @@ export function ChatPanel() {
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
+  const handleRegenerate = useCallback(async () => {
+    if (!activeChat || isStreaming) return;
+    const messages = activeChat.messages;
+    // Find the last user message
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (!lastUserMsg) return;
+    await sendMessage(lastUserMsg.content, currentPersona.prefix);
+  }, [activeChat, isStreaming, sendMessage, currentPersona]);
+
+  /* ───────── Export Functions ───────── */
+
+  const exportAsMarkdown = useCallback(() => {
+    if (!activeChat) return;
+    const lines: string[] = [`# ${activeChat.title}\n`];
+    activeChat.messages.forEach((msg) => {
+      if (msg.role === 'user') {
+        lines.push(`## You\n\n${msg.content}\n`);
+      } else if (msg.role === 'assistant') {
+        lines.push(`## MASSIVE NUMBER${msg.model ? ` (${msg.model})` : ''}\n\n${msg.content}\n`);
+        if (msg.tokens) lines.push(`*${msg.tokens} tokens | ${(msg.duration || 0) / 1000}s*\n`);
+      }
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeChat.title.replace(/\s+/g, '_')}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('Chat exported as Markdown', 'success');
+  }, [activeChat, addToast]);
+
+  const exportAsJSON = useCallback(() => {
+    if (!activeChat) return;
+    const data = {
+      title: activeChat.title,
+      model: activeChat.model,
+      mode: activeChat.mode,
+      exportedAt: new Date().toISOString(),
+      messages: activeChat.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        model: m.model,
+        tokens: m.tokens,
+        duration: m.duration,
+        timestamp: m.timestamp,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeChat.title.replace(/\s+/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('Chat exported as JSON', 'success');
+  }, [activeChat, addToast]);
+
+  const handleClearChat = useCallback(() => {
+    clearChats();
+    addToast('Chat cleared', 'info');
+  }, [clearChats, addToast]);
+
+  // Find last assistant message for regenerate button
+  const lastAssistantMsgId = activeChat
+    ? [...activeChat.messages].reverse().find((m) => m.role === 'assistant' && !m.isStreaming)?.id
+    : null;
+
   return (
     <div className="flex flex-col h-full bg-background">
+      {/* Chat header with export menu */}
+      {activeChat && activeChat.messages.length > 0 && (
+        <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border/30 bg-card/30">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+              {activeChat.title}
+            </span>
+            <Badge variant="secondary" className="text-[8px] h-4 px-1.5 font-mono">
+              {activeChat.messages.length} msgs
+            </Badge>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={exportAsMarkdown} className="text-xs">
+                <FileText className="h-3.5 w-3.5 mr-2" />
+                Export as Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportAsJSON} className="text-xs">
+                <FileJson className="h-3.5 w-3.5 mr-2" />
+                Export as JSON
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleClearChat} className="text-xs text-red-400 focus:text-red-400">
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Clear Chat
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
       {/* Messages area */}
       {activeChat && activeChat.messages.length > 0 ? (
         <ScrollArea className="flex-1">
@@ -496,6 +709,8 @@ export function ChatPanel() {
                   key={msg.id}
                   message={msg}
                   isStreaming={msg.isStreaming}
+                  isLastAssistant={msg.id === lastAssistantMsgId}
+                  onRegenerate={msg.id === lastAssistantMsgId ? handleRegenerate : undefined}
                 />
               ))}
             </AnimatePresence>
@@ -510,9 +725,58 @@ export function ChatPanel() {
       {/* Input area */}
       <div className="border-t border-border/50 bg-background/95 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 py-3">
-          {/* Top row: model selector + toggles */}
+          {/* Top row: model selector + persona + toggles */}
           <div className="flex items-center gap-1 mb-2">
             <ModelSelector />
+
+            {/* Persona Selector */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 text-[10px] px-2 gap-1 ${
+                    activePersona !== 'default'
+                      ? 'text-amber-400 bg-amber-400/10'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  {currentPersona.icon}
+                  <span className="hidden sm:inline">{currentPersona.name}</span>
+                  <ChevronDown className="h-2.5 w-2.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="start">
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-medium text-muted-foreground px-2 py-1 uppercase tracking-wider">
+                    AI Persona
+                  </p>
+                  {PERSONAS.map((persona) => (
+                    <button
+                      key={persona.id}
+                      onClick={() => setActivePersona(persona.id)}
+                      className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-left transition-colors ${
+                        activePersona === persona.id
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : 'hover:bg-muted/50 text-foreground'
+                      }`}
+                    >
+                      <span className={`shrink-0 ${activePersona === persona.id ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                        {persona.icon}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium">{persona.name}</div>
+                        <div className="text-[9px] text-muted-foreground truncate">{persona.description}</div>
+                      </div>
+                      {activePersona === persona.id && (
+                        <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
             <div className="flex-1" />
             <TooltipProvider delayDuration={200}>
               <Tooltip>
@@ -582,12 +846,17 @@ export function ChatPanel() {
             </Button>
           </div>
 
-          {/* Bottom hint */}
-          <div className="flex items-center justify-center mt-1.5">
+          {/* Bottom hint with token counter */}
+          <div className="flex items-center justify-between mt-1.5">
             <span className="text-[10px] text-muted-foreground/50">
               <MessageSquare className="h-3 w-3 inline mr-1" />
               Powered by MASSIVE NUMBER · Multi-model orchestration
             </span>
+            {input.length > 0 && (
+              <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+                ≈{tokenCount} tokens
+              </span>
+            )}
           </div>
         </div>
       </div>

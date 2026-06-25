@@ -30,6 +30,10 @@ import {
   FileText,
   Store,
   Crown,
+  LayoutTemplate,
+  Bell,
+  UserCog,
+  Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +53,10 @@ import { CollabPanel } from '@/components/nexus/collab-panel';
 import { SpecPanel } from '@/components/nexus/spec-panel';
 import { MarketplacePanel } from '@/components/nexus/marketplace-panel';
 import { CompetitivePanel } from '@/components/nexus/competitive-panel';
+import { TemplatesPanel } from '@/components/nexus/templates-panel';
+import { NotificationsPanel } from '@/components/nexus/notifications-panel';
+import { CustomizationHub } from '@/components/nexus/customization-hub';
+import { ContextMemory } from '@/components/nexus/context-memory';
 import { useUIStore, type PanelView } from '@/stores/ui-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useAgentStore } from '@/stores/agent-store';
@@ -76,6 +84,10 @@ const NAV_ITEMS: {
   { id: 'spec', label: 'Spec Pipeline', icon: FileText, shortcut: '0' },
   { id: 'marketplace', label: 'Marketplace', icon: Store },
   { id: 'competitive', label: 'Comparison', icon: Crown },
+  { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'customization', label: 'Customize', icon: UserCog },
+  { id: 'context', label: 'Context & Memory', icon: Brain },
 ];
 
 // ── Title Bar ────────────────────────────────────────────────────────────
@@ -266,6 +278,10 @@ function PanelContent({ view }: { view: PanelView }) {
         {view === 'spec' && <SpecPanel />}
         {view === 'marketplace' && <MarketplacePanel />}
         {view === 'competitive' && <CompetitivePanel />}
+        {view === 'templates' && <TemplatesPanel />}
+        {view === 'notifications' && <NotificationsPanel />}
+        {view === 'customization' && <CustomizationHub />}
+        {view === 'context' && <ContextMemory />}
       </motion.div>
     </AnimatePresence>
   );
@@ -380,6 +396,10 @@ export default function Home() {
       'open-spec': 'spec',
       'open-marketplace': 'marketplace',
       'open-competitive': 'competitive',
+      'open-templates': 'templates',
+      'open-notifications': 'notifications',
+      'open-customization': 'customization',
+      'open-context': 'context',
     };
     const view = commandViewMap[commandId];
     if (view) setActiveView(view);

@@ -13,6 +13,15 @@ import {
   Code,
   Zap,
   FolderOpen,
+  LayoutTemplate,
+  Bell,
+  Plug,
+  GitBranch,
+  Users,
+  FileText,
+  Store,
+  Crown,
+  Globe,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -111,6 +120,62 @@ export function CommandPalette({ open, onOpenChange, onSelect }: CommandPaletteP
         label: 'Web Search',
         description: 'Search the web for information',
         icon: <Search className="h-4 w-4 text-red-400" />,
+      },
+      {
+        id: 'open-mcp',
+        type: 'action',
+        label: 'Open MCP Hub',
+        description: 'Manage MCP servers and tools',
+        icon: <Plug className="h-4 w-4 text-teal-400" />,
+      },
+      {
+        id: 'open-git',
+        type: 'action',
+        label: 'Open Git Panel',
+        description: 'View repository status and changes',
+        icon: <GitBranch className="h-4 w-4 text-emerald-400" />,
+      },
+      {
+        id: 'open-collab',
+        type: 'action',
+        label: 'Open Collaboration',
+        description: 'Share and collaborate on sessions',
+        icon: <Users className="h-4 w-4 text-blue-400" />,
+      },
+      {
+        id: 'open-spec',
+        type: 'action',
+        label: 'Open Spec Pipeline',
+        description: 'Create and manage AI specs',
+        icon: <FileText className="h-4 w-4 text-orange-400" />,
+      },
+      {
+        id: 'open-marketplace',
+        type: 'action',
+        label: 'Open Marketplace',
+        description: 'Browse and install integrations',
+        icon: <Store className="h-4 w-4 text-amber-400" />,
+      },
+      {
+        id: 'open-competitive',
+        type: 'action',
+        label: 'Open Comparison',
+        description: 'Compare with competing platforms',
+        icon: <Crown className="h-4 w-4 text-yellow-400" />,
+      },
+      {
+        id: 'open-templates',
+        type: 'action',
+        label: 'Open Templates',
+        description: 'Browse project templates & code snippets',
+        icon: <LayoutTemplate className="h-4 w-4 text-emerald-400" />,
+      },
+      {
+        id: 'open-notifications',
+        type: 'action',
+        label: 'Open Notifications',
+        description: 'View alerts and activity timeline',
+        icon: <Bell className="h-4 w-4 text-amber-400" />,
       },
     ];
 

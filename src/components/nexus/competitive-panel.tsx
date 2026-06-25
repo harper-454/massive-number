@@ -25,7 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Types ───────────────────────────────────────────────────────────────
 
-type FeatureValue = '⚡' | '✅' | '❌' | '✅(basic)' | '✅(Live Share)';
+type FeatureValue = '⚡' | '✅' | '❌';
 
 interface Platform {
   name: string;
@@ -52,71 +52,81 @@ const PLATFORMS: Platform[] = [
   { name: 'VS Code+Copilot', shortName: 'VSC', color: 'text-zinc-400', bgColor: 'bg-zinc-500/15', borderColor: 'border-zinc-500/30' },
 ];
 
+// All 34 features with exact values as specified
+// ⚡ = Unique/Advanced (3pts), ✅ = Supported (1pt), ❌ = Not available (0pts)
 const FEATURES: Feature[] = [
-  // AI & Orchestration
-  { name: 'Multi-model orchestration', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Orchestration' },
-  { name: 'Visual MCP hub', values: { MN: '⚡', Cursor: '✅(basic)', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅(basic)' }, category: 'AI & Orchestration' },
-  { name: 'Web grounding', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Orchestration' },
-  { name: 'Agent mode', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'AI & Orchestration' },
-  { name: 'Multi-provider support', values: { MN: '⚡', Cursor: '✅(basic)', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅(basic)' }, category: 'AI & Orchestration' },
-  { name: 'Voice-to-code', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Orchestration' },
-  { name: 'Cost optimization', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Orchestration' },
-  { name: 'Model auto-routing', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Orchestration' },
-  // Development
-  { name: 'Spec-to-Code pipeline', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '✅', CC: '❌', VSC: '❌' }, category: 'Development' },
-  { name: 'Integration marketplace', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Development' },
-  { name: 'Git integration', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'Development' },
-  { name: 'Code review', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Development' },
-  { name: 'Inline editing', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'Development' },
-  { name: 'Code generation', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Development' },
-  // Infrastructure
-  { name: 'CI/CD integration', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Infrastructure' },
-  { name: 'Terminal', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Infrastructure' },
-  { name: 'File explorer', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'Infrastructure' },
-  { name: 'Docker support', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Infrastructure' },
-  { name: 'Cloud deployment', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Infrastructure' },
-  // Collaboration
-  { name: 'Real-time collaboration', values: { MN: '✅', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅(Live Share)' }, category: 'Collaboration' },
-  { name: 'Live cursors', values: { MN: '✅', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Collaboration' },
-  { name: 'Activity feed', values: { MN: '✅', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Collaboration' },
-  { name: 'Team chat', values: { MN: '✅', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Collaboration' },
-  // Search & Knowledge
-  { name: 'Web search', values: { MN: '⚡', Cursor: '❌', WS: '✅', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Search & Knowledge' },
-  { name: 'Codebase search', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Search & Knowledge' },
-  { name: 'Context awareness', values: { MN: '⚡', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Search & Knowledge' },
-  // Quality & Safety
-  { name: 'Security scanning', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Quality & Safety' },
-  { name: 'Error monitoring', values: { MN: '✅', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Quality & Safety' },
-  { name: 'Auto-testing', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Quality & Safety' },
-  { name: 'Lint integration', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'Quality & Safety' },
-  // UX
-  { name: 'Command palette', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'UX' },
-  { name: 'Keyboard shortcuts', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'UX' },
-  { name: 'Customizable themes', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'UX' },
-  { name: 'Streaming responses', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'UX' },
+  // AI & Models
+  { name: 'Multi-model orchestration', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+  { name: '7+ AI providers', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+  { name: 'Auto model routing', values: { MN: '⚡', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'AI & Models' },
+  { name: 'Cost optimization', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+  { name: 'Custom AI personas', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+  { name: 'AI rules system', values: { MN: '⚡', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+
+  // Integrations
+  { name: 'Visual MCP hub', values: { MN: '⚡', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Integrations' },
+  { name: '12+ MCP servers', values: { MN: '⚡', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Integrations' },
+  { name: 'Git integration', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'Integrations' },
+  { name: 'Code diff viewer', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Integrations' },
+  { name: 'CI/CD integration', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Integrations' },
+  { name: 'Marketplace', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Integrations' },
+  { name: 'Collaboration', values: { MN: '✅', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Integrations' },
+  { name: 'Project templates', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Integrations' },
+
+  // Code Intelligence
+  { name: 'Code completion', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'Code Intelligence' },
+  { name: 'Inline AI assist', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Code Intelligence' },
+  { name: 'Multi-file editing', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Code Intelligence' },
+  { name: 'Codebase context', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Code Intelligence' },
+  { name: 'Error detection', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Code Intelligence' },
+  { name: 'Context memory', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Code Intelligence' },
+
+  // Agent & Automation
+  { name: 'Agent mode', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Agent & Automation' },
+  { name: 'Multi-step pipelines', values: { MN: '⚡', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Agent & Automation' },
+  { name: 'Background agents', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Agent & Automation' },
+  { name: 'Spec-to-code', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '✅', CC: '❌', VSC: '❌' }, category: 'Agent & Automation' },
+  { name: 'Voice-to-code', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Agent & Automation' },
+
+  // Web & Search
+  { name: 'Web grounding', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Web & Search' },
+  { name: 'AI-summarized search', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Web & Search' },
+  { name: 'Source citations', values: { MN: '✅', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Web & Search' },
+  { name: 'Real-time data', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'Web & Search' },
+
+  // Developer Experience
+  { name: 'Terminal', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '✅', VSC: '✅' }, category: 'Developer Experience' },
+  { name: 'File explorer', values: { MN: '✅', Cursor: '✅', WS: '✅', Kiro: '✅', CC: '❌', VSC: '✅' }, category: 'Developer Experience' },
+  { name: 'Command palette', values: { MN: '✅', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Developer Experience' },
+  { name: 'Custom keybindings', values: { MN: '⚡', Cursor: '✅', WS: '✅', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Developer Experience' },
+  { name: 'Theme customization', values: { MN: '⚡', Cursor: '✅', WS: '✅', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Developer Experience' },
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
+// Scoring: ⚡ = 3 points, ✅ = 1 point, ❌ = 0 points
 function calculateScore(values: Record<string, FeatureValue>): number {
   let score = 0;
-  const vals = Object.values(values);
-  vals.forEach((v) => {
+  Object.values(values).forEach((v) => {
     if (v === '⚡') score += 3;
-    else if (v === '✅') score += 2;
-    else if (v.startsWith('✅')) score += 1;
+    else if (v === '✅') score += 1;
     else score += 0;
   });
   return score;
 }
 
-const MAX_SCORE = FEATURES.length * 3;
+const MAX_SCORE = FEATURES.length * 3; // 34 * 3 = 102
 
+// Pre-calculate scores
 const SCORES: Record<string, number> = {};
 PLATFORMS.forEach((p) => {
-  SCORES[p.shortName] = calculateScore(
-    FEATURES.reduce((acc, f) => ({ ...acc, [p.shortName]: f.values[p.shortName] }), {})
-  );
+  let score = 0;
+  FEATURES.forEach((f) => {
+    const v = f.values[p.shortName];
+    if (v === '⚡') score += 3;
+    else if (v === '✅') score += 1;
+  });
+  SCORES[p.shortName] = score;
 });
 
 function renderCellValue(value: FeatureValue) {
@@ -141,23 +151,13 @@ function renderCellValue(value: FeatureValue) {
       </span>
     );
   }
-  if (value.startsWith('✅')) {
-    return (
-      <span className="flex items-center justify-center gap-0.5">
-        <Check className="h-3 w-3 text-amber-400" />
-        <span className="text-[7px] text-amber-400/70">
-          {value.replace('✅', '')}
-        </span>
-      </span>
-    );
-  }
   return null;
 }
 
 // ── Component ───────────────────────────────────────────────────────────
 
 export function CompetitivePanel() {
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['AI & Orchestration', 'Development']));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['AI & Models', 'Integrations']));
 
   const categories = [...new Set(FEATURES.map((f) => f.category).filter(Boolean))];
 
@@ -173,6 +173,7 @@ export function CompetitivePanel() {
   const mnScore = SCORES['MN'];
   const secondBest = Math.max(...Object.entries(SCORES).filter(([k]) => k !== 'MN').map(([, v]) => v));
   const mnAdvantage = Math.round(((mnScore - secondBest) / MAX_SCORE) * 100);
+  const mnPct = ((mnScore / MAX_SCORE) * 100).toFixed(1);
 
   return (
     <div className="flex flex-col h-full">
@@ -194,17 +195,17 @@ export function CompetitivePanel() {
           </Badge>
         </div>
 
-        {/* Score bars */}
+        {/* Animated Score Bars */}
         <div className="space-y-1.5 mb-3">
           {PLATFORMS.map((platform) => {
             const score = SCORES[platform.shortName];
-            const pct = Math.round((score / MAX_SCORE) * 100);
+            const pct = ((score / MAX_SCORE) * 100).toFixed(1);
             const isTop = platform.shortName === 'MN';
 
             return (
               <div key={platform.shortName} className="flex items-center gap-2">
                 <span
-                  className={`text-[9px] font-medium w-24 text-right shrink-0 ${
+                  className={`text-[9px] font-medium w-28 text-right shrink-0 ${
                     isTop ? platform.color : 'text-muted-foreground'
                   }`}
                 >
@@ -214,7 +215,7 @@ export function CompetitivePanel() {
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+                    transition={{ duration: 1, ease: 'easeOut', delay: 0.1 }}
                     className={`h-full rounded-full ${
                       isTop
                         ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
@@ -222,7 +223,7 @@ export function CompetitivePanel() {
                     }`}
                   />
                 </div>
-                <span className={`text-[9px] font-mono w-8 shrink-0 ${isTop ? platform.color : 'text-muted-foreground'}`}>
+                <span className={`text-[9px] font-mono w-10 shrink-0 text-right ${isTop ? platform.color : 'text-muted-foreground'}`}>
                   {pct}%
                 </span>
               </div>
@@ -287,6 +288,12 @@ export function CompetitivePanel() {
             const isExpanded = expandedCategories.has(cat!);
             const catFeatures = FEATURES.filter((f) => f.category === cat);
 
+            // Calculate category-specific score for MN
+            const catMnScore = catFeatures.reduce((sum, f) => {
+              return sum + (f.values.MN === '⚡' ? 3 : f.values.MN === '✅' ? 1 : 0);
+            }, 0);
+            const catMaxScore = catFeatures.length * 3;
+
             return (
               <div key={cat} className="mb-2">
                 <button
@@ -301,6 +308,9 @@ export function CompetitivePanel() {
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     {cat}
                   </span>
+                  <Badge className="text-[7px] h-3.5 px-1 bg-emerald-500/15 text-emerald-400 border-emerald-500/20 ml-1">
+                    {catMnScore}/{catMaxScore}
+                  </Badge>
                   <Badge variant="secondary" className="text-[7px] h-3.5 px-1 ml-auto">
                     {catFeatures.length}
                   </Badge>
@@ -343,18 +353,18 @@ export function CompetitivePanel() {
       <div className="shrink-0 px-4 py-2 flex items-center gap-4 text-[9px] text-muted-foreground bg-card/30">
         <span className="flex items-center gap-1">
           <Zap className="h-3 w-3 text-emerald-400 fill-emerald-400" />
-          Unique
+          Unique (3pts)
         </span>
         <span className="flex items-center gap-1">
           <Check className="h-3 w-3 text-emerald-500" />
-          Supported
+          Supported (1pt)
         </span>
         <span className="flex items-center gap-1">
           <X className="h-3 w-3 text-red-400/70" />
-          Not available
+          Not available (0pts)
         </span>
         <span className="ml-auto text-[8px]">
-          Based on {FEATURES.length} features across {categories.length} categories
+          {FEATURES.length} features · Max {MAX_SCORE}pts · MN {mnScore}pts ({mnPct}%)
         </span>
       </div>
     </div>
