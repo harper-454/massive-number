@@ -24,6 +24,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Search,
+  Plug,
+  GitBranch,
+  Users,
+  FileText,
+  Store,
+  Crown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +43,12 @@ import TerminalPanel from '@/components/nexus/terminal-panel';
 import FileExplorer from '@/components/nexus/file-explorer';
 import { SettingsPanel } from '@/components/nexus/settings-panel';
 import { CommandPalette } from '@/components/nexus/command-palette';
+import { MCPHub } from '@/components/nexus/mcp-hub';
+import { GitPanel } from '@/components/nexus/git-panel';
+import { CollabPanel } from '@/components/nexus/collab-panel';
+import { SpecPanel } from '@/components/nexus/spec-panel';
+import { MarketplacePanel } from '@/components/nexus/marketplace-panel';
+import { CompetitivePanel } from '@/components/nexus/competitive-panel';
 import { useUIStore, type PanelView } from '@/stores/ui-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useAgentStore } from '@/stores/agent-store';
@@ -58,6 +70,12 @@ const NAV_ITEMS: {
   { id: 'search', label: 'Web Search', icon: Globe, shortcut: '4' },
   { id: 'terminal', label: 'Terminal', icon: TerminalIcon, shortcut: '5' },
   { id: 'files', label: 'Files', icon: FolderOpen, shortcut: '6' },
+  { id: 'mcp', label: 'MCP Hub', icon: Plug, shortcut: '7' },
+  { id: 'git', label: 'Git Panel', icon: GitBranch, shortcut: '8' },
+  { id: 'collab', label: 'Collaboration', icon: Users, shortcut: '9' },
+  { id: 'spec', label: 'Spec Pipeline', icon: FileText, shortcut: '0' },
+  { id: 'marketplace', label: 'Marketplace', icon: Store },
+  { id: 'competitive', label: 'Comparison', icon: Crown },
 ];
 
 // ── Title Bar ────────────────────────────────────────────────────────────
@@ -149,7 +167,7 @@ function ActivityBar({
 
       <Separator className="w-6 mb-2" />
 
-      {/* Nav items */}
+      {/* Nav items - primary */}
       <nav className="flex flex-col gap-1 flex-1">
         {NAV_ITEMS.map((item) => {
           const isActive = activeView === item.id;
@@ -242,6 +260,12 @@ function PanelContent({ view }: { view: PanelView }) {
         {view === 'terminal' && <TerminalPanel />}
         {view === 'files' && <FileExplorer />}
         {view === 'settings' && <SettingsPanel />}
+        {view === 'mcp' && <MCPHub />}
+        {view === 'git' && <GitPanel />}
+        {view === 'collab' && <CollabPanel />}
+        {view === 'spec' && <SpecPanel />}
+        {view === 'marketplace' && <MarketplacePanel />}
+        {view === 'competitive' && <CompetitivePanel />}
       </motion.div>
     </AnimatePresence>
   );
@@ -293,7 +317,7 @@ function StatsBar() {
         )}
       </div>
       <div className="flex-1" />
-      <span>June 24, 2026</span>
+      <span>June 26, 2026</span>
     </div>
   );
 }
@@ -301,10 +325,10 @@ function StatsBar() {
 // ── Main Page ───────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [activeView, setActiveView] = useState<PanelView>('chat');
+  const [activeView, setActiveView] = useState<PanelView>('mcp');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
-  const [rightPanelView, setRightPanelView] = useState<PanelView>('editor');
+  const [rightPanelView, setRightPanelView] = useState<PanelView>('competitive');
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -350,6 +374,12 @@ export default function Home() {
       'search-web': 'search',
       'open-editor': 'editor',
       'open-files': 'files',
+      'open-mcp': 'mcp',
+      'open-git': 'git',
+      'open-collab': 'collab',
+      'open-spec': 'spec',
+      'open-marketplace': 'marketplace',
+      'open-competitive': 'competitive',
     };
     const view = commandViewMap[commandId];
     if (view) setActiveView(view);
