@@ -889,3 +889,188 @@ Stage Summary:
 - Context windows range from 128K to 10M tokens
 - Fixed USAGE_BY_MODEL undefined error that was causing runtime crashes
 - Zero lint errors, zero browser console errors
+
+---
+Task ID: 2-a
+Agent: API Route Builder
+Task: Create 6 API routes for Account, History, Chat Folders, Library, Dev Surfaces, and Project Templates
+
+Work Log:
+- Updated Prisma schema: added `folderId`, `pinned`, `archived` fields to Chat model; added `chats` relation to ChatFolder model
+- Ran `bun run db:push` successfully to sync schema with SQLite database
+- Created 6 API route files:
+
+1. `/src/app/api/account/route.ts` — Account Management API
+   - GET: Return current user account info, auto-create with defaults if not found, update lastLoginAt and increment loginCount
+   - PUT: Update account fields (displayName, email, avatarUrl, bio, plan, preferences) with field whitelist
+   - POST: Create/register new account with email uniqueness check, returns 201
+
+2. `/src/app/api/history/route.ts` — Chat History API
+   - GET: List chats with pagination (limit/offset), search (across titles and message content), folder filter, sort by updatedAt|createdAt, pinned first, includes folder info and message count
+   - PUT: Update chat (rename, move to folder, pin/archive) with folder connect/disconnect support
+   - DELETE: Delete chat and all messages (cascading delete)
+
+3. `/src/app/api/chat-folders/route.ts` — Chat Folder Management
+   - GET: List all folders sorted by sortOrder, includes chat count per folder
+   - POST: Create folder with auto-incrementing sortOrder
+   - PUT: Update folder (name, color, icon, sortOrder)
+   - DELETE: Delete folder, moves all chats in folder to uncategorized (folderId=null)
+
+4. `/src/app/api/library/route.ts` — Library API (Generated Sites, Apps, Objects)
+   - GET: List items with type/category/status/search filters, includes byType and byCategory aggregation stats, parses JSON fields
+   - POST (regular): Create library item with JSON serialization for tags/config
+   - POST (action=fork): Fork item with parentId reference, increments fork count on original
+   - PUT: Update item fields with JSON serialization
+   - DELETE: Delete item
+
+5. `/src/app/api/dev-surfaces/route.ts` — Dev Surfaces API
+   - Seeds 10 default surfaces on first GET if table empty: Modeling, Game Dev, Web Design, Backend, Frontend, Fullstack, Mobile, Data, API Design, DevOps
+   - GET: List all surfaces sorted by sortOrder, with parsed JSON tools/layout
+   - POST: Create custom surface with auto sortOrder
+   - PUT: Update surface
+   - DELETE: Delete surface
+
+6. `/src/app/api/project-templates/route.ts` — Project Templates API
+   - Seeds 8 default templates on first GET if table empty: Next.js Starter, React+Vite, Fullstack SaaS, REST API Server, Portfolio Website, GraphQL API, React Native App, Game Engine Starter
+   - GET: List templates with category/framework/language/search filters, includes distinct categories list
+   - POST: Create template
+
+- All routes use try/catch with proper HTTP status codes (200, 201, 400, 404, 500)
+- All routes use NextRequest/NextResponse from 'next/server'
+- ESLint passes with zero errors
+- Dev server running cleanly
+
+Stage Summary:
+- 6 API routes created with full CRUD operations
+- Prisma schema updated with Chat↔ChatFolder relation (folderId, pinned, archived)
+- Auto-seeding for dev-surfaces (10 defaults) and project-templates (8 defaults)
+- Library API supports fork operation with parentId tracking
+- All JSON fields (tags, config, tools, layout, files) properly serialized/deserialized
+
+---
+Task ID: 3
+Agent: Frontend Component Builder
+Task: Create AccountPanel component at /src/components/nexus/account-panel.tsx
+
+Work Log:
+- Read worklog.md and settings-panel.tsx for styling reference (dark zinc theme, shadcn/ui, emerald/amber accents)
+- Read Prisma schema — confirmed Account and Activity models exist with all required fields
+- Read existing /api/account and /api/activity routes — verified data shapes match component needs
+- Created account-panel.tsx with all 7 features:
+  1. Profile Card — Avatar with initials/image, displayName, email, bio, role/plan/status badges, member since
+  2. Profile Editing — Inline editing of displayName, email, bio, avatarUrl with save/cancel and loading states
+  3. Account Stats — Login count, last login, chats created, library items, agents run (fetched from multiple APIs)
+  4. Plan Management — Current plan display, upgrade dialog, plan comparison cards, usage progress bars
+  5. Preferences — JSON key-value editor with add/remove/edit, raw JSON preview, save-all
+  6. Activity Log — Recent activity from /api/activity with per-type icons/colors, time-ago formatting
+  7. Session Info — Platform, screen, timezone, language, cookies, connection, user agent
+- Lint passes with zero errors
+- Dev server running cleanly
+
+Stage Summary:
+- Full AccountPanel component created (~580 lines) with named export
+- 4-tab layout: Profile | Plan | Preferences | Activity
+- All data fetched from API endpoints, no hardcoded demo data
+- Loading skeletons and error handling with retry included
+- Responsive grid layouts, dark zinc/emerald/amber theme matching settings-panel.tsx
+
+---
+Task ID: 4
+Agent: UI Component Engineer
+Task: Create comprehensive Chat History panel component
+
+Work Log:
+- Updated `/api/history/route.ts` to support additional query parameters:
+  - `model` — filter chats by model ID
+  - `dateRange` — filter by today/week/month/all
+  - `pinned=true` — show only pinned chats
+  - `archived=true` — show only archived chats
+  - `sortBy=messageCount` — sort by message count (in addition to existing updatedAt/createdAt)
+  - Enhanced response to include `previewMessages` (first 3 messages for preview pane)
+  - Enhanced folder response to include chat counts filtered by userId
+- Created `/src/components/nexus/history-panel.tsx` (~580 lines) with all required features:
+  1. **Search Bar** — Debounced full-text search across chat titles and message content
+  2. **Folder Sidebar** — Collapsible folder tree with color-coded folders, chat counts, create/rename/delete folders
+  3. **Chat List** — Chronological chat list with title, model badge (color-coded per provider), message count, last updated time, pin indicator (amber), archive indicator
+  4. **Chat Actions** — Dropdown menu with Rename, Move to Folder, Pin/Unpin, Archive/Unarchive, Delete (with confirmation)
+  5. **Filters** — By model (dynamic from available chats), by date range (today/week/month/all), pinned only, archived only — with dismissible filter badges
+  6. **Sort Options** — By last updated, created date, message count
+  7. **Pagination** — Load More button with remaining count
+  8. **Preview Pane** — Click a chat to see animated side pane with message preview (user/assistant messages with role icons)
+- All data fetched from API endpoints, no hardcoded demo data
+- Loading skeletons, empty states with contextual messages
+- Delete confirmation dialog for both chats and folders
+- Create folder dialog with color picker (8 preset colors)
+- Move to folder dialog with folder list
+- Rename dialog for chats and folders
+- Framer Motion animations for list items, preview pane, and empty states
+- Dark zinc/emerald/amber theme consistent with chat-panel.tsx
+- Lint passes with zero errors
+
+Stage Summary:
+- Full HistoryPanel component created with named export `HistoryPanel`
+- Enhanced /api/history backend with 4 new filter parameters
+- 3-panel layout: folder sidebar | chat list | preview pane
+- All 8 required features implemented with production-ready UX
+
+---
+Task ID: 5
+Agent: UI Engineer
+Task: Create LibraryPanel component for generated sites, apps, objects, and assets
+
+Work Log:
+- Read worklog.md and marketplace-panel.tsx for styling reference (dark theme, zinc/emerald/amber colors, compact layout)
+- Read existing /api/library/route.ts backend — fully functional with GET/POST/PUT/DELETE + fork action
+- Read prisma schema for LibraryItem model (id, name, description, type, category, tags, thumbnail, code, config, status, version, isPublic, stars, forks, parentId, userId, projectId, timestamps)
+- Created `/src/components/nexus/library-panel.tsx` — comprehensive Library panel with all 8 required features:
+
+1. **View Toggle** — Grid view (cards with thumbnail placeholders, type-colored backgrounds) and List view (compact rows with inline stats)
+2. **Category Tabs** — All, Sites, Apps, Components, APIs, Games, Models, Assets, Templates with item counts from API stats
+3. **Search & Filter** — Search by name/description, status filter (all/draft/published/archived) with animated dropdown, sort by date/name/stars via DropdownMenu
+4. **Library Cards** — Grid cards: thumbnail/placeholder with type icon, name, type badge (color-coded), status badge (overlay), public/private indicator, stars/forks/version/last-updated, tags (max 3 + overflow). List rows: icon, name+description, type badge, stats, updated time, context menu
+5. **Create New** — Dialog with name input, 8-type selector grid (icon + label, color-coded), category input, description textarea, tags input (comma-separated)
+6. **Item Detail** — Click-to-open dialog showing: type icon, name (editable), status/version/stars/forks/public badges, description (editable), tags, config JSON viewer, code viewer with copy button (editable), metadata grid (created date, category, fork source), action buttons (fork, publish, archive, republish, delete). Full edit mode with save/cancel
+7. **Stats Bar** — Footer with total items count, status breakdown (draft/published/archived counts), type distribution bar (color-coded segments)
+8. **Empty States** — Context-aware empty state: "Your library is empty" with create button when no items, "No items match your filters" with suggestion when filtered. Loading skeleton states for both grid and list views
+
+Styling: Dark theme with zinc/emerald/amber colors, framer-motion animations, consistent with marketplace-panel.tsx patterns
+API: All data fetched from /api/library endpoint, no hardcoded demo data
+Lint: Clean — no errors
+
+Stage Summary:
+- LibraryPanel component created with named export `LibraryPanel` and 'use client' directive
+- All 8 features implemented: view toggle, category tabs, search/filter, library cards, create dialog, item detail, stats bar, empty states
+- Full CRUD + fork integration with existing /api/library backend
+- Dark theme consistent with marketplace-panel.tsx styling reference
+
+---
+Task ID: 10
+Agent: Main Orchestrator
+Task: Add Account Management, Chat History, Library, Dev Surfaces, and Project Templates
+
+Work Log:
+- Researched 18+ competitor features (Cursor, Replit, Bolt, Lovable, v0, Windsurf)
+- Updated Prisma schema with 5 new models: Account, ChatFolder, LibraryItem, DevSurface, ProjectTemplate
+- Added folderId, pinned, archived fields to Chat model
+- Pushed schema changes to database
+- Created 6 new API routes: /api/account, /api/history, /api/chat-folders, /api/library, /api/dev-surfaces, /api/project-templates
+- Built AccountPanel component: profile editing, plan management, preferences, activity log, session info
+- Built HistoryPanel component: search, folder sidebar, chat list, actions, filters, sort, pagination, preview
+- Built LibraryPanel component: grid/list views, category tabs, search/filter, create/fork/publish/archive, item detail
+- Built DevSurfacesPanel component: 10 surface cards (Modeling, Game, Web Design, Backend, Frontend, Fullstack, Mobile, Data, API, DevOps), detail pane, custom surface creation
+- Updated PanelView type to include 'account', 'history', 'library', 'dev-surfaces'
+- Updated page.tsx: 20 nav items organized into 3 sections (primary/workspace/tools), v2.0 badge, 10 surfaces badge
+- Auto-seeding: 10 dev surfaces + 8 project templates seed on first API call
+- Fixed project-templates route: removed sortOrder field that doesn't exist in model
+- All 6 APIs verified working with curl
+- Page compiles and serves 200 OK
+- Zero lint errors
+
+Stage Summary:
+- 5 new database models added (Account, ChatFolder, LibraryItem, DevSurface, ProjectTemplate)
+- 6 new API routes created
+- 4 new UI panels created (Account, History, Library, Dev Surfaces)
+- Navigation reorganized into 3 sections: Primary (4), Workspace (3), Tools (13) + Settings
+- 10 dev surfaces auto-seeded: Modeling, Game Dev, Web Design, Backend, Frontend, Fullstack, Mobile, Data, API Design, DevOps
+- 8 project templates auto-seeded: Next.js, React+Vite, Fullstack SaaS, REST API, Portfolio, GraphQL, React Native, Game Engine
+- Total features: 20+ panels, 16+ API routes, 16 free AI models from 10+ providers

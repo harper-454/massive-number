@@ -34,6 +34,10 @@ import {
   Bell,
   UserCog,
   Brain,
+  User,
+  History,
+  Library,
+  LayoutGrid,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +61,10 @@ import { TemplatesPanel } from '@/components/nexus/templates-panel';
 import { NotificationsPanel } from '@/components/nexus/notifications-panel';
 import { CustomizationHub } from '@/components/nexus/customization-hub';
 import { ContextMemory } from '@/components/nexus/context-memory';
+import { AccountPanel } from '@/components/nexus/account-panel';
+import { HistoryPanel } from '@/components/nexus/history-panel';
+import { LibraryPanel } from '@/components/nexus/library-panel';
+import { DevSurfacesPanel } from '@/components/nexus/dev-surfaces-panel';
 import { useUIStore, type PanelView } from '@/stores/ui-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useAgentStore } from '@/stores/agent-store';
@@ -71,23 +79,31 @@ const NAV_ITEMS: {
   label: string;
   icon: React.ElementType;
   shortcut?: string;
+  section?: 'primary' | 'workspace' | 'tools';
 }[] = [
-  { id: 'chat', label: 'AI Chat', icon: MessageSquare, shortcut: '1' },
-  { id: 'editor', label: 'Code Editor', icon: Code, shortcut: '2' },
-  { id: 'agent', label: 'Agent Mode', icon: Bot, shortcut: '3' },
-  { id: 'search', label: 'Web Search', icon: Globe, shortcut: '4' },
-  { id: 'terminal', label: 'Terminal', icon: TerminalIcon, shortcut: '5' },
-  { id: 'files', label: 'Files', icon: FolderOpen, shortcut: '6' },
-  { id: 'mcp', label: 'MCP Hub', icon: Plug, shortcut: '7' },
-  { id: 'git', label: 'Git Panel', icon: GitBranch, shortcut: '8' },
-  { id: 'collab', label: 'Collaboration', icon: Users, shortcut: '9' },
-  { id: 'spec', label: 'Spec Pipeline', icon: FileText, shortcut: '0' },
-  { id: 'marketplace', label: 'Marketplace', icon: Store },
-  { id: 'competitive', label: 'Comparison', icon: Crown },
-  { id: 'templates', label: 'Templates', icon: LayoutTemplate },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'customization', label: 'Customize', icon: UserCog },
-  { id: 'context', label: 'Context & Memory', icon: Brain },
+  // ── Primary ──
+  { id: 'chat', label: 'AI Chat', icon: MessageSquare, shortcut: '1', section: 'primary' },
+  { id: 'editor', label: 'Code Editor', icon: Code, shortcut: '2', section: 'primary' },
+  { id: 'agent', label: 'Agent Mode', icon: Bot, shortcut: '3', section: 'primary' },
+  { id: 'dev-surfaces', label: 'Dev Surfaces', icon: LayoutGrid, section: 'primary' },
+  // ── Workspace ──
+  { id: 'history', label: 'Chat History', icon: History, section: 'workspace' },
+  { id: 'library', label: 'Library', icon: Library, section: 'workspace' },
+  { id: 'account', label: 'Account', icon: User, section: 'workspace' },
+  // ── Tools ──
+  { id: 'search', label: 'Web Search', icon: Globe, shortcut: '4', section: 'tools' },
+  { id: 'terminal', label: 'Terminal', icon: TerminalIcon, shortcut: '5', section: 'tools' },
+  { id: 'files', label: 'Files', icon: FolderOpen, shortcut: '6', section: 'tools' },
+  { id: 'mcp', label: 'MCP Hub', icon: Plug, shortcut: '7', section: 'tools' },
+  { id: 'git', label: 'Git Panel', icon: GitBranch, shortcut: '8', section: 'tools' },
+  { id: 'collab', label: 'Collaboration', icon: Users, shortcut: '9', section: 'tools' },
+  { id: 'spec', label: 'Spec Pipeline', icon: FileText, shortcut: '0', section: 'tools' },
+  { id: 'marketplace', label: 'Marketplace', icon: Store, section: 'tools' },
+  { id: 'competitive', label: 'Comparison', icon: Crown, section: 'tools' },
+  { id: 'templates', label: 'Templates', icon: LayoutTemplate, section: 'tools' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, section: 'tools' },
+  { id: 'customization', label: 'Customize', icon: UserCog, section: 'tools' },
+  { id: 'context', label: 'Context & Memory', icon: Brain, section: 'tools' },
 ];
 
 // ── Title Bar ────────────────────────────────────────────────────────────
@@ -121,7 +137,7 @@ function TitleBar() {
         <Separator orientation="vertical" className="h-4 mx-1" />
         <Badge variant="secondary" className="text-[9px] h-4 px-1.5 font-mono gap-1">
           <Activity className="h-2.5 w-2.5 text-emerald-400" />
-          v1.0
+          v2.0
         </Badge>
       </div>
 
@@ -134,6 +150,10 @@ function TitleBar() {
         <Badge variant="outline" className="text-[10px] h-5 px-2 gap-1">
           <Layers className="h-3 w-3" />
           {models.filter(m => m.enabled).length} models
+        </Badge>
+        <Badge variant="outline" className="text-[10px] h-5 px-2 gap-1 border-amber-500/30 text-amber-400">
+          <LayoutGrid className="h-3 w-3" />
+          10 surfaces
         </Badge>
       </div>
 
@@ -168,81 +188,102 @@ function ActivityBar({
   const { chats } = useChatStore();
   const { agents, isRunning } = useAgentStore();
 
+  const primaryItems = NAV_ITEMS.filter(i => i.section === 'primary');
+  const workspaceItems = NAV_ITEMS.filter(i => i.section === 'workspace');
+  const toolItems = NAV_ITEMS.filter(i => i.section === 'tools');
+
+  const renderNavGroup = (items: typeof NAV_ITEMS) =>
+    items.map((item) => {
+      const isActive = activeView === item.id;
+      const Icon = item.icon;
+      return (
+        <TooltipProvider key={item.id} delayDuration={300}>
+          <Tooltip side="right" disableHoverableContent>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onViewChange(item.id)}
+                className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all group ${
+                  isActive
+                    ? 'bg-emerald-500/15 text-emerald-400'
+                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                }`}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="activeIndicator"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-emerald-400 rounded-r"
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
+                )}
+                <Icon className="h-4 w-4" />
+                {/* Badges */}
+                {item.id === 'chat' && chats.length > 0 && (
+                  <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                )}
+                {item.id === 'agent' && isRunning && (
+                  <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              <div className="flex items-center gap-2">
+                <span>{item.label}</span>
+                {item.shortcut && (
+                  <kbd className="px-1 py-0.5 text-[9px] rounded bg-muted font-mono">
+                    {item.shortcut}
+                  </kbd>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    });
+
   return (
-    <div className="flex flex-col items-center w-12 border-r border-border/40 bg-card/40 py-2 shrink-0">
+    <div className="flex flex-col items-center w-11 border-r border-border/40 bg-card/40 py-2 shrink-0">
       {/* Top: Logo */}
-      <div className="mb-3">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-md shadow-orange-500/20">
-          <Zap className="h-4 w-4 text-white" />
+      <div className="mb-2">
+        <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-md shadow-orange-500/20">
+          <Zap className="h-3.5 w-3.5 text-white" />
         </div>
       </div>
 
-      <Separator className="w-6 mb-2" />
+      <Separator className="w-5 mb-1.5" />
 
-      {/* Nav items - primary */}
-      <nav className="flex flex-col gap-1 flex-1">
-        {NAV_ITEMS.map((item) => {
-          const isActive = activeView === item.id;
-          const Icon = item.icon;
-          return (
-            <TooltipProvider key={item.id} delayDuration={300}>
-              <Tooltip side="right" disableHoverableContent>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => onViewChange(item.id)}
-                    className={`relative h-10 w-10 rounded-lg flex items-center justify-center transition-all group ${
-                      isActive
-                        ? 'bg-emerald-500/15 text-emerald-400'
-                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-                    }`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeIndicator"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-emerald-400 rounded-r"
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      />
-                    )}
-                    <Icon className="h-4.5 w-4.5" />
-                    {/* Badges */}
-                    {item.id === 'chat' && chats.length > 0 && (
-                      <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-emerald-400" />
-                    )}
-                    {item.id === 'agent' && isRunning && (
-                      <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right" sideOffset={8}>
-                  <div className="flex items-center gap-2">
-                    <span>{item.label}</span>
-                    {item.shortcut && (
-                      <kbd className="px-1 py-0.5 text-[9px] rounded bg-muted font-mono">
-                        {item.shortcut}
-                      </kbd>
-                    )}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          );
-        })}
+      {/* Primary */}
+      <nav className="flex flex-col gap-0.5">
+        {renderNavGroup(primaryItems)}
+      </nav>
+
+      <Separator className="w-5 my-1.5" />
+
+      {/* Workspace */}
+      <nav className="flex flex-col gap-0.5">
+        {renderNavGroup(workspaceItems)}
+      </nav>
+
+      <Separator className="w-5 my-1.5" />
+
+      {/* Tools */}
+      <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto">
+        {renderNavGroup(toolItems)}
       </nav>
 
       {/* Bottom: Settings */}
-      <Separator className="w-6 mb-2" />
+      <Separator className="w-5 mb-1.5" />
       <TooltipProvider delayDuration={300}>
         <Tooltip side="right" disableHoverableContent>
           <TooltipTrigger asChild>
             <button
               onClick={() => onViewChange('settings')}
-              className={`h-10 w-10 rounded-lg flex items-center justify-center transition-all ${
+              className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all ${
                 activeView === 'settings'
                   ? 'bg-emerald-500/15 text-emerald-400'
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
               }`}
             >
-              <Settings className="h-4.5 w-4.5" />
+              <Settings className="h-4 w-4" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>Settings</TooltipContent>
@@ -282,6 +323,10 @@ function PanelContent({ view }: { view: PanelView }) {
         {view === 'notifications' && <NotificationsPanel />}
         {view === 'customization' && <CustomizationHub />}
         {view === 'context' && <ContextMemory />}
+        {view === 'account' && <AccountPanel />}
+        {view === 'history' && <HistoryPanel />}
+        {view === 'library' && <LibraryPanel />}
+        {view === 'dev-surfaces' && <DevSurfacesPanel />}
       </motion.div>
     </AnimatePresence>
   );
@@ -319,6 +364,10 @@ function StatsBar() {
           <Bot className="h-2.5 w-2.5" />
           {agents.length} agents
         </span>
+        <span className="flex items-center gap-1 text-emerald-400">
+          <LayoutGrid className="h-2.5 w-2.5" />
+          10 surfaces
+        </span>
         {totalTokens > 0 && (
           <span className="flex items-center gap-1">
             <Timer className="h-2.5 w-2.5" />
@@ -341,7 +390,7 @@ function StatsBar() {
 // ── Main Page ───────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [activeView, setActiveView] = useState<PanelView>('mcp');
+  const [activeView, setActiveView] = useState<PanelView>('dev-surfaces');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [rightPanelView, setRightPanelView] = useState<PanelView>('competitive');
@@ -359,8 +408,9 @@ export default function Home() {
       // Number keys for quick panel switch (without modifiers)
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         const numKey = parseInt(e.key);
-        if (numKey >= 1 && numKey <= NAV_ITEMS.length) {
-          const target = NAV_ITEMS[numKey - 1];
+        if (numKey >= 1 && numKey <= NAV_ITEMS.filter(i => i.shortcut).length) {
+          const shortcutItems = NAV_ITEMS.filter(i => i.shortcut);
+          const target = shortcutItems[numKey - 1];
           if (target) setActiveView(target.id);
         }
       }
@@ -380,7 +430,6 @@ export default function Home() {
   }, []);
 
   const handleCommandSelect = useCallback((commandId: string) => {
-    // Map commands to views
     const commandViewMap: Record<string, PanelView> = {
       'new-chat': 'chat',
       'new-agent': 'agent',
@@ -400,6 +449,10 @@ export default function Home() {
       'open-notifications': 'notifications',
       'open-customization': 'customization',
       'open-context': 'context',
+      'open-account': 'account',
+      'open-history': 'history',
+      'open-library': 'library',
+      'open-dev-surfaces': 'dev-surfaces',
     };
     const view = commandViewMap[commandId];
     if (view) setActiveView(view);

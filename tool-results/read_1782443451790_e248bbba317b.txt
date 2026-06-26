@@ -1,0 +1,916 @@
+     1→'use client';
+     2→
+     3→import { useState } from 'react';
+     4→import { useEffect } from 'react';
+     5→import {
+     6→  Settings,
+     7→  Key,
+     8→  Palette,
+     9→  Globe,
+    10→  Bot,
+    11→  Shield,
+    12→  Zap,
+    13→  Plus,
+    14→  Trash2,
+    15→  Eye,
+    16→  EyeOff,
+    17→  Check,
+    18→  RefreshCw,
+    19→  CreditCard,
+    20→  Cpu,
+    21→  Cloud,
+    22→  MessageSquare,
+    23→  Code,
+    24→  Terminal,
+    25→  Search,
+    26→  Sparkles,
+    27→} from 'lucide-react';
+    28→import { Button } from '@/components/ui/button';
+    29→import { Input } from '@/components/ui/input';
+    30→import {
+    31→  Card,
+    32→  CardContent,
+    33→  CardDescription,
+    34→  CardHeader,
+    35→  CardTitle,
+    36→} from '@/components/ui/card';
+    37→import {
+    38→  Tabs,
+    39→  TabsContent,
+    40→  TabsList,
+    41→  TabsTrigger,
+    42→} from '@/components/ui/tabs';
+    43→import { Badge } from '@/components/ui/badge';
+    44→import { Switch } from '@/components/ui/switch';
+    45→import { Label } from '@/components/ui/label';
+    46→import { Separator } from '@/components/ui/separator';
+    47→import { ScrollArea } from '@/components/ui/scroll-area';
+    48→import {
+    49→  Select,
+    50→  SelectContent,
+    51→  SelectItem,
+    52→  SelectTrigger,
+    53→  SelectValue,
+    54→} from '@/components/ui/select';
+    55→import {
+    56→  Dialog,
+    57→  DialogContent,
+    58→  DialogDescription,
+    59→  DialogHeader,
+    60→  DialogTitle,
+    61→  DialogTrigger,
+    62→} from '@/components/ui/dialog';
+    63→import { Slider } from '@/components/ui/slider';
+    64→import { useModelStore } from '@/stores/model-store';
+    65→
+    66→// ── Provider Data ──────────────────────────────────────────────────────────
+    67→
+    68→interface ProviderInfo {
+    69→  id: string;
+    70→  name: string;
+    71→  icon: React.ReactNode;
+    72→  color: string;
+    73→  connected: boolean;
+    74→  enabled: boolean;
+    75→  apiKey: string;
+    76→  models: { id: string; name: string }[];
+    77→}
+    78→
+    79→const INITIAL_PROVIDERS: ProviderInfo[] = [];
+    80→
+    81→// ── Provider icon map ────────────────────────────────────────────────────────
+    82→
+    83→const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
+    84→  google: <Globe className="h-5 w-5" />,
+    85→  deepseek: <Zap className="h-5 w-5" />,
+    86→  meta: <Cpu className="h-5 w-5" />,
+    87→  alibaba: <MessageSquare className="h-5 w-5" />,
+    88→  mistral: <Bot className="h-5 w-5" />,
+    89→  groq: <Zap className="h-5 w-5" />,
+    90→  cerebras: <Cpu className="h-5 w-5" />,
+    91→  cohere: <Cloud className="h-5 w-5" />,
+    92→  sambanova: <Zap className="h-5 w-5" />,
+    93→  openrouter: <Globe className="h-5 w-5" />,
+    94→};
+    95→
+    96→// ── Component ───────────────────────────────────────────────────────────
+    97→
+    98→export function SettingsPanel() {
+    99→  const { models, selectedModel, setSelectedModel, toggleModel } =
+   100→    useModelStore();
+   101→  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+   102→
+   103→  useEffect(() => {
+   104→    fetch('/api/providers')
+   105→      .then(res => res.json())
+   106→      .then(data => {
+   107→        const mapped = (data.providers || []).map((p: { id: string; name: string; provider: string; apiKey: string; models: Array<{ id: string; name: string }>; enabled: boolean }) => ({
+   108→          id: p.provider || p.id,
+   109→          name: p.name,
+   110→          icon: PROVIDER_ICON_MAP[p.provider?.toLowerCase()] || <Cloud className="h-5 w-5" />,
+   111→          color: 'text-muted-foreground',
+   112→          connected: !!p.apiKey,
+   113→          enabled: p.enabled,
+   114→          apiKey: p.apiKey || '',
+   115→          models: p.models || [],
+   116→        }));
+   117→        setProviders(mapped);
+   118→      })
+   119→      .catch(() => {});
+   120→  }, []);
+   121→  const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
+   122→  const [addDialogOpen, setAddDialogOpen] = useState(false);
+   123→  const [newProviderName, setNewProviderName] = useState('');
+   124→  const [newProviderKey, setNewProviderKey] = useState('');
+   125→
+   126→  // General settings
+   127→  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+   128→  const [defaultModel, setDefaultModel] = useState('auto');
+   129→  const [autoApprove, setAutoApprove] = useState(false);
+   130→  const [voiceEnabled, setVoiceEnabled] = useState(true);
+   131→  const [costOptimization, setCostOptimization] = useState(true);
+   132→  const [webGrounding, setWebGrounding] = useState(false);
+   133→  const [fontSize, setFontSize] = useState([14]);
+   134→  const [tabSize, setTabSize] = useState('2');
+   135→  const [wordWrap, setWordWrap] = useState(true);
+   136→
+   137→  // Helpers
+   138→  const toggleProviderEnabled = (id: string) => {
+   139→    setProviders((prev) =>
+   140→      prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p))
+   141→    );
+   142→  };
+   143→
+   144→  const toggleShowApiKey = (id: string) => {
+   145→    setShowApiKeys((prev) => ({ ...prev, [id]: !prev[id] }));
+   146→  };
+   147→
+   148→  const removeProvider = (id: string) => {
+   149→    setProviders((prev) => prev.filter((p) => p.id !== id));
+   150→  };
+   151→
+   152→  const handleAddProvider = () => {
+   153→    if (!newProviderName.trim() || !newProviderKey.trim()) return;
+   154→    const newProvider: ProviderInfo = {
+   155→      id: `custom-${Date.now()}`,
+   156→      name: newProviderName.trim(),
+   157→      icon: <Cloud className="h-5 w-5" />,
+   158→      color: 'text-gray-400',
+   159→      connected: true,
+   160→      enabled: true,
+   161→      apiKey: newProviderKey.trim(),
+   162→      models: [],
+   163→    };
+   164→    setProviders((prev) => [...prev, newProvider]);
+   165→    setNewProviderName('');
+   166→    setNewProviderKey('');
+   167→    setAddDialogOpen(false);
+   168→  };
+   169→
+   170→  // ── Usage by model (derived from model store, all free) ─────────────────
+   171→  const USAGE_BY_MODEL = models.map((m) => ({
+   172→    model: m.name,
+   173→    tokens: m.contextWindow,
+   174→    cost: m.costPer1kTokens,
+   175→    color: m.provider === 'google' ? 'bg-red-500' :
+   176→           m.provider === 'deepseek' ? 'bg-cyan-500' :
+   177→           m.provider === 'meta' ? 'bg-violet-500' :
+   178→           m.provider === 'alibaba' ? 'bg-amber-500' :
+   179→           m.provider === 'mistral' ? 'bg-orange-500' :
+   180→           m.provider === 'groq' ? 'bg-emerald-500' :
+   181→           m.provider === 'cerebras' ? 'bg-rose-500' :
+   182→           m.provider === 'cohere' ? 'bg-teal-500' :
+   183→           'bg-emerald-500',
+   184→  }));
+   185→
+   186→  const maxTokens = Math.max(...USAGE_BY_MODEL.map((m) => m.tokens), 1);
+   187→
+   188→  // ── Speed rating helper ──────────────────────────────────────────────────
+   189→  const speedStars = (speed: string) => {
+   190→    const map: Record<string, number> = {
+   191→      optimal: 4,
+   192→      fast: 4,
+   193→      medium: 3,
+   194→      slow: 2,
+   195→    };
+   196→    const count = map[speed] ?? 3;
+   197→    return '★'.repeat(count) + '☆'.repeat(5 - count);
+   198→  };
+   199→
+   200→  // ── Auto-routing config (updated June 2026 — all free models) ────────────
+   201→  const autoRouting: { task: string; icon: React.ReactNode; model: string }[] =
+   202→    [
+   203→      {
+   204→        task: 'General Chat',
+   205→        icon: <MessageSquare className="h-4 w-4" />,
+   206→        model: 'gemini-2.5-flash',
+   207→      },
+   208→      {
+   209→        task: 'Code Generation',
+   210→        icon: <Code className="h-4 w-4" />,
+   211→        model: 'qwen3-coder-480b',
+   212→      },
+   213→      {
+   214→        task: 'Agent Tasks',
+   215→        icon: <Bot className="h-4 w-4" />,
+   216→        model: 'qwen3.7-max',
+   217→      },
+   218→      {
+   219→        task: 'Web Search',
+   220→        icon: <Search className="h-4 w-4" />,
+   221→        model: 'gemini-2.5-flash',
+   222→      },
+   223→      {
+   224→        task: 'Reasoning',
+   225→        icon: <Sparkles className="h-4 w-4" />,
+   226→        model: 'deepseek-r1',
+   227→      },
+   228→      {
+   229→        task: 'Ultra Fast',
+   230→        icon: <Zap className="h-4 w-4" />,
+   231→        model: 'llama-4-scout-17b',
+   232→      },
+   233→    ];
+   234→
+   235→  // ─────────────────────────────────────────────────────────────────────────
+   236→  return (
+   237→    <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
+   238→      {/* Header */}
+   239→      <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+   240→        <Settings className="h-5 w-5 text-zinc-400" />
+   241→        <h2 className="text-lg font-semibold">Settings</h2>
+   242→      </div>
+   243→
+   244→      {/* Tabs */}
+   245→      <Tabs defaultValue="providers" className="flex flex-1 flex-col overflow-hidden">
+   246→        <TabsList className="mx-4 mt-2 grid w-auto grid-cols-4 bg-zinc-900">
+   247→          <TabsTrigger
+   248→            value="providers"
+   249→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   250→          >
+   251→            Providers
+   252→          </TabsTrigger>
+   253→          <TabsTrigger
+   254→            value="models"
+   255→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   256→          >
+   257→            Models
+   258→          </TabsTrigger>
+   259→          <TabsTrigger
+   260→            value="general"
+   261→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   262→          >
+   263→            General
+   264→          </TabsTrigger>
+   265→          <TabsTrigger
+   266→            value="usage"
+   267→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   268→          >
+   269→            Usage
+   270→          </TabsTrigger>
+   271→        </TabsList>
+   272→
+   273→        {/* ── Providers Tab ────────────────────────────────────────────── */}
+   274→        <TabsContent value="providers" className="mt-0 flex-1 overflow-hidden">
+   275→          <ScrollArea className="h-full">
+   276→            <div className="space-y-3 p-4">
+   277→              {/* Add provider button */}
+   278→              <div className="flex items-center justify-between">
+   279→                <p className="text-sm text-zinc-400">
+   280→                  {providers.filter((p) => p.connected).length} of{' '}
+   281→                  {providers.length} providers connected
+   282→                </p>
+   283→                <Dialog
+   284→                  open={addDialogOpen}
+   285→                  onOpenChange={setAddDialogOpen}
+   286→                >
+   287→                  <DialogTrigger asChild>
+   288→                    <Button
+   289→                      size="sm"
+   290→                      className="bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+   291→                    >
+   292→                      <Plus className="mr-1 h-4 w-4" /> Add Provider
+   293→                    </Button>
+   294→                  </DialogTrigger>
+   295→                  <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 sm:max-w-md">
+   296→                    <DialogHeader>
+   297→                      <DialogTitle>Add Custom Provider</DialogTitle>
+   298→                      <DialogDescription className="text-zinc-400">
+   299→                        Connect a new AI provider with an API key
+   300→                      </DialogDescription>
+   301→                    </DialogHeader>
+   302→                    <div className="space-y-4 pt-2">
+   303→                      <div className="space-y-2">
+   304→                        <Label className="text-zinc-300">Provider Name</Label>
+   305→                        <Input
+   306→                          value={newProviderName}
+   307→                          onChange={(e) => setNewProviderName(e.target.value)}
+   308→                          placeholder="e.g. Cohere"
+   309→                          className="border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-600"
+   310→                        />
+   311→                      </div>
+   312→                      <div className="space-y-2">
+   313→                        <Label className="text-zinc-300">API Key</Label>
+   314→                        <Input
+   315→                          type="password"
+   316→                          value={newProviderKey}
+   317→                          onChange={(e) => setNewProviderKey(e.target.value)}
+   318→                          placeholder="Enter API key"
+   319→                          className="border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-600"
+   320→                        />
+   321→                      </div>
+   322→                      <Button
+   323→                        onClick={handleAddProvider}
+   324→                        className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
+   325→                      >
+   326→                        <Check className="mr-1 h-4 w-4" /> Connect Provider
+   327→                      </Button>
+   328→                    </div>
+   329→                  </DialogContent>
+   330→                </Dialog>
+   331→              </div>
+   332→
+   333→              {/* Provider cards */}
+   334→              {providers.map((provider) => (
+   335→                <Card
+   336→                  key={provider.id}
+   337→                  className="border-zinc-800 bg-zinc-900/60 transition-colors hover:bg-zinc-900"
+   338→                >
+   339→                  <CardHeader className="pb-3">
+   340→                    <div className="flex items-center justify-between">
+   341→                      <div className="flex items-center gap-3">
+   342→                        <div
+   343→                          className={`flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-800 ${provider.color}`}
+   344→                        >
+   345→                          {provider.icon}
+   346→                        </div>
+   347→                        <div>
+   348→                          <CardTitle className="text-sm font-medium">
+   349→                            {provider.name}
+   350→                          </CardTitle>
+   351→                          <CardDescription className="text-xs text-zinc-500">
+   352→                            {provider.models.length} model
+   353→                            {provider.models.length !== 1 ? 's' : ''} available
+   354→                          </CardDescription>
+   355→                        </div>
+   356→                      </div>
+   357→                      <div className="flex items-center gap-2">
+   358→                        <Badge
+   359→                          variant="outline"
+   360→                          className={`text-[10px] ${
+   361→                            provider.connected
+   362→                              ? 'border-emerald-700 text-emerald-400'
+   363→                              : 'border-zinc-700 text-zinc-500'
+   364→                          }`}
+   365→                        >
+   366→                          {provider.connected ? 'Connected' : 'Disconnected'}
+   367→                        </Badge>
+   368→                        <Switch
+   369→                          checked={provider.enabled}
+   370→                          onCheckedChange={() =>
+   371→                            toggleProviderEnabled(provider.id)
+   372→                          }
+   373→                        />
+   374→                      </div>
+   375→                    </div>
+   376→                  </CardHeader>
+   377→                  <CardContent className="space-y-3 pt-0">
+   378→                    {/* Model badges */}
+   379→                    <div className="flex flex-wrap gap-1">
+   380→                      {provider.models.map((m) => (
+   381→                        <Badge
+   382→                          key={m.id}
+   383→                          variant="secondary"
+   384→                          className="bg-zinc-800 text-[10px] text-zinc-300"
+   385→                        >
+   386→                          {m.name}
+   387→                        </Badge>
+   388→                      ))}
+   389→                    </div>
+   390→
+   391→                    {/* API key field */}
+   392→                    <div className="flex items-center gap-2">
+   393→                      <Key className="h-3.5 w-3.5 text-zinc-500" />
+   394→                      <div className="relative flex-1">
+   395→                        <Input
+   396→                          type={
+   397→                            showApiKeys[provider.id] ? 'text' : 'password'
+   398→                          }
+   399→                          value={provider.apiKey || 'No API key set'}
+   400→                          readOnly
+   401→                          className="h-8 border-zinc-700 bg-zinc-800 pr-9 text-xs text-zinc-400"
+   402→                        />
+   403→                        <Button
+   404→                          variant="ghost"
+   405→                          size="icon"
+   406→                          className="absolute right-0.5 top-0.5 h-7 w-7 text-zinc-500 hover:text-zinc-300"
+   407→                          onClick={() => toggleShowApiKey(provider.id)}
+   408→                        >
+   409→                          {showApiKeys[provider.id] ? (
+   410→                            <EyeOff className="h-3.5 w-3.5" />
+   411→                          ) : (
+   412→                            <Eye className="h-3.5 w-3.5" />
+   413→                          )}
+   414→                        </Button>
+   415→                      </div>
+   416→                      <Button
+   417→                        variant="ghost"
+   418→                        size="icon"
+   419→                        className="h-8 w-8 text-zinc-500 hover:text-red-400"
+   420→                        onClick={() => removeProvider(provider.id)}
+   421→                      >
+   422→                        <Trash2 className="h-3.5 w-3.5" />
+   423→                      </Button>
+   424→                    </div>
+   425→                  </CardContent>
+   426→                </Card>
+   427→              ))}
+   428→            </div>
+   429→          </ScrollArea>
+   430→        </TabsContent>
+   431→
+   432→        {/* ── Models Tab ───────────────────────────────────────────────── */}
+   433→        <TabsContent value="models" className="mt-0 flex-1 overflow-hidden">
+   434→          <ScrollArea className="h-full">
+   435→            <div className="space-y-4 p-4">
+   436→              {/* Auto-routing section */}
+   437→              <div>
+   438→                <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-zinc-300">
+   439→                  <Zap className="h-4 w-4 text-amber-400" /> Auto-Routing
+   440→                  Configuration
+   441→                </h3>
+   442→                <Card className="border-zinc-800 bg-zinc-900/60">
+   443→                  <CardContent className="divide-y divide-zinc-800 p-0">
+   444→                    {autoRouting.map((r) => (
+   445→                      <div
+   446→                        key={r.task}
+   447→                        className="flex items-center justify-between px-4 py-2.5"
+   448→                      >
+   449→                        <div className="flex items-center gap-2 text-sm text-zinc-300">
+   450→                          {r.icon}
+   451→                          {r.task}
+   452→                        </div>
+   453→                        <Select
+   454→                          value={r.model}
+   455→                          onValueChange={() => {
+   456→                            /* configurable */
+   457→                          }}
+   458→                        >
+   459→                          <SelectTrigger className="h-7 w-36 border-zinc-700 bg-zinc-800 text-xs text-zinc-300">
+   460→                            <SelectValue />
+   461→                          </SelectTrigger>
+   462→                          <SelectContent className="border-zinc-700 bg-zinc-900">
+   463→                            {models
+   464→                              .filter((m) => m.id !== 'auto')
+   465→                              .map((m) => (
+   466→                                <SelectItem
+   467→                                  key={m.id}
+   468→                                  value={m.id}
+   469→                                  className="text-xs text-zinc-300"
+   470→                                >
+   471→                                  {m.name}
+   472→                                </SelectItem>
+   473→                              ))}
+   474→                          </SelectContent>
+   475→                        </Select>
+   476→                      </div>
+   477→                    ))}
+   478→                  </CardContent>
+   479→                </Card>
+   480→              </div>
+   481→
+   482→              <Separator className="bg-zinc-800" />
+   483→
+   484→              {/* Model cards grid */}
+   485→              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+   486→                {models.map((model) => (
+   487→                  <Card
+   488→                    key={model.id}
+   489→                    className={`border-zinc-800 bg-zinc-900/60 transition-colors ${
+   490→                      model.enabled ? 'hover:bg-zinc-900' : 'opacity-50'
+   491→                    }`}
+   492→                  >
+   493→                    <CardHeader className="pb-2">
+   494→                      <div className="flex items-start justify-between">
+   495→                        <div>
+   496→                          <CardTitle className="text-sm font-medium">
+   497→                            {model.name}
+   498→                          </CardTitle>
+   499→                          <CardDescription className="text-[11px] text-zinc-500">
+   500→                            {model.provider} · {model.description}
+   501→                          </CardDescription>
+   502→                        </div>
+   503→                        <Switch
+   504→                          checked={model.enabled}
+   505→                          onCheckedChange={() => toggleModel(model.id)}
+   506→                        />
+   507→                      </div>
+   508→                    </CardHeader>
+   509→                    <CardContent className="space-y-2 pt-0">
+   510→                      {/* Capability badges */}
+   511→                      <div className="flex flex-wrap gap-1">
+   512→                        {model.capabilities.map((cap) => (
+   513→                          <Badge
+   514→                            key={cap}
+   515→                            variant="secondary"
+   516→                            className="bg-zinc-800 text-[9px] text-zinc-400"
+   517→                          >
+   518→                            {cap}
+   519→                          </Badge>
+   520→                        ))}
+   521→                      </div>
+   522→                      {/* Stats row */}
+   523→                      <div className="grid grid-cols-3 gap-2 text-[11px] text-zinc-400">
+   524→                        <div>
+   525→                          <span className="text-zinc-600">Cost</span>
+   526→                          <br />${model.costPer1kTokens}/1K
+   527→                        </div>
+   528→                        <div>
+   529→                          <span className="text-zinc-600">Context</span>
+   530→                          <br />
+   531→                          {model.contextWindow >= 1000000
+   532→                            ? `${model.contextWindow / 1000000}M`
+   533→                            : `${model.contextWindow / 1000}K`}
+   534→                        </div>
+   535→                        <div>
+   536→                          <span className="text-zinc-600">Speed</span>
+   537→                          <br />
+   538→                          <span className="text-amber-400">
+   539→                            {speedStars(model.speed)}
+   540→                          </span>
+   541→                        </div>
+   542→                      </div>
+   543→                    </CardContent>
+   544→                  </Card>
+   545→                ))}
+   546→              </div>
+   547→            </div>
+   548→          </ScrollArea>
+   549→        </TabsContent>
+   550→
+   551→        {/* ── General Tab ──────────────────────────────────────────────── */}
+   552→        <TabsContent value="general" className="mt-0 flex-1 overflow-hidden">
+   553→          <ScrollArea className="h-full">
+   554→            <div className="space-y-6 p-4">
+   555→              {/* Theme */}
+   556→              <section className="space-y-3">
+   557→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   558→                  <Palette className="h-4 w-4" /> Appearance
+   559→                </h3>
+   560→                <Card className="border-zinc-800 bg-zinc-900/60">
+   561→                  <CardContent className="space-y-4 p-4">
+   562→                    <div className="flex items-center justify-between">
+   563→                      <Label className="text-sm text-zinc-300">Theme</Label>
+   564→                      <Select
+   565→                        value={theme}
+   566→                        onValueChange={(v) =>
+   567→                          setTheme(v as 'dark' | 'light' | 'system')
+   568→                        }
+   569→                      >
+   570→                        <SelectTrigger className="w-32 border-zinc-700 bg-zinc-800 text-sm text-zinc-300">
+   571→                          <SelectValue />
+   572→                        </SelectTrigger>
+   573→                        <SelectContent className="border-zinc-700 bg-zinc-900">
+   574→                          <SelectItem
+   575→                            value="dark"
+   576→                            className="text-zinc-300"
+   577→                          >
+   578→                            Dark
+   579→                          </SelectItem>
+   580→                          <SelectItem
+   581→                            value="light"
+   582→                            className="text-zinc-300"
+   583→                          >
+   584→                            Light
+   585→                          </SelectItem>
+   586→                          <SelectItem
+   587→                            value="system"
+   588→                            className="text-zinc-300"
+   589→                          >
+   590→                            System
+   591→                          </SelectItem>
+   592→                        </SelectContent>
+   593→                      </Select>
+   594→                    </div>
+   595→
+   596→                    <div className="space-y-2">
+   597→                      <div className="flex items-center justify-between">
+   598→                        <Label className="text-sm text-zinc-300">
+   599→                          Font Size
+   600→                        </Label>
+   601→                        <span className="text-xs text-zinc-500">
+   602→                          {fontSize[0]}px
+   603→                        </span>
+   604→                      </div>
+   605→                      <Slider
+   606→                        value={fontSize}
+   607→                        onValueChange={setFontSize}
+   608→                        min={10}
+   609→                        max={24}
+   610→                        step={1}
+   611→                        className="[&_[role=slider]]:h-4 [&_[role=slider]]:w-4"
+   612→                      />
+   613→                    </div>
+   614→                  </CardContent>
+   615→                </Card>
+   616→              </section>
+   617→
+   618→              {/* Default Model */}
+   619→              <section className="space-y-3">
+   620→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   621→                  <Bot className="h-4 w-4" /> Model Preferences
+   622→                </h3>
+   623→                <Card className="border-zinc-800 bg-zinc-900/60">
+   624→                  <CardContent className="space-y-4 p-4">
+   625→                    <div className="flex items-center justify-between">
+   626→                      <Label className="text-sm text-zinc-300">
+   627→                        Default Model
+   628→                      </Label>
+   629→                      <Select
+   630→                        value={defaultModel}
+   631→                        onValueChange={(v) => {
+   632→                          setDefaultModel(v);
+   633→                          setSelectedModel(v);
+   634→                        }}
+   635→                      >
+   636→                        <SelectTrigger className="w-48 border-zinc-700 bg-zinc-800 text-sm text-zinc-300">
+   637→                          <SelectValue />
+   638→                        </SelectTrigger>
+   639→                        <SelectContent className="border-zinc-700 bg-zinc-900">
+   640→                          {models
+   641→                            .filter((m) => m.enabled)
+   642→                            .map((m) => (
+   643→                              <SelectItem
+   644→                                key={m.id}
+   645→                                value={m.id}
+   646→                                className="text-zinc-300"
+   647→                              >
+   648→                                {m.name}
+   649→                              </SelectItem>
+   650→                            ))}
+   651→                        </SelectContent>
+   652→                      </Select>
+   653→                    </div>
+   654→
+   655→                    <Separator className="bg-zinc-800" />
+   656→
+   657→                    <div className="flex items-center justify-between">
+   658→                      <div className="space-y-0.5">
+   659→                        <Label className="text-sm text-zinc-300">
+   660→                          Cost Optimization
+   661→                        </Label>
+   662→                        <p className="text-[11px] text-zinc-500">
+   663→                          Auto-route to the cheapest capable model
+   664→                        </p>
+   665→                      </div>
+   666→                      <Switch
+   667→                        checked={costOptimization}
+   668→                        onCheckedChange={setCostOptimization}
+   669→                      />
+   670→                    </div>
+   671→
+   672→                    <div className="flex items-center justify-between">
+   673→                      <div className="space-y-0.5">
+   674→                        <Label className="text-sm text-zinc-300">
+   675→                          Web Grounding
+   676→                        </Label>
+   677→                        <p className="text-[11px] text-zinc-500">
+   678→                          Always search before coding
+   679→                        </p>
+   680→                      </div>
+   681→                      <Switch
+   682→                        checked={webGrounding}
+   683→                        onCheckedChange={setWebGrounding}
+   684→                      />
+   685→                    </div>
+   686→                  </CardContent>
+   687→                </Card>
+   688→              </section>
+   689→
+   690→              {/* Behavior */}
+   691→              <section className="space-y-3">
+   692→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   693→                  <Shield className="h-4 w-4" /> Behavior
+   694→                </h3>
+   695→                <Card className="border-zinc-800 bg-zinc-900/60">
+   696→                  <CardContent className="space-y-4 p-4">
+   697→                    <div className="flex items-center justify-between">
+   698→                      <div className="space-y-0.5">
+   699→                        <Label className="text-sm text-zinc-300">
+   700→                          Agent Auto-Approve
+   701→                        </Label>
+   702→                        <p className="text-[11px] text-zinc-500">
+   703→                          Allow agents to run without confirmation
+   704→                        </p>
+   705→                      </div>
+   706→                      <Switch
+   707→                        checked={autoApprove}
+   708→                        onCheckedChange={setAutoApprove}
+   709→                      />
+   710→                    </div>
+   711→
+   712→                    <div className="flex items-center justify-between">
+   713→                      <div className="space-y-0.5">
+   714→                        <Label className="text-sm text-zinc-300">
+   715→                          Voice Enabled
+   716→                        </Label>
+   717→                        <p className="text-[11px] text-zinc-500">
+   718→                          Enable voice-to-code input
+   719→                        </p>
+   720→                      </div>
+   721→                      <Switch
+   722→                        checked={voiceEnabled}
+   723→                        onCheckedChange={setVoiceEnabled}
+   724→                      />
+   725→                    </div>
+   726→                  </CardContent>
+   727→                </Card>
+   728→              </section>
+   729→
+   730→              {/* Editor */}
+   731→              <section className="space-y-3">
+   732→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   733→                  <Code className="h-4 w-4" /> Editor
+   734→                </h3>
+   735→                <Card className="border-zinc-800 bg-zinc-900/60">
+   736→                  <CardContent className="space-y-4 p-4">
+   737→                    <div className="flex items-center justify-between">
+   738→                      <Label className="text-sm text-zinc-300">Tab Size</Label>
+   739→                      <Select
+   740→                        value={tabSize}
+   741→                        onValueChange={setTabSize}
+   742→                      >
+   743→                        <SelectTrigger className="w-20 border-zinc-700 bg-zinc-800 text-sm text-zinc-300">
+   744→                          <SelectValue />
+   745→                        </SelectTrigger>
+   746→                        <SelectContent className="border-zinc-700 bg-zinc-900">
+   747→                          <SelectItem
+   748→                            value="2"
+   749→                            className="text-zinc-300"
+   750→                          >
+   751→                            2
+   752→                          </SelectItem>
+   753→                          <SelectItem
+   754→                            value="4"
+   755→                            className="text-zinc-300"
+   756→                          >
+   757→                            4
+   758→                          </SelectItem>
+   759→                          <SelectItem
+   760→                            value="8"
+   761→                            className="text-zinc-300"
+   762→                          >
+   763→                            8
+   764→                          </SelectItem>
+   765→                        </SelectContent>
+   766→                      </Select>
+   767→                    </div>
+   768→
+   769→                    <div className="flex items-center justify-between">
+   770→                      <Label className="text-sm text-zinc-300">
+   771→                        Word Wrap
+   772→                      </Label>
+   773→                      <Switch
+   774→                        checked={wordWrap}
+   775→                        onCheckedChange={setWordWrap}
+   776→                      />
+   777→                    </div>
+   778→                  </CardContent>
+   779→                </Card>
+   780→              </section>
+   781→            </div>
+   782→          </ScrollArea>
+   783→        </TabsContent>
+   784→
+   785→        {/* ── Usage Tab ───────────────────────────────────────────────── */}
+   786→        <TabsContent value="usage" className="mt-0 flex-1 overflow-hidden">
+   787→          <ScrollArea className="h-full">
+   788→            <div className="space-y-6 p-4">
+   789→              {/* Summary cards */}
+   790→              <div className="grid grid-cols-2 gap-3">
+   791→                <Card className="border-zinc-800 bg-zinc-900/60">
+   792→                  <CardContent className="p-4">
+   793→                    <div className="flex items-center gap-2 text-zinc-500">
+   794→                      <RefreshCw className="h-4 w-4" />
+   795→                      <span className="text-xs">Tokens Today</span>
+   796→                    </div>
+   797→                    <p className="mt-1 text-2xl font-bold text-zinc-100">
+   798→                      47,283
+   799→                    </p>
+   800→                  </CardContent>
+   801→                </Card>
+   802→                <Card className="border-zinc-800 bg-zinc-900/60">
+   803→                  <CardContent className="p-4">
+   804→                    <div className="flex items-center gap-2 text-zinc-500">
+   805→                      <CreditCard className="h-4 w-4" />
+   806→                      <span className="text-xs">Cost Today</span>
+   807→                    </div>
+   808→                    <p className="mt-1 text-2xl font-bold text-emerald-400">
+   809→                      $2.14
+   810→                    </p>
+   811→                  </CardContent>
+   812→                </Card>
+   813→              </div>
+   814→
+   815→              {/* Cost breakdown */}
+   816→              <section className="space-y-3">
+   817→                <h3 className="text-sm font-medium text-zinc-300">
+   818→                  Context Window by Model
+   819→                </h3>
+   820→                <Card className="border-zinc-800 bg-zinc-900/60">
+   821→                  <CardContent className="space-y-3 p-4">
+   822→                    {USAGE_BY_MODEL.map((item) => (
+   823→                      <div key={item.model} className="space-y-1">
+   824→                        <div className="flex items-center justify-between text-xs">
+   825→                          <span className="text-zinc-300">{item.model}</span>
+   826→                          <span className="text-zinc-500">
+   827→                            {item.tokens >= 1000000
+   828→                              ? `${(item.tokens / 1000000).toFixed(0)}M`
+   829→                              : `${(item.tokens / 1000).toFixed(0)}K`} ctx · {item.cost === 0 ? 'FREE' : `$${item.cost.toFixed(4)}/1K`}
+   830→                          </span>
+   831→                        </div>
+   832→                        <div className="h-2 w-full rounded-full bg-zinc-800">
+   833→                          <div
+   834→                            className={`h-2 rounded-full ${item.color} transition-all duration-500`}
+   835→                            style={{
+   836→                              width: `${Math.min((item.tokens / maxTokens) * 100, 100)}%`,
+   837→                            }}
+   838→                          />
+   839→                        </div>
+   840→                      </div>
+   841→                    ))}
+   842→                  </CardContent>
+   843→                </Card>
+   844→              </section>
+   845→
+   846→              {/* Session stats */}
+   847→              <section className="space-y-3">
+   848→                <h3 className="text-sm font-medium text-zinc-300">
+   849→                  Session Stats
+   850→                </h3>
+   851→                <Card className="border-zinc-800 bg-zinc-900/60">
+   852→                  <CardContent className="grid grid-cols-2 gap-4 p-4">
+   853→                    <div>
+   854→                      <p className="text-[11px] text-zinc-500">
+   855→                        Messages Sent
+   856→                      </p>
+   857→                      <p className="text-lg font-semibold text-zinc-100">24</p>
+   858→                    </div>
+   859→                    <div>
+   860→                      <p className="text-[11px] text-zinc-500">
+   861→                        Agent Runs
+   862→                      </p>
+   863→                      <p className="text-lg font-semibold text-zinc-100">3</p>
+   864→                    </div>
+   865→                    <div>
+   866→                      <p className="text-[11px] text-zinc-500">Avg Response Time</p>
+   867→                      <p className="text-lg font-semibold text-zinc-100">
+   868→                        1.8s
+   869→                      </p>
+   870→                    </div>
+   871→                    <div>
+   872→                      <p className="text-[11px] text-zinc-500">Sessions Today</p>
+   873→                      <p className="text-lg font-semibold text-zinc-100">2</p>
+   874→                    </div>
+   875→                  </CardContent>
+   876→                </Card>
+   877→              </section>
+   878→
+   879→              {/* Context window chart */}
+   880→              <section className="space-y-3">
+   881→                <h3 className="text-sm font-medium text-zinc-300">Provider Coverage</h3>
+   882→                <Card className="border-zinc-800 bg-zinc-900/60">
+   883→                  <CardContent className="space-y-3 p-4">
+   884→                    {USAGE_BY_MODEL.map((item) => (
+   885→                      <div key={item.model} className="flex-1">
+   886→                        <div className="mb-1 flex items-center justify-between text-xs text-zinc-300">
+   887→                          <span>{item.model}</span>
+   888→                          <span className="text-zinc-500">
+   889→                            {item.tokens >= 1000000
+   890→                              ? `${(item.tokens / 1000000).toFixed(0)}M ctx`
+   891→                              : `${(item.tokens / 1000).toFixed(0)}K ctx`}
+   892→                          </span>
+   893→                        </div>
+   894→                        <div className="h-2 w-full rounded-full bg-zinc-800">
+   895→                          <div
+   896→                            className={`h-2 rounded-full ${item.color} transition-all duration-500`}
+   897→                            style={{
+   898→                              width: `${Math.min((item.tokens / maxTokens) * 100, 100)}%`,
+   899→                            }}
+   900→                          />
+   901→                        </div>
+   902→                      </div>
+   903→                    ))}
+   904→                  </CardContent>
+   905→                </Card>
+   906→              </section>
+   907→            </div>
+   908→          </ScrollArea>
+   909→        </TabsContent>
+   910→      </Tabs>
+   911→    </div>
+   912→  );
+   913→}
+   914→
+   915→export default SettingsPanel;
+   916→

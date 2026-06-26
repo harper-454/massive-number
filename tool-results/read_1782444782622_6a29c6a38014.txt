@@ -1,0 +1,1309 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo, useEffect, useCallback } from 'react';
+     4→import {
+     5→  Globe,
+     6→  Smartphone,
+     7→  Code,
+     8→  Gamepad2,
+     9→  Box,
+    10→  Star,
+    11→  GitFork,
+    12→  Plus,
+    13→  LayoutGrid,
+    14→  List,
+    15→  Search,
+    16→  MoreVertical,
+    17→  Trash2,
+    18→  Edit3,
+    19→  ExternalLink,
+    20→  Eye,
+    21→  EyeOff,
+    22→  Copy,
+    23→  ArrowUpDown,
+    24→  Filter,
+    25→  Archive,
+    26→  Package,
+    27→  Layers,
+    28→  Cpu,
+    29→  FileCode,
+    30→  Rocket,
+    31→  Clock,
+    32→  Tag,
+    33→  X,
+    34→  CheckCircle2,
+    35→  ChevronDown,
+    36→  Sparkles,
+    37→  Hash,
+    38→} from 'lucide-react';
+    39→import { Card, CardContent } from '@/components/ui/card';
+    40→import { Badge } from '@/components/ui/badge';
+    41→import { Button } from '@/components/ui/button';
+    42→import { Input } from '@/components/ui/input';
+    43→import { ScrollArea } from '@/components/ui/scroll-area';
+    44→import { Separator } from '@/components/ui/separator';
+    45→import { Textarea } from '@/components/ui/textarea';
+    46→import {
+    47→  Dialog,
+    48→  DialogContent,
+    49→  DialogHeader,
+    50→  DialogTitle,
+    51→  DialogFooter,
+    52→  DialogDescription,
+    53→} from '@/components/ui/dialog';
+    54→import {
+    55→  DropdownMenu,
+    56→  DropdownMenuContent,
+    57→  DropdownMenuItem,
+    58→  DropdownMenuSeparator,
+    59→  DropdownMenuTrigger,
+    60→} from '@/components/ui/dropdown-menu';
+    61→import { motion, AnimatePresence } from 'framer-motion';
+    62→
+    63→// ── Types ───────────────────────────────────────────────────────────────
+    64→
+    65→type LibraryType = 'site' | 'app' | 'component' | 'api' | 'game' | 'model' | 'asset' | 'template';
+    66→type LibraryCategory = 'All' | 'Sites' | 'Apps' | 'Components' | 'APIs' | 'Games' | 'Models' | 'Assets' | 'Templates';
+    67→type LibraryStatus = 'draft' | 'published' | 'archived';
+    68→type ViewMode = 'grid' | 'list';
+    69→type SortMode = 'date' | 'name' | 'stars';
+    70→
+    71→interface LibraryItem {
+    72→  id: string;
+    73→  name: string;
+    74→  description?: string | null;
+    75→  type: string;
+    76→  category: string;
+    77→  tags: string[];
+    78→  thumbnail?: string | null;
+    79→  code: string;
+    80→  config: Record<string, unknown>;
+    81→  status: string;
+    82→  version: string;
+    83→  isPublic: boolean;
+    84→  stars: number;
+    85→  forks: number;
+    86→  parentId?: string | null;
+    87→  userId: string;
+    88→  projectId?: string | null;
+    89→  createdAt: string;
+    90→  updatedAt: string;
+    91→}
+    92→
+    93→interface LibraryStats {
+    94→  total: number;
+    95→  byType: Record<string, number>;
+    96→  byCategory: Record<string, number>;
+    97→}
+    98→
+    99→interface CreateFormData {
+   100→  name: string;
+   101→  description: string;
+   102→  type: LibraryType;
+   103→  category: string;
+   104→  tags: string;
+   105→}
+   106→
+   107→// ── Config ──────────────────────────────────────────────────────────────
+   108→
+   109→const CATEGORIES: LibraryCategory[] = [
+   110→  'All', 'Sites', 'Apps', 'Components', 'APIs', 'Games', 'Models', 'Assets', 'Templates',
+   111→];
+   112→
+   113→const TYPE_TO_CATEGORY: Record<string, LibraryCategory> = {
+   114→  site: 'Sites',
+   115→  app: 'Apps',
+   116→  component: 'Components',
+   117→  api: 'APIs',
+   118→  game: 'Games',
+   119→  model: 'Models',
+   120→  asset: 'Assets',
+   121→  template: 'Templates',
+   122→};
+   123→
+   124→const CATEGORY_TO_TYPES: Record<string, string[]> = {
+   125→  All: [],
+   126→  Sites: ['site'],
+   127→  Apps: ['app'],
+   128→  Components: ['component'],
+   129→  APIs: ['api'],
+   130→  Games: ['game'],
+   131→  Models: ['model'],
+   132→  Assets: ['asset'],
+   133→  Templates: ['template'],
+   134→};
+   135→
+   136→const TYPE_ICONS: Record<string, React.ElementType> = {
+   137→  site: Globe,
+   138→  app: Smartphone,
+   139→  component: Code,
+   140→  api: Cpu,
+   141→  game: Gamepad2,
+   142→  model: Box,
+   143→  asset: Package,
+   144→  template: Layers,
+   145→};
+   146→
+   147→const TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+   148→  site: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+   149→  app: { bg: 'bg-violet-500/15', text: 'text-violet-400', border: 'border-violet-500/30' },
+   150→  component: { bg: 'bg-sky-500/15', text: 'text-sky-400', border: 'border-sky-500/30' },
+   151→  api: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' },
+   152→  game: { bg: 'bg-rose-500/15', text: 'text-rose-400', border: 'border-rose-500/30' },
+   153→  model: { bg: 'bg-cyan-500/15', text: 'text-cyan-400', border: 'border-cyan-500/30' },
+   154→  asset: { bg: 'bg-orange-500/15', text: 'text-orange-400', border: 'border-orange-500/30' },
+   155→  template: { bg: 'bg-pink-500/15', text: 'text-pink-400', border: 'border-pink-500/30' },
+   156→};
+   157→
+   158→const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+   159→  draft: { bg: 'bg-zinc-500/15', text: 'text-zinc-400', border: 'border-zinc-500/30' },
+   160→  published: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' },
+   161→  archived: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' },
+   162→};
+   163→
+   164→const STATUS_ICONS: Record<string, React.ElementType> = {
+   165→  draft: FileCode,
+   166→  published: Rocket,
+   167→  archived: Archive,
+   168→};
+   169→
+   170→const LIBRARY_TYPES: LibraryType[] = ['site', 'app', 'component', 'api', 'game', 'model', 'asset', 'template'];
+   171→
+   172→const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+   173→  { value: 'date', label: 'Last Updated' },
+   174→  { value: 'name', label: 'Name' },
+   175→  { value: 'stars', label: 'Stars' },
+   176→];
+   177→
+   178→// ── Helpers ─────────────────────────────────────────────────────────────
+   179→
+   180→function formatDate(dateStr: string): string {
+   181→  const d = new Date(dateStr);
+   182→  const now = new Date();
+   183→  const diff = now.getTime() - d.getTime();
+   184→  const mins = Math.floor(diff / 60000);
+   185→  if (mins < 1) return 'just now';
+   186→  if (mins < 60) return `${mins}m ago`;
+   187→  const hours = Math.floor(mins / 60);
+   188→  if (hours < 24) return `${hours}h ago`;
+   189→  const days = Math.floor(hours / 24);
+   190→  if (days < 7) return `${days}d ago`;
+   191→  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+   192→}
+   193→
+   194→function formatNumber(n: number): string {
+   195→  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+   196→  return n.toString();
+   197→}
+   198→
+   199→// ── Component ───────────────────────────────────────────────────────────
+   200→
+   201→export function LibraryPanel() {
+   202→  // State
+   203→  const [items, setItems] = useState<LibraryItem[]>([]);
+   204→  const [stats, setStats] = useState<LibraryStats>({ total: 0, byType: {}, byCategory: {} });
+   205→  const [loading, setLoading] = useState(true);
+   206→  const [category, setCategory] = useState<LibraryCategory>('All');
+   207→  const [search, setSearch] = useState('');
+   208→  const [statusFilter, setStatusFilter] = useState<string>('all');
+   209→  const [sortMode, setSortMode] = useState<SortMode>('date');
+   210→  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+   211→  const [showFilters, setShowFilters] = useState(false);
+   212→  const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
+   213→  const [showCreateDialog, setShowCreateDialog] = useState(false);
+   214→  const [showDetailDialog, setShowDetailDialog] = useState(false);
+   215→  const [creating, setCreating] = useState(false);
+   216→  const [actionLoading, setActionLoading] = useState<string | null>(null);
+   217→  const [editMode, setEditMode] = useState(false);
+   218→  const [editData, setEditData] = useState<{ name: string; description: string; code: string }>({ name: '', description: '', code: '' });
+   219→
+   220→  // Create form
+   221→  const [createForm, setCreateForm] = useState<CreateFormData>({
+   222→    name: '',
+   223→    description: '',
+   224→    type: 'site',
+   225→    category: 'web',
+   226→    tags: '',
+   227→  });
+   228→
+   229→  // Fetch data
+   230→  const fetchItems = useCallback(async () => {
+   231→    setLoading(true);
+   232→    try {
+   233→      const params = new URLSearchParams();
+   234→      if (statusFilter !== 'all') params.set('status', statusFilter);
+   235→      if (search) params.set('search', search);
+   236→      // Map category tab to type filter
+   237→      if (category !== 'All') {
+   238→        const types = CATEGORY_TO_TYPES[category];
+   239→        if (types.length > 0) params.set('type', types[0]);
+   240→      }
+   241→      params.set('limit', '100');
+   242→      params.set('offset', '0');
+   243→
+   244→      const res = await fetch(`/api/library?${params.toString()}`);
+   245→      if (res.ok) {
+   246→        const data = await res.json();
+   247→        setItems((data.items || []).map((item: LibraryItem) => ({
+   248→          ...item,
+   249→          tags: Array.isArray(item.tags) ? item.tags : JSON.parse(item.tags as unknown as string || '[]'),
+   250→          config: typeof item.config === 'string' ? JSON.parse(item.config) : item.config,
+   251→        })));
+   252→        setStats({
+   253→          total: data.total || 0,
+   254→          byType: data.byType || {},
+   255→          byCategory: data.byCategory || {},
+   256→        });
+   257→      }
+   258→    } catch (err) {
+   259→      console.error('Failed to fetch library items:', err);
+   260→    } finally {
+   261→      setLoading(false);
+   262→    }
+   263→  }, [category, statusFilter, search]);
+   264→
+   265→  useEffect(() => {
+   266→    fetchItems();
+   267→  }, [fetchItems]);
+   268→
+   269→  // Sorted items
+   270→  const sortedItems = useMemo(() => {
+   271→    const sorted = [...items];
+   272→    switch (sortMode) {
+   273→      case 'name':
+   274→        sorted.sort((a, b) => a.name.localeCompare(b.name));
+   275→        break;
+   276→      case 'stars':
+   277→        sorted.sort((a, b) => b.stars - a.stars);
+   278→        break;
+   279→      case 'date':
+   280→      default:
+   281→        sorted.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+   282→    }
+   283→    return sorted;
+   284→  }, [items, sortMode]);
+   285→
+   286→  // Actions
+   287→  const handleCreate = async () => {
+   288→    if (!createForm.name.trim()) return;
+   289→    setCreating(true);
+   290→    try {
+   291→      const tags = createForm.tags
+   292→        .split(',')
+   293→        .map(t => t.trim())
+   294→        .filter(Boolean);
+   295→
+   296→      const res = await fetch('/api/library', {
+   297→        method: 'POST',
+   298→        headers: { 'Content-Type': 'application/json' },
+   299→        body: JSON.stringify({
+   300→          name: createForm.name.trim(),
+   301→          description: createForm.description.trim() || undefined,
+   302→          type: createForm.type,
+   303→          category: createForm.category,
+   304→          tags,
+   305→        }),
+   306→      });
+   307→      if (res.ok) {
+   308→        setShowCreateDialog(false);
+   309→        setCreateForm({ name: '', description: '', type: 'site', category: 'web', tags: '' });
+   310→        fetchItems();
+   311→      }
+   312→    } catch (err) {
+   313→      console.error('Create failed:', err);
+   314→    } finally {
+   315→      setCreating(false);
+   316→    }
+   317→  };
+   318→
+   319→  const handleFork = async (id: string) => {
+   320→    setActionLoading(id);
+   321→    try {
+   322→      const res = await fetch('/api/library', {
+   323→        method: 'POST',
+   324→        headers: { 'Content-Type': 'application/json' },
+   325→        body: JSON.stringify({ action: 'fork', id }),
+   326→      });
+   327→      if (res.ok) {
+   328→        fetchItems();
+   329→      }
+   330→    } catch (err) {
+   331→      console.error('Fork failed:', err);
+   332→    } finally {
+   333→      setActionLoading(null);
+   334→    }
+   335→  };
+   336→
+   337→  const handlePublish = async (id: string) => {
+   338→    setActionLoading(id);
+   339→    try {
+   340→      const res = await fetch('/api/library', {
+   341→        method: 'PUT',
+   342→        headers: { 'Content-Type': 'application/json' },
+   343→        body: JSON.stringify({ id, status: 'published', isPublic: true }),
+   344→      });
+   345→      if (res.ok) {
+   346→        fetchItems();
+   347→        if (selectedItem?.id === id) {
+   348→          setSelectedItem(prev => prev ? { ...prev, status: 'published', isPublic: true } : null);
+   349→        }
+   350→      }
+   351→    } catch (err) {
+   352→      console.error('Publish failed:', err);
+   353→    } finally {
+   354→      setActionLoading(null);
+   355→    }
+   356→  };
+   357→
+   358→  const handleArchive = async (id: string) => {
+   359→    setActionLoading(id);
+   360→    try {
+   361→      const res = await fetch('/api/library', {
+   362→        method: 'PUT',
+   363→        headers: { 'Content-Type': 'application/json' },
+   364→        body: JSON.stringify({ id, status: 'archived' }),
+   365→      });
+   366→      if (res.ok) {
+   367→        fetchItems();
+   368→        if (selectedItem?.id === id) {
+   369→          setSelectedItem(prev => prev ? { ...prev, status: 'archived' } : null);
+   370→        }
+   371→      }
+   372→    } catch (err) {
+   373→      console.error('Archive failed:', err);
+   374→    } finally {
+   375→      setActionLoading(null);
+   376→    }
+   377→  };
+   378→
+   379→  const handleDelete = async (id: string) => {
+   380→    setActionLoading(id);
+   381→    try {
+   382→      const res = await fetch('/api/library', {
+   383→        method: 'DELETE',
+   384→        headers: { 'Content-Type': 'application/json' },
+   385→        body: JSON.stringify({ id }),
+   386→      });
+   387→      if (res.ok) {
+   388→        if (selectedItem?.id === id) {
+   389→          setShowDetailDialog(false);
+   390→          setSelectedItem(null);
+   391→        }
+   392→        fetchItems();
+   393→      }
+   394→    } catch (err) {
+   395→      console.error('Delete failed:', err);
+   396→    } finally {
+   397→      setActionLoading(null);
+   398→    }
+   399→  };
+   400→
+   401→  const handleUpdateItem = async () => {
+   402→    if (!selectedItem) return;
+   403→    setActionLoading(selectedItem.id);
+   404→    try {
+   405→      const res = await fetch('/api/library', {
+   406→        method: 'PUT',
+   407→        headers: { 'Content-Type': 'application/json' },
+   408→        body: JSON.stringify({
+   409→          id: selectedItem.id,
+   410→          name: editData.name,
+   411→          description: editData.description,
+   412→          code: editData.code,
+   413→        }),
+   414→      });
+   415→      if (res.ok) {
+   416→        setEditMode(false);
+   417→        fetchItems();
+   418→      }
+   419→    } catch (err) {
+   420→      console.error('Update failed:', err);
+   421→    } finally {
+   422→      setActionLoading(null);
+   423→    }
+   424→  };
+   425→
+   426→  const openDetail = (item: LibraryItem) => {
+   427→    setSelectedItem(item);
+   428→    setEditData({
+   429→      name: item.name,
+   430→      description: item.description || '',
+   431→      code: item.code || '',
+   432→    });
+   433→    setEditMode(false);
+   434→    setShowDetailDialog(true);
+   435→  };
+   436→
+   437→  // Status breakdown for stats bar
+   438→  const statusBreakdown = useMemo(() => {
+   439→    const counts: Record<string, number> = { draft: 0, published: 0, archived: 0 };
+   440→    items.forEach(item => {
+   441→      const s = item.status || 'draft';
+   442→      if (counts[s] !== undefined) counts[s]++;
+   443→    });
+   444→    return counts;
+   445→  }, [items]);
+   446→
+   447→  // ── Render ──────────────────────────────────────────────────────────
+   448→
+   449→  return (
+   450→    <div className="flex flex-col h-full">
+   451→      {/* Header */}
+   452→      <div className="shrink-0 px-4 pt-4 pb-2">
+   453→        <div className="flex items-center justify-between mb-3">
+   454→          <div className="flex items-center gap-2">
+   455→            <div className="h-7 w-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+   456→              <Layers className="h-4 w-4 text-emerald-400" />
+   457→            </div>
+   458→            <div>
+   459→              <h2 className="text-sm font-semibold">Library</h2>
+   460→              <p className="text-[10px] text-muted-foreground">Your generated sites, apps & assets</p>
+   461→            </div>
+   462→          </div>
+   463→          <div className="flex items-center gap-1.5">
+   464→            {/* View toggle */}
+   465→            <div className="flex items-center bg-muted/50 rounded-md border border-border/50 p-0.5">
+   466→              <button
+   467→                onClick={() => setViewMode('grid')}
+   468→                className={`p-1 rounded-sm transition-colors ${
+   469→                  viewMode === 'grid'
+   470→                    ? 'bg-emerald-500/15 text-emerald-400'
+   471→                    : 'text-muted-foreground hover:text-foreground'
+   472→                }`}
+   473→              >
+   474→                <LayoutGrid className="h-3 w-3" />
+   475→              </button>
+   476→              <button
+   477→                onClick={() => setViewMode('list')}
+   478→                className={`p-1 rounded-sm transition-colors ${
+   479→                  viewMode === 'list'
+   480→                    ? 'bg-emerald-500/15 text-emerald-400'
+   481→                    : 'text-muted-foreground hover:text-foreground'
+   482→                }`}
+   483→              >
+   484→                <List className="h-3 w-3" />
+   485→              </button>
+   486→            </div>
+   487→            <Button
+   488→              size="sm"
+   489→              className="h-7 text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+   490→              onClick={() => setShowCreateDialog(true)}
+   491→            >
+   492→              <Plus className="h-3 w-3" />
+   493→              New
+   494→            </Button>
+   495→          </div>
+   496→        </div>
+   497→
+   498→        {/* Search & Filters */}
+   499→        <div className="flex items-center gap-2 mb-3">
+   500→          <div className="relative flex-1">
+   501→            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+   502→            <Input
+   503→              value={search}
+   504→              onChange={(e) => setSearch(e.target.value)}
+   505→              placeholder="Search library..."
+   506→              className="pl-8 h-8 text-xs bg-card/50"
+   507→            />
+   508→          </div>
+   509→          <Button
+   510→            variant="outline"
+   511→            size="sm"
+   512→            className={`h-8 px-2 text-[10px] gap-1 ${showFilters ? 'border-emerald-500/30 text-emerald-400' : ''}`}
+   513→            onClick={() => setShowFilters(!showFilters)}
+   514→          >
+   515→            <Filter className="h-3 w-3" />
+   516→            Filter
+   517→          </Button>
+   518→          <DropdownMenu>
+   519→            <DropdownMenuTrigger asChild>
+   520→              <Button variant="outline" size="sm" className="h-8 px-2 text-[10px] gap-1">
+   521→                <ArrowUpDown className="h-3 w-3" />
+   522→                {SORT_OPTIONS.find(o => o.value === sortMode)?.label}
+   523→              </Button>
+   524→            </DropdownMenuTrigger>
+   525→            <DropdownMenuContent align="end" className="w-40">
+   526→              {SORT_OPTIONS.map(opt => (
+   527→                <DropdownMenuItem
+   528→                  key={opt.value}
+   529→                  onClick={() => setSortMode(opt.value)}
+   530→                  className="text-xs"
+   531→                >
+   532→                  {sortMode === opt.value && <CheckCircle2 className="h-3 w-3 mr-1.5 text-emerald-400" />}
+   533→                  {opt.label}
+   534→                </DropdownMenuItem>
+   535→              ))}
+   536→            </DropdownMenuContent>
+   537→          </DropdownMenu>
+   538→        </div>
+   539→
+   540→        {/* Extended filters */}
+   541→        <AnimatePresence>
+   542→          {showFilters && (
+   543→            <motion.div
+   544→              initial={{ height: 0, opacity: 0 }}
+   545→              animate={{ height: 'auto', opacity: 1 }}
+   546→              exit={{ height: 0, opacity: 0 }}
+   547→              transition={{ duration: 0.15 }}
+   548→              className="overflow-hidden mb-2"
+   549→            >
+   550→              <div className="flex items-center gap-2 py-2">
+   551→                <span className="text-[10px] text-muted-foreground shrink-0">Status:</span>
+   552→                <div className="flex gap-1">
+   553→                  {(['all', 'draft', 'published', 'archived'] as const).map(s => (
+   554→                    <button
+   555→                      key={s}
+   556→                      onClick={() => setStatusFilter(s)}
+   557→                      className={`px-2 py-0.5 rounded text-[9px] font-medium transition-colors ${
+   558→                        statusFilter === s
+   559→                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+   560→                          : 'bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent'
+   561→                      }`}
+   562→                    >
+   563→                      {s.charAt(0).toUpperCase() + s.slice(1)}
+   564→                    </button>
+   565→                  ))}
+   566→                </div>
+   567→              </div>
+   568→            </motion.div>
+   569→          )}
+   570→        </AnimatePresence>
+   571→
+   572→        {/* Category Tabs */}
+   573→        <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-none">
+   574→          {CATEGORIES.map(cat => {
+   575→            const catCount = cat === 'All' ? stats.total : (stats.byType[CATEGORY_TO_TYPES[cat]?.[0] || ''] || 0);
+   576→            return (
+   577→              <button
+   578→                key={cat}
+   579→                onClick={() => setCategory(cat)}
+   580→                className={`px-2.5 py-1 rounded-md text-[10px] font-medium whitespace-nowrap transition-colors shrink-0 flex items-center gap-1 ${
+   581→                  category === cat
+   582→                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+   583→                    : 'bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent'
+   584→                }`}
+   585→              >
+   586→                {cat}
+   587→                {catCount > 0 && (
+   588→                  <span className="text-[8px] opacity-60">{catCount}</span>
+   589→                )}
+   590→              </button>
+   591→            );
+   592→          })}
+   593→        </div>
+   594→      </div>
+   595→
+   596→      <Separator className="shrink-0" />
+   597→
+   598→      {/* Content */}
+   599→      <ScrollArea className="flex-1 min-h-0">
+   600→        <div className="p-4">
+   601→          {loading ? (
+   602→            /* Loading skeleton */
+   603→            <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3' : 'space-y-2'}>
+   604→              {Array.from({ length: 6 }).map((_, i) => (
+   605→                <div key={i} className="rounded-lg border border-border/30 bg-card/30 p-3 animate-pulse">
+   606→                  <div className="flex items-start gap-2">
+   607→                    <div className="h-10 w-10 rounded-lg bg-muted/30 shrink-0" />
+   608→                    <div className="flex-1 space-y-1.5">
+   609→                      <div className="h-3 w-24 rounded bg-muted/30" />
+   610→                      <div className="h-2 w-16 rounded bg-muted/20" />
+   611→                      <div className="h-2 w-32 rounded bg-muted/20" />
+   612→                    </div>
+   613→                  </div>
+   614→                </div>
+   615→              ))}
+   616→            </div>
+   617→          ) : sortedItems.length === 0 ? (
+   618→            /* Empty state */
+   619→            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+   620→              <div className="h-16 w-16 rounded-2xl bg-muted/20 flex items-center justify-center mb-4">
+   621→                <Layers className="h-8 w-8 opacity-30" />
+   622→              </div>
+   623→              <p className="text-sm font-medium mb-1">
+   624→                {search || statusFilter !== 'all' || category !== 'All'
+   625→                  ? 'No items match your filters'
+   626→                  : 'Your library is empty'}
+   627→              </p>
+   628→              <p className="text-[10px] text-muted-foreground/60 mb-4 max-w-48 text-center">
+   629→                {search || statusFilter !== 'all' || category !== 'All'
+   630→                  ? 'Try adjusting your search or filters'
+   631→                  : 'Generate your first site, app, or asset to see it here'}
+   632→              </p>
+   633→              {!search && statusFilter === 'all' && category === 'All' && (
+   634→                <Button
+   635→                  size="sm"
+   636→                  className="h-7 text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+   637→                  onClick={() => setShowCreateDialog(true)}
+   638→                >
+   639→                  <Plus className="h-3 w-3" />
+   640→                  Create First Item
+   641→                </Button>
+   642→              )}
+   643→            </div>
+   644→          ) : viewMode === 'grid' ? (
+   645→            /* Grid View */
+   646→            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   647→              {sortedItems.map(item => {
+   648→                const Icon = TYPE_ICONS[item.type] || Package;
+   649→                const colors = TYPE_COLORS[item.type] || TYPE_COLORS.site;
+   650→                const statusColors = STATUS_COLORS[item.status] || STATUS_COLORS.draft;
+   651→                const StatusIcon = STATUS_ICONS[item.status] || FileCode;
+   652→
+   653→                return (
+   654→                  <motion.div
+   655→                    key={item.id}
+   656→                    layout
+   657→                    initial={{ opacity: 0, scale: 0.95 }}
+   658→                    animate={{ opacity: 1, scale: 1 }}
+   659→                    className="rounded-lg border border-border/50 bg-card/50 hover:border-border/80 transition-all cursor-pointer group"
+   660→                    onClick={() => openDetail(item)}
+   661→                  >
+   662→                    {/* Thumbnail area */}
+   663→                    <div className={`h-24 rounded-t-lg relative overflow-hidden ${
+   664→                      item.thumbnail ? '' : `${colors.bg} flex items-center justify-center`
+   665→                    }`}>
+   666→                      {item.thumbnail ? (
+   667→                        <img
+   668→                          src={item.thumbnail}
+   669→                          alt={item.name}
+   670→                          className="w-full h-full object-cover"
+   671→                        />
+   672→                      ) : (
+   673→                        <Icon className={`h-8 w-8 ${colors.text} opacity-40`} />
+   674→                      )}
+   675→                      {/* Overlay on hover */}
+   676→                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+   677→                        <Eye className="h-4 w-4 text-white" />
+   678→                      </div>
+   679→                      {/* Status indicator */}
+   680→                      <div className="absolute top-1.5 right-1.5">
+   681→                        <Badge
+   682→                          variant="outline"
+   683→                          className={`text-[7px] h-4 px-1.5 ${statusColors.bg} ${statusColors.text} border-${statusColors.border}`}
+   684→                        >
+   685→                          <StatusIcon className="h-2 w-2 mr-0.5" />
+   686→                          {item.status}
+   687→                        </Badge>
+   688→                      </div>
+   689→                      {/* Public indicator */}
+   690→                      {item.isPublic && (
+   691→                        <div className="absolute top-1.5 left-1.5">
+   692→                          <Badge variant="outline" className="text-[7px] h-4 px-1 bg-sky-500/15 text-sky-400 border-sky-500/30">
+   693→                            <Globe className="h-2 w-2 mr-0.5" />
+   694→                            Public
+   695→                          </Badge>
+   696→                        </div>
+   697→                      )}
+   698→                    </div>
+   699→                    {/* Card content */}
+   700→                    <div className="p-3">
+   701→                      <div className="flex items-start justify-between gap-1 mb-1">
+   702→                        <span className="text-[11px] font-semibold truncate">{item.name}</span>
+   703→                        <Badge
+   704→                          variant="outline"
+   705→                          className={`text-[7px] h-4 px-1 shrink-0 ${colors.bg} ${colors.text} ${colors.border}`}
+   706→                        >
+   707→                          {item.type}
+   708→                        </Badge>
+   709→                      </div>
+   710→                      {item.description && (
+   711→                        <p className="text-[9px] text-muted-foreground line-clamp-1 mb-2">{item.description}</p>
+   712→                      )}
+   713→                      <div className="flex items-center justify-between">
+   714→                        <div className="flex items-center gap-2.5">
+   715→                          <span className="text-[8px] text-muted-foreground flex items-center gap-0.5">
+   716→                            <Star className="h-2.5 w-2.5 text-amber-400" />
+   717→                            {item.stars}
+   718→                          </span>
+   719→                          <span className="text-[8px] text-muted-foreground flex items-center gap-0.5">
+   720→                            <GitFork className="h-2.5 w-2.5" />
+   721→                            {item.forks}
+   722→                          </span>
+   723→                          <span className="text-[8px] text-muted-foreground">v{item.version}</span>
+   724→                        </div>
+   725→                        <span className="text-[8px] text-muted-foreground flex items-center gap-0.5">
+   726→                          <Clock className="h-2 w-2" />
+   727→                          {formatDate(item.updatedAt)}
+   728→                        </span>
+   729→                      </div>
+   730→                      {item.tags && item.tags.length > 0 && (
+   731→                        <div className="flex gap-1 mt-2 flex-wrap">
+   732→                          {item.tags.slice(0, 3).map((tag, i) => (
+   733→                            <span key={i} className="text-[7px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground">
+   734→                              {tag}
+   735→                            </span>
+   736→                          ))}
+   737→                          {item.tags.length > 3 && (
+   738→                            <span className="text-[7px] px-1 py-0.5 text-muted-foreground">+{item.tags.length - 3}</span>
+   739→                          )}
+   740→                        </div>
+   741→                      )}
+   742→                    </div>
+   743→                  </motion.div>
+   744→                );
+   745→              })}
+   746→            </div>
+   747→          ) : (
+   748→            /* List View */
+   749→            <div className="space-y-1">
+   750→              {sortedItems.map(item => {
+   751→                const Icon = TYPE_ICONS[item.type] || Package;
+   752→                const colors = TYPE_COLORS[item.type] || TYPE_COLORS.site;
+   753→                const statusColors = STATUS_COLORS[item.status] || STATUS_COLORS.draft;
+   754→                const StatusIcon = STATUS_ICONS[item.status] || FileCode;
+   755→
+   756→                return (
+   757→                  <motion.div
+   758→                    key={item.id}
+   759→                    layout
+   760→                    initial={{ opacity: 0, x: -8 }}
+   761→                    animate={{ opacity: 1, x: 0 }}
+   762→                    className="flex items-center gap-3 rounded-lg border border-border/40 bg-card/30 hover:border-border/70 hover:bg-card/60 transition-all cursor-pointer px-3 py-2 group"
+   763→                    onClick={() => openDetail(item)}
+   764→                  >
+   765→                    {/* Icon/Thumbnail */}
+   766→                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+   767→                      item.thumbnail
+   768→                        ? 'overflow-hidden'
+   769→                        : colors.bg
+   770→                    }`}>
+   771→                      {item.thumbnail ? (
+   772→                        <img src={item.thumbnail} alt={item.name} className="w-full h-full object-cover rounded-lg" />
+   773→                      ) : (
+   774→                        <Icon className={`h-4 w-4 ${colors.text}`} />
+   775→                      )}
+   776→                    </div>
+   777→
+   778→                    {/* Name & desc */}
+   779→                    <div className="flex-1 min-w-0">
+   780→                      <div className="flex items-center gap-1.5">
+   781→                        <span className="text-[10px] font-semibold truncate">{item.name}</span>
+   782→                        <Badge
+   783→                          variant="outline"
+   784→                          className={`text-[7px] h-3.5 px-1 shrink-0 ${statusColors.bg} ${statusColors.text}`}
+   785→                        >
+   786→                          <StatusIcon className="h-2 w-2 mr-0.5" />
+   787→                          {item.status}
+   788→                        </Badge>
+   789→                      </div>
+   790→                      {item.description && (
+   791→                        <p className="text-[8px] text-muted-foreground truncate">{item.description}</p>
+   792→                      )}
+   793→                    </div>
+   794→
+   795→                    {/* Type badge */}
+   796→                    <Badge
+   797→                      variant="outline"
+   798→                      className={`text-[7px] h-5 px-1.5 shrink-0 ${colors.bg} ${colors.text} ${colors.border}`}
+   799→                    >
+   800→                      {item.type}
+   801→                    </Badge>
+   802→
+   803→                    {/* Stats */}
+   804→                    <div className="flex items-center gap-3 shrink-0">
+   805→                      <span className="text-[8px] text-muted-foreground flex items-center gap-0.5">
+   806→                        <Star className="h-2.5 w-2.5 text-amber-400" />
+   807→                        {item.stars}
+   808→                      </span>
+   809→                      <span className="text-[8px] text-muted-foreground flex items-center gap-0.5">
+   810→                        <GitFork className="h-2.5 w-2.5" />
+   811→                        {item.forks}
+   812→                      </span>
+   813→                      <span className="text-[8px] text-muted-foreground">v{item.version}</span>
+   814→                    </div>
+   815→
+   816→                    {/* Updated */}
+   817→                    <span className="text-[8px] text-muted-foreground shrink-0 w-14 text-right flex items-center gap-0.5 justify-end">
+   818→                      <Clock className="h-2 w-2" />
+   819→                      {formatDate(item.updatedAt)}
+   820→                    </span>
+   821→
+   822→                    {/* Actions dropdown */}
+   823→                    <DropdownMenu>
+   824→                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+   825→                        <Button
+   826→                          variant="ghost"
+   827→                          size="sm"
+   828→                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+   829→                        >
+   830→                          <MoreVertical className="h-3 w-3" />
+   831→                        </Button>
+   832→                      </DropdownMenuTrigger>
+   833→                      <DropdownMenuContent align="end" className="w-36">
+   834→                        <DropdownMenuItem
+   835→                          className="text-xs"
+   836→                          onClick={(e) => { e.stopPropagation(); openDetail(item); }}
+   837→                        >
+   838→                          <Eye className="h-3 w-3 mr-1.5" /> View Details
+   839→                        </DropdownMenuItem>
+   840→                        <DropdownMenuItem
+   841→                          className="text-xs"
+   842→                          onClick={(e) => { e.stopPropagation(); handleFork(item.id); }}
+   843→                          disabled={actionLoading === item.id}
+   844→                        >
+   845→                          <GitFork className="h-3 w-3 mr-1.5" /> Fork
+   846→                        </DropdownMenuItem>
+   847→                        {item.status === 'draft' && (
+   848→                          <DropdownMenuItem
+   849→                            className="text-xs text-emerald-400"
+   850→                            onClick={(e) => { e.stopPropagation(); handlePublish(item.id); }}
+   851→                            disabled={actionLoading === item.id}
+   852→                          >
+   853→                            <Rocket className="h-3 w-3 mr-1.5" /> Publish
+   854→                          </DropdownMenuItem>
+   855→                        )}
+   856→                        {item.status !== 'archived' && (
+   857→                          <DropdownMenuItem
+   858→                            className="text-xs text-amber-400"
+   859→                            onClick={(e) => { e.stopPropagation(); handleArchive(item.id); }}
+   860→                            disabled={actionLoading === item.id}
+   861→                          >
+   862→                            <Archive className="h-3 w-3 mr-1.5" /> Archive
+   863→                          </DropdownMenuItem>
+   864→                        )}
+   865→                        <DropdownMenuSeparator />
+   866→                        <DropdownMenuItem
+   867→                          className="text-xs text-red-400"
+   868→                          onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
+   869→                          disabled={actionLoading === item.id}
+   870→                        >
+   871→                          <Trash2 className="h-3 w-3 mr-1.5" /> Delete
+   872→                        </DropdownMenuItem>
+   873→                      </DropdownMenuContent>
+   874→                    </DropdownMenu>
+   875→                  </motion.div>
+   876→                );
+   877→              })}
+   878→            </div>
+   879→          )}
+   880→        </div>
+   881→      </ScrollArea>
+   882→
+   883→      <Separator className="shrink-0" />
+   884→
+   885→      {/* Stats Bar */}
+   886→      <div className="shrink-0 px-4 py-2 bg-card/30">
+   887→        <div className="flex items-center justify-between mb-1">
+   888→          <div className="flex items-center gap-3">
+   889→            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+   890→              <Layers className="h-2.5 w-2.5" />
+   891→              {stats.total} items
+   892→            </span>
+   893→          </div>
+   894→          <div className="flex items-center gap-3">
+   895→            {Object.entries(statusBreakdown).map(([status, count]) => {
+   896→              if (count === 0) return null;
+   897→              const sc = STATUS_COLORS[status];
+   898→              return (
+   899→                <span key={status} className={`text-[9px] flex items-center gap-0.5 ${sc.text}`}>
+   900→                  {count} {status}
+   901→                </span>
+   902→              );
+   903→            })}
+   904→          </div>
+   905→        </div>
+   906→        {/* Type breakdown bar */}
+   907→        {stats.total > 0 && (
+   908→          <div className="flex h-1 rounded-full overflow-hidden bg-muted/30">
+   909→            {Object.entries(stats.byType).map(([type, count]) => {
+   910→              const pct = (count / stats.total) * 100;
+   911→              const typeColorMap: Record<string, string> = {
+   912→                site: 'bg-emerald-500',
+   913→                app: 'bg-violet-500',
+   914→                component: 'bg-sky-500',
+   915→                api: 'bg-amber-500',
+   916→                game: 'bg-rose-500',
+   917→                model: 'bg-cyan-500',
+   918→                asset: 'bg-orange-500',
+   919→                template: 'bg-pink-500',
+   920→              };
+   921→              return (
+   922→                <div
+   923→                  key={type}
+   924→                  className={`${typeColorMap[type] || 'bg-zinc-500'} transition-all`}
+   925→                  style={{ width: `${pct}%` }}
+   926→                  title={`${type}: ${count}`}
+   927→                />
+   928→              );
+   929→            })}
+   930→          </div>
+   931→        )}
+   932→      </div>
+   933→
+   934→      {/* ── Create Dialog ──────────────────────────────────────────── */}
+   935→      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+   936→        <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800">
+   937→          <DialogHeader>
+   938→            <DialogTitle className="text-sm flex items-center gap-2">
+   939→              <div className="h-6 w-6 rounded-md bg-emerald-500/15 flex items-center justify-center">
+   940→                <Plus className="h-3.5 w-3.5 text-emerald-400" />
+   941→              </div>
+   942→              Create Library Item
+   943→            </DialogTitle>
+   944→            <DialogDescription className="text-[11px] text-muted-foreground">
+   945→              Add a new site, app, component, or asset to your library.
+   946→            </DialogDescription>
+   947→          </DialogHeader>
+   948→
+   949→          <div className="space-y-3 py-2">
+   950→            <div>
+   951→              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Name *</label>
+   952→              <Input
+   953→                value={createForm.name}
+   954→                onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
+   955→                placeholder="My awesome project"
+   956→                className="h-8 text-xs"
+   957→              />
+   958→            </div>
+   959→            <div>
+   960→              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Type *</label>
+   961→              <div className="grid grid-cols-4 gap-1">
+   962→                {LIBRARY_TYPES.map(type => {
+   963→                  const Icon = TYPE_ICONS[type];
+   964→                  const colors = TYPE_COLORS[type];
+   965→                  return (
+   966→                    <button
+   967→                      key={type}
+   968→                      onClick={() => setCreateForm(prev => ({ ...prev, type }))}
+   969→                      className={`flex flex-col items-center gap-1 p-2 rounded-md text-[9px] font-medium transition-colors border ${
+   970→                        createForm.type === type
+   971→                          ? `${colors.bg} ${colors.text} ${colors.border}`
+   972→                          : 'bg-muted/30 text-muted-foreground border-transparent hover:border-border/50'
+   973→                      }`}
+   974→                    >
+   975→                      <Icon className="h-3.5 w-3.5" />
+   976→                      {type}
+   977→                    </button>
+   978→                  );
+   979→                })}
+   980→              </div>
+   981→            </div>
+   982→            <div>
+   983→              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Category</label>
+   984→              <Input
+   985→                value={createForm.category}
+   986→                onChange={(e) => setCreateForm(prev => ({ ...prev, category: e.target.value }))}
+   987→                placeholder="web, mobile, backend..."
+   988→                className="h-8 text-xs"
+   989→              />
+   990→            </div>
+   991→            <div>
+   992→              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Description</label>
+   993→              <Textarea
+   994→                value={createForm.description}
+   995→                onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+   996→                placeholder="Describe what this item does..."
+   997→                className="text-xs min-h-[60px] resize-none"
+   998→              />
+   999→            </div>
+  1000→            <div>
+  1001→              <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+  1002→                Tags <span className="opacity-50">(comma separated)</span>
+  1003→              </label>
+  1004→              <Input
+  1005→                value={createForm.tags}
+  1006→                onChange={(e) => setCreateForm(prev => ({ ...prev, tags: e.target.value }))}
+  1007→                placeholder="react, typescript, saas"
+  1008→                className="h-8 text-xs"
+  1009→              />
+  1010→            </div>
+  1011→          </div>
+  1012→
+  1013→          <DialogFooter className="gap-2">
+  1014→            <Button
+  1015→              variant="outline"
+  1016→              size="sm"
+  1017→              className="text-[10px] h-7"
+  1018→              onClick={() => setShowCreateDialog(false)}
+  1019→            >
+  1020→              Cancel
+  1021→            </Button>
+  1022→            <Button
+  1023→              size="sm"
+  1024→              className="text-[10px] h-7 bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+  1025→              onClick={handleCreate}
+  1026→              disabled={!createForm.name.trim() || creating}
+  1027→            >
+  1028→              {creating ? (
+  1029→                <Sparkles className="h-3 w-3 animate-spin" />
+  1030→              ) : (
+  1031→                <Plus className="h-3 w-3" />
+  1032→              )}
+  1033→              Create
+  1034→            </Button>
+  1035→          </DialogFooter>
+  1036→        </DialogContent>
+  1037→      </Dialog>
+  1038→
+  1039→      {/* ── Detail Dialog ──────────────────────────────────────────── */}
+  1040→      <Dialog open={showDetailDialog} onOpenChange={(open) => { if (!open) { setShowDetailDialog(false); setSelectedItem(null); setEditMode(false); } }}>
+  1041→        <DialogContent className="sm:max-w-2xl bg-zinc-950 border-zinc-800 max-h-[80vh] overflow-y-auto">
+  1042→          {selectedItem && (() => {
+  1043→            const Icon = TYPE_ICONS[selectedItem.type] || Package;
+  1044→            const colors = TYPE_COLORS[selectedItem.type] || TYPE_COLORS.site;
+  1045→            const statusColors = STATUS_COLORS[selectedItem.status] || STATUS_COLORS.draft;
+  1046→            const StatusIcon = STATUS_ICONS[selectedItem.status] || FileCode;
+  1047→
+  1048→            return (
+  1049→              <>
+  1050→                <DialogHeader>
+  1051→                  <div className="flex items-center justify-between">
+  1052→                    <DialogTitle className="text-sm flex items-center gap-2">
+  1053→                      <div className={`h-7 w-7 rounded-lg ${colors.bg} flex items-center justify-center`}>
+  1054→                        <Icon className={`h-4 w-4 ${colors.text}`} />
+  1055→                      </div>
+  1056→                      {editMode ? (
+  1057→                        <Input
+  1058→                          value={editData.name}
+  1059→                          onChange={(e) => setEditData(prev => ({ ...prev, name: e.target.value }))}
+  1060→                          className="h-7 text-xs max-w-48"
+  1061→                        />
+  1062→                      ) : (
+  1063→                        <span>{selectedItem.name}</span>
+  1064→                      )}
+  1065→                      <Badge variant="outline" className={`text-[8px] h-5 px-1.5 ${colors.bg} ${colors.text} ${colors.border}`}>
+  1066→                        {selectedItem.type}
+  1067→                      </Badge>
+  1068→                    </DialogTitle>
+  1069→                    <div className="flex items-center gap-1">
+  1070→                      {!editMode ? (
+  1071→                        <Button
+  1072→                          variant="ghost"
+  1073→                          size="sm"
+  1074→                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+  1075→                          onClick={() => setEditMode(true)}
+  1076→                        >
+  1077→                          <Edit3 className="h-3.5 w-3.5" />
+  1078→                        </Button>
+  1079→                      ) : (
+  1080→                        <>
+  1081→                          <Button
+  1082→                            variant="ghost"
+  1083→                            size="sm"
+  1084→                            className="h-7 text-[10px] text-red-400 hover:text-red-300"
+  1085→                            onClick={() => { setEditMode(false); setEditData({ name: selectedItem.name, description: selectedItem.description || '', code: selectedItem.code || '' }); }}
+  1086→                          >
+  1087→                            <X className="h-3 w-3 mr-0.5" /> Cancel
+  1088→                          </Button>
+  1089→                          <Button
+  1090→                            size="sm"
+  1091→                            className="h-7 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white gap-0.5"
+  1092→                            onClick={handleUpdateItem}
+  1093→                            disabled={actionLoading === selectedItem.id}
+  1094→                          >
+  1095→                            <CheckCircle2 className="h-3 w-3" /> Save
+  1096→                          </Button>
+  1097→                        </>
+  1098→                      )}
+  1099→                    </div>
+  1100→                  </div>
+  1101→                  <DialogDescription className="sr-only">Details for {selectedItem.name}</DialogDescription>
+  1102→                </DialogHeader>
+  1103→
+  1104→                <div className="space-y-4 py-2">
+  1105→                  {/* Meta row */}
+  1106→                  <div className="flex items-center gap-3 flex-wrap">
+  1107→                    <Badge variant="outline" className={`text-[8px] h-5 px-1.5 gap-0.5 ${statusColors.bg} ${statusColors.text}`}>
+  1108→                      <StatusIcon className="h-2.5 w-2.5" />
+  1109→                      {selectedItem.status}
+  1110→                    </Badge>
+  1111→                    <Badge variant="outline" className="text-[8px] h-5 px-1.5 gap-0.5 bg-zinc-500/10 text-zinc-400 border-zinc-500/30">
+  1112→                      <Hash className="h-2.5 w-2.5" />
+  1113→                      v{selectedItem.version}
+  1114→                    </Badge>
+  1115→                    <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+  1116→                      <Star className="h-2.5 w-2.5 text-amber-400" />
+  1117→                      {selectedItem.stars} stars
+  1118→                    </span>
+  1119→                    <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+  1120→                      <GitFork className="h-2.5 w-2.5" />
+  1121→                      {selectedItem.forks} forks
+  1122→                    </span>
+  1123→                    <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+  1124→                      <Clock className="h-2.5 w-2.5" />
+  1125→                      Updated {formatDate(selectedItem.updatedAt)}
+  1126→                    </span>
+  1127→                    {selectedItem.isPublic ? (
+  1128→                      <Badge variant="outline" className="text-[8px] h-5 px-1.5 gap-0.5 bg-sky-500/15 text-sky-400 border-sky-500/30">
+  1129→                        <Globe className="h-2.5 w-2.5" /> Public
+  1130→                      </Badge>
+  1131→                    ) : (
+  1132→                      <Badge variant="outline" className="text-[8px] h-5 px-1.5 gap-0.5 bg-zinc-500/10 text-zinc-500 border-zinc-500/30">
+  1133→                        <EyeOff className="h-2.5 w-2.5" /> Private
+  1134→                      </Badge>
+  1135→                    )}
+  1136→                  </div>
+  1137→
+  1138→                  {/* Description */}
+  1139→                  <div>
+  1140→                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Description</label>
+  1141→                    {editMode ? (
+  1142→                      <Textarea
+  1143→                        value={editData.description}
+  1144→                        onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
+  1145→                        className="text-xs min-h-[60px] resize-none"
+  1146→                      />
+  1147→                    ) : (
+  1148→                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+  1149→                        {selectedItem.description || 'No description provided.'}
+  1150→                      </p>
+  1151→                    )}
+  1152→                  </div>
+  1153→
+  1154→                  {/* Tags */}
+  1155→                  {selectedItem.tags && selectedItem.tags.length > 0 && (
+  1156→                    <div>
+  1157→                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Tags</label>
+  1158→                      <div className="flex gap-1 flex-wrap">
+  1159→                        {selectedItem.tags.map((tag, i) => (
+  1160→                          <Badge key={i} variant="outline" className="text-[8px] h-5 px-1.5 bg-muted/30 text-muted-foreground border-border/50 gap-0.5">
+  1161→                            <Tag className="h-2 w-2" />
+  1162→                            {tag}
+  1163→                          </Badge>
+  1164→                        ))}
+  1165→                      </div>
+  1166→                    </div>
+  1167→                  )}
+  1168→
+  1169→                  <Separator />
+  1170→
+  1171→                  {/* Config */}
+  1172→                  {selectedItem.config && Object.keys(selectedItem.config).length > 0 && (
+  1173→                    <div>
+  1174→                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Configuration</label>
+  1175→                      <div className="rounded-md border border-border/40 bg-zinc-900/80 p-3">
+  1176→                        <pre className="text-[9px] text-emerald-400/80 font-mono whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">
+  1177→                          {JSON.stringify(selectedItem.config, null, 2)}
+  1178→                        </pre>
+  1179→                      </div>
+  1180→                    </div>
+  1181→                  )}
+  1182→
+  1183→                  {/* Code */}
+  1184→                  <div>
+  1185→                    <div className="flex items-center justify-between mb-1">
+  1186→                      <label className="text-[10px] font-medium text-muted-foreground">Code</label>
+  1187→                      {!editMode && selectedItem.code && (
+  1188→                        <Button
+  1189→                          variant="ghost"
+  1190→                          size="sm"
+  1191→                          className="h-5 text-[8px] text-muted-foreground gap-0.5"
+  1192→                          onClick={() => {
+  1193→                            navigator.clipboard.writeText(selectedItem.code);
+  1194→                          }}
+  1195→                        >
+  1196→                          <Copy className="h-2.5 w-2.5" /> Copy
+  1197→                        </Button>
+  1198→                      )}
+  1199→                    </div>
+  1200→                    {editMode ? (
+  1201→                      <Textarea
+  1202→                        value={editData.code}
+  1203→                        onChange={(e) => setEditData(prev => ({ ...prev, code: e.target.value }))}
+  1204→                        className="text-[9px] font-mono min-h-[120px] resize-none"
+  1205→                      />
+  1206→                    ) : (
+  1207→                      <div className="rounded-md border border-border/40 bg-zinc-900/80 p-3">
+  1208→                        <pre className="text-[9px] text-sky-400/80 font-mono whitespace-pre-wrap overflow-x-auto max-h-48 overflow-y-auto">
+  1209→                          {selectedItem.code || '// No code yet'}
+  1210→                        </pre>
+  1211→                      </div>
+  1212→                    )}
+  1213→                  </div>
+  1214→
+  1215→                  {/* Metadata */}
+  1216→                  <div>
+  1217→                    <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Metadata</label>
+  1218→                    <div className="grid grid-cols-2 gap-2">
+  1219→                      <div className="rounded-md border border-border/30 bg-muted/20 p-2">
+  1220→                        <span className="text-[8px] text-muted-foreground block">Created</span>
+  1221→                        <span className="text-[10px]">{new Date(selectedItem.createdAt).toLocaleDateString()}</span>
+  1222→                      </div>
+  1223→                      <div className="rounded-md border border-border/30 bg-muted/20 p-2">
+  1224→                        <span className="text-[8px] text-muted-foreground block">Category</span>
+  1225→                        <span className="text-[10px]">{selectedItem.category}</span>
+  1226→                      </div>
+  1227→                      {selectedItem.parentId && (
+  1228→                        <div className="rounded-md border border-border/30 bg-muted/20 p-2 col-span-2">
+  1229→                          <span className="text-[8px] text-muted-foreground block">Forked from</span>
+  1230→                          <span className="text-[10px] flex items-center gap-1">
+  1231→                            <GitFork className="h-2.5 w-2.5 text-muted-foreground" />
+  1232→                            {selectedItem.parentId}
+  1233→                          </span>
+  1234→                        </div>
+  1235→                      )}
+  1236→                    </div>
+  1237→                  </div>
+  1238→
+  1239→                  <Separator />
+  1240→
+  1241→                  {/* Action buttons */}
+  1242→                  <div className="flex items-center gap-2 flex-wrap">
+  1243→                    <Button
+  1244→                      size="sm"
+  1245→                      variant="outline"
+  1246→                      className="h-7 text-[10px] gap-1"
+  1247→                      onClick={() => handleFork(selectedItem.id)}
+  1248→                      disabled={actionLoading === selectedItem.id}
+  1249→                    >
+  1250→                      <GitFork className="h-3 w-3" />
+  1251→                      Fork
+  1252→                    </Button>
+  1253→                    {selectedItem.status === 'draft' && (
+  1254→                      <Button
+  1255→                        size="sm"
+  1256→                        className="h-7 text-[10px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+  1257→                        onClick={() => handlePublish(selectedItem.id)}
+  1258→                        disabled={actionLoading === selectedItem.id}
+  1259→                      >
+  1260→                        <Rocket className="h-3 w-3" />
+  1261→                        Publish
+  1262→                      </Button>
+  1263→                    )}
+  1264→                    {selectedItem.status === 'published' && (
+  1265→                      <Button
+  1266→                        size="sm"
+  1267→                        variant="outline"
+  1268→                        className="h-7 text-[10px] gap-1"
+  1269→                        onClick={() => handleArchive(selectedItem.id)}
+  1270→                        disabled={actionLoading === selectedItem.id}
+  1271→                      >
+  1272→                        <Archive className="h-3 w-3" />
+  1273→                        Archive
+  1274→                      </Button>
+  1275→                    )}
+  1276→                    {selectedItem.status === 'archived' && (
+  1277→                      <Button
+  1278→                        size="sm"
+  1279→                        variant="outline"
+  1280→                        className="h-7 text-[10px] gap-1"
+  1281→                        onClick={() => handlePublish(selectedItem.id)}
+  1282→                        disabled={actionLoading === selectedItem.id}
+  1283→                      >
+  1284→                        <Rocket className="h-3 w-3" />
+  1285→                        Republish
+  1286→                      </Button>
+  1287→                    )}
+  1288→                    <div className="flex-1" />
+  1289→                    <Button
+  1290→                      size="sm"
+  1291→                      variant="outline"
+  1292→                      className="h-7 text-[10px] gap-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
+  1293→                      onClick={() => handleDelete(selectedItem.id)}
+  1294→                      disabled={actionLoading === selectedItem.id}
+  1295→                    >
+  1296→                      <Trash2 className="h-3 w-3" />
+  1297→                      Delete
+  1298→                    </Button>
+  1299→                  </div>
+  1300→                </div>
+  1301→              </>
+  1302→            );
+  1303→          })()}
+  1304→        </DialogContent>
+  1305→      </Dialog>
+  1306→    </div>
+  1307→  );
+  1308→}
+  1309→

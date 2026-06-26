@@ -1,0 +1,853 @@
+     1→'use client';
+     2→
+     3→import { useState, useRef, useEffect, useCallback, type ComponentPropsWithoutRef } from 'react';
+     4→import {
+     5→  Send,
+     6→  Bot,
+     7→  User,
+     8→  Globe,
+     9→  Zap,
+    10→  Copy,
+    11→  Check,
+    12→  RefreshCw,
+    13→  Sparkles,
+    14→  Paperclip,
+    15→  Mic,
+    16→  Code,
+    17→  MessageSquare,
+    18→  ExternalLink,
+    19→  Loader2,
+    20→  MoreVertical,
+    21→  Download,
+    22→  FileJson,
+    23→  FileText,
+    24→  Trash2,
+    25→  ChevronDown,
+    26→} from 'lucide-react';
+    27→import { Button } from '@/components/ui/button';
+    28→import { Textarea } from '@/components/ui/textarea';
+    29→import { Badge } from '@/components/ui/badge';
+    30→import { ScrollArea } from '@/components/ui/scroll-area';
+    31→import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+    32→import {
+    33→  Tooltip,
+    34→  TooltipContent,
+    35→  TooltipProvider,
+    36→  TooltipTrigger,
+    37→} from '@/components/ui/tooltip';
+    38→import {
+    39→  DropdownMenu,
+    40→  DropdownMenuContent,
+    41→  DropdownMenuItem,
+    42→  DropdownMenuTrigger,
+    43→  DropdownMenuSeparator,
+    44→} from '@/components/ui/dropdown-menu';
+    45→import {
+    46→  Popover,
+    47→  PopoverContent,
+    48→  PopoverTrigger,
+    49→} from '@/components/ui/popover';
+    50→import { useChatStore, type Message } from '@/stores/chat-store';
+    51→import { useModelStore } from '@/stores/model-store';
+    52→import { useUIStore } from '@/stores/ui-store';
+    53→import { ModelSelector } from '@/components/nexus/model-selector';
+    54→import ReactMarkdown from 'react-markdown';
+    55→import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+    56→import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+    57→import { motion, AnimatePresence } from 'framer-motion';
+    58→
+    59→/* ───────── System Prompt Personas ───────── */
+    60→
+    61→interface Persona {
+    62→  id: string;
+    63→  name: string;
+    64→  icon: React.ReactNode;
+    65→  prefix: string;
+    66→  description: string;
+    67→}
+    68→
+    69→const DEFAULT_PERSONA: Persona = {
+    70→  id: 'default',
+    71→  name: 'Default',
+    72→  icon: <Bot className="h-3 w-3" />,
+    73→  prefix: '',
+    74→  description: 'General-purpose AI assistant',
+    75→};
+    76→
+    77→/* ───────── Code block with copy ───────── */
+    78→
+    79→function CodeBlock({
+    80→  className,
+    81→  children,
+    82→  ...props
+    83→}: ComponentPropsWithoutRef<'code'> & { children?: React.ReactNode }) {
+    84→  const [copied, setCopied] = useState(false);
+    85→  const match = /language-(\w+)/.exec(className || '');
+    86→  const language = match ? match[1] : '';
+    87→  const codeStr = String(children).replace(/\n$/, '');
+    88→
+    89→  const handleCopy = async () => {
+    90→    await navigator.clipboard.writeText(codeStr);
+    91→    setCopied(true);
+    92→    setTimeout(() => setCopied(false), 2000);
+    93→  };
+    94→
+    95→  if (match) {
+    96→    return (
+    97→      <div className="group relative my-3 rounded-lg overflow-hidden border border-border/50">
+    98→        <div className="flex items-center justify-between bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground">
+    99→          <span className="font-mono">{language}</span>
+   100→          <button
+   101→            onClick={handleCopy}
+   102→            className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted transition-colors"
+   103→            aria-label="Copy code"
+   104→          >
+   105→            {copied ? (
+   106→              <Check className="h-3 w-3 text-emerald-400" />
+   107→            ) : (
+   108→              <Copy className="h-3 w-3" />
+   109→            )}
+   110→            <span>{copied ? 'Copied' : 'Copy'}</span>
+   111→          </button>
+   112→        </div>
+   113→        <SyntaxHighlighter
+   114→          style={oneDark}
+   115→          language={language}
+   116→          PreTag="div"
+   117→          customStyle={{
+   118→            margin: 0,
+   119→            padding: '0.75rem',
+   120→            background: 'rgb(30, 30, 30)',
+   121→            fontSize: '0.8125rem',
+   122→            lineHeight: '1.5',
+   123→          }}
+   124→        >
+   125→          {codeStr}
+   126→        </SyntaxHighlighter>
+   127→      </div>
+   128→    );
+   129→  }
+   130→
+   131→  return (
+   132→    <code
+   133→      className="rounded bg-muted px-1.5 py-0.5 text-sm font-mono"
+   134→      {...props}
+   135→    >
+   136→      {children}
+   137→    </code>
+   138→  );
+   139→}
+   140→
+   141→/* ───────── Blinking cursor ───────── */
+   142→
+   143→function BlinkingCursor() {
+   144→  return (
+   145→    <span className="inline-block w-2 h-4 ml-0.5 bg-foreground/70 animate-pulse rounded-sm align-text-bottom" />
+   146→  );
+   147→}
+   148→
+   149→/* ───────── Token Counter ───────── */
+   150→
+   151→function estimateTokens(text: string): number {
+   152→  // Rough estimation: ~4 chars per token for English text
+   153→  return Math.ceil(text.length / 4);
+   154→}
+   155→
+   156→/* ───────── Message component ───────── */
+   157→
+   158→function ChatMessage({
+   159→  message,
+   160→  isStreaming,
+   161→  isLastAssistant,
+   162→  onRegenerate,
+   163→}: {
+   164→  message: Message;
+   165→  isStreaming?: boolean;
+   166→  isLastAssistant?: boolean;
+   167→  onRegenerate?: () => void;
+   168→}) {
+   169→  const isUser = message.role === 'user';
+   170→  const isAssistant = message.role === 'assistant';
+   171→
+   172→  return (
+   173→    <motion.div
+   174→      initial={{ opacity: 0, y: 8 }}
+   175→      animate={{ opacity: 1, y: 0 }}
+   176→      transition={{ duration: 0.2 }}
+   177→      className={`flex gap-3 px-4 py-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+   178→    >
+   179→      {/* Avatar */}
+   180→      <Avatar className="h-8 w-8 shrink-0 mt-0.5">
+   181→        <AvatarFallback
+   182→          className={
+   183→            isUser
+   184→              ? 'bg-emerald-600 text-white text-xs'
+   185→              : 'bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xs'
+   186→          }
+   187→        >
+   188→          {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+   189→        </AvatarFallback>
+   190→      </Avatar>
+   191→
+   192→      {/* Content */}
+   193→      <div
+   194→        className={`flex flex-col gap-1 max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}
+   195→      >
+   196→        {/* Name */}
+   197→        <span className="text-xs font-medium text-muted-foreground">
+   198→          {isUser ? 'You' : 'MASSIVE NUMBER'}
+   199→        </span>
+   200→
+   201→        {/* Message bubble */}
+   202→        <div
+   203→          className={`rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
+   204→            isUser
+   205→              ? 'bg-emerald-600/15 text-foreground rounded-tr-sm'
+   206→              : 'bg-card border border-border/50 text-foreground rounded-tl-sm'
+   207→          }`}
+   208→        >
+   209→          {isAssistant ? (
+   210→            <div className="prose prose-sm prose-invert max-w-none break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+   211→              <ReactMarkdown
+   212→                components={{
+   213→                  code: CodeBlock as never,
+   214→                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+   215→                  ul: ({ children }) => (
+   216→                    <ul className="mb-2 list-disc pl-4 space-y-1">{children}</ul>
+   217→                  ),
+   218→                  ol: ({ children }) => (
+   219→                    <ol className="mb-2 list-decimal pl-4 space-y-1">{children}</ol>
+   220→                  ),
+   221→                  h1: ({ children }) => (
+   222→                    <h1 className="text-lg font-bold mt-4 mb-2">{children}</h1>
+   223→                  ),
+   224→                  h2: ({ children }) => (
+   225→                    <h2 className="text-base font-bold mt-3 mb-1.5">{children}</h2>
+   226→                  ),
+   227→                  h3: ({ children }) => (
+   228→                    <h3 className="text-sm font-bold mt-2 mb-1">{children}</h3>
+   229→                  ),
+   230→                  a: ({ href, children }) => (
+   231→                    <a
+   232→                      href={href}
+   233→                      target="_blank"
+   234→                      rel="noopener noreferrer"
+   235→                      className="text-emerald-400 hover:underline inline-flex items-center gap-0.5"
+   236→                    >
+   237→                      {children}
+   238→                      <ExternalLink className="h-3 w-3" />
+   239→                    </a>
+   240→                  ),
+   241→                  blockquote: ({ children }) => (
+   242→                    <blockquote className="border-l-2 border-emerald-500/50 pl-3 italic text-muted-foreground">
+   243→                      {children}
+   244→                    </blockquote>
+   245→                  ),
+   246→                }}
+   247→              >
+   248→                {message.content}
+   249→              </ReactMarkdown>
+   250→              {isStreaming && <BlinkingCursor />}
+   251→            </div>
+   252→          ) : (
+   253→            <span className="whitespace-pre-wrap">{message.content}</span>
+   254→          )}
+   255→        </div>
+   256→
+   257→        {/* Sources */}
+   258→        {isAssistant && message.sources && message.sources.length > 0 && (
+   259→          <div className="flex flex-wrap gap-1.5 mt-1">
+   260→            {message.sources.map((source, i) => (
+   261→              <a
+   262→                key={i}
+   263→                href={source.url}
+   264→                target="_blank"
+   265→                rel="noopener noreferrer"
+   266→                className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+   267→              >
+   268→                <Globe className="h-3 w-3" />
+   269→                <span className="max-w-[150px] truncate">{source.name}</span>
+   270→                <ExternalLink className="h-2.5 w-2.5" />
+   271→              </a>
+   272→            ))}
+   273→          </div>
+   274→        )}
+   275→
+   276→        {/* Metadata footer */}
+   277→        {isAssistant && message.model && !isStreaming && (
+   278→          <div className="flex items-center gap-2 mt-1 flex-wrap">
+   279→            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
+   280→              {message.model}
+   281→            </Badge>
+   282→            {message.tokens !== undefined && message.tokens > 0 && (
+   283→              <span className="text-[10px] text-muted-foreground">
+   284→                {message.tokens} tokens
+   285→              </span>
+   286→            )}
+   287→            {message.cost !== undefined && message.cost > 0 && (
+   288→              <span className="text-[10px] text-muted-foreground">
+   289→                ${(message.cost / 1000).toFixed(4)}
+   290→              </span>
+   291→            )}
+   292→            {message.duration !== undefined && message.duration > 0 && (
+   293→              <span className="text-[10px] text-muted-foreground">
+   294→                {(message.duration / 1000).toFixed(1)}s
+   295→              </span>
+   296→            )}
+   297→            {/* Regenerate button for last assistant message */}
+   298→            {isLastAssistant && onRegenerate && (
+   299→              <Button
+   300→                variant="ghost"
+   301→                size="sm"
+   302→                className="h-5 px-1.5 text-[9px] text-muted-foreground hover:text-foreground"
+   303→                onClick={onRegenerate}
+   304→              >
+   305→                <RefreshCw className="h-3 w-3 mr-0.5" />
+   306→                Regenerate
+   307→              </Button>
+   308→            )}
+   309→          </div>
+   310→        )}
+   311→      </div>
+   312→    </motion.div>
+   313→  );
+   314→}
+   315→
+   316→/* ───────── Empty state ───────── */
+   317→
+   318→const SUGGESTIONS = [
+   319→  { icon: <Code className="h-4 w-4" />, label: 'Build a REST API', desc: 'Create endpoints with validation' },
+   320→  { icon: <Sparkles className="h-4 w-4" />, label: 'Create a React component', desc: 'Build reusable UI components' },
+   321→  { icon: <Zap className="h-4 w-4" />, label: 'Debug this error', desc: 'Analyze and fix code issues' },
+   322→  { icon: <Globe className="h-4 w-4" />, label: 'Search the web for...', desc: 'Get real-time information' },
+   323→];
+   324→
+   325→function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
+   326→  return (
+   327→    <div className="flex flex-col items-center justify-center h-full px-6 py-12">
+   328→      <motion.div
+   329→        initial={{ opacity: 0, scale: 0.9 }}
+   330→        animate={{ opacity: 1, scale: 1 }}
+   331→        transition={{ duration: 0.4 }}
+   332→        className="flex flex-col items-center gap-6 max-w-md"
+   333→      >
+   334→        {/* Branding */}
+   335→        <div className="flex flex-col items-center gap-2">
+   336→          <div className="relative">
+   337→            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+   338→              <Bot className="h-8 w-8 text-white" />
+   339→            </div>
+   340→            <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center ring-2 ring-background">
+   341→              <Sparkles className="h-3 w-3 text-white" />
+   342→            </div>
+   343→          </div>
+   344→          <h1 className="text-2xl font-bold tracking-tight mt-2">
+   345→            MASSIVE NUMBER
+   346→          </h1>
+   347→          <p className="text-sm text-muted-foreground text-center leading-relaxed">
+   348→            Your AI coding superpower. Chat with any model, search the web,
+   349→            and let agents build for you.
+   350→          </p>
+   351→        </div>
+   352→
+   353→        {/* Suggestions */}
+   354→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+   355→          {SUGGESTIONS.map((suggestion) => (
+   356→            <button
+   357→              key={suggestion.label}
+   358→              onClick={() => onSuggestionClick(suggestion.label)}
+   359→              className="flex items-start gap-3 rounded-lg border border-border/50 bg-card p-3 text-left hover:bg-accent/50 hover:border-border transition-all group"
+   360→            >
+   361→              <span className="mt-0.5 text-muted-foreground group-hover:text-foreground transition-colors">
+   362→                {suggestion.icon}
+   363→              </span>
+   364→              <div>
+   365→                <div className="text-sm font-medium group-hover:text-foreground transition-colors">
+   366→                  {suggestion.label}
+   367→                </div>
+   368→                <div className="text-xs text-muted-foreground">{suggestion.desc}</div>
+   369→              </div>
+   370→            </button>
+   371→          ))}
+   372→        </div>
+   373→      </motion.div>
+   374→    </div>
+   375→  );
+   376→}
+   377→
+   378→/* ───────── Main Chat Panel ───────── */
+   379→
+   380→export function ChatPanel() {
+   381→  const [input, setInput] = useState('');
+   382→  const [webGrounding, setWebGrounding] = useState(false);
+   383→  const [isListening, setIsListening] = useState(false);
+   384→  const [activePersona, setActivePersona] = useState<string>('default');
+   385→  const [personas, setPersonas] = useState<Persona[]>([DEFAULT_PERSONA]);
+   386→  const scrollRef = useRef<HTMLDivElement>(null);
+   387→
+   388→  useEffect(() => {
+   389→    fetch('/api/personas')
+   390→      .then(res => res.json())
+   391→      .then(data => {
+   392→        const fetched = (data.personas || []).map((p: { id: string; name: string; description: string; systemPrompt: string }) => ({
+   393→          id: p.id,
+   394→          name: p.name,
+   395→          icon: <Bot className="h-3 w-3" />,
+   396→          prefix: p.systemPrompt || '',
+   397→          description: p.description || '',
+   398→        }));
+   399→        setPersonas([DEFAULT_PERSONA, ...fetched]);
+   400→      })
+   401→      .catch(() => {});
+   402→  }, []);
+   403→  const textareaRef = useRef<HTMLTextAreaElement>(null);
+   404→  const streamingMsgIdRef = useRef<string | null>(null);
+   405→  const abortControllerRef = useRef<AbortController | null>(null);
+   406→
+   407→  const { chats, activeChatId, isStreaming, createChat, addMessage, updateMessage, setStreaming, clearChats } =
+   408→    useChatStore();
+   409→  const { selectedModel } = useModelStore();
+   410→  const { addToast } = useUIStore();
+   411→
+   412→  const activeChat = chats.find((c) => c.id === activeChatId);
+   413→  const tokenCount = estimateTokens(input);
+   414→  const currentPersona = personas.find((p) => p.id === activePersona) || DEFAULT_PERSONA;
+   415→
+   416→  // Auto-scroll
+   417→  useEffect(() => {
+   418→    if (scrollRef.current) {
+   419→      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+   420→    }
+   421→  }, [activeChat?.messages]);
+   422→
+   423→  // Auto-resize textarea
+   424→  useEffect(() => {
+   425→    if (textareaRef.current) {
+   426→      textareaRef.current.style.height = 'auto';
+   427→      textareaRef.current.style.height =
+   428→        Math.min(textareaRef.current.scrollHeight, 200) + 'px';
+   429→    }
+   430→  }, [input]);
+   431→
+   432→  // Simulated streaming: reveal text character by character
+   433→  const simulateStreaming = useCallback(async (chatId: string, msgId: string, fullContent: string, model: string, tokens: number, cost: number, duration: number) => {
+   434→    const chunkSize = 3;
+   435→    let revealed = '';
+   436→    for (let i = 0; i < fullContent.length; i += chunkSize) {
+   437→      if (abortControllerRef.current?.signal.aborted) break;
+   438→      revealed += fullContent.slice(i, i + chunkSize);
+   439→      updateMessage(chatId, msgId, { content: revealed });
+   440→      await new Promise(r => setTimeout(r, 12));
+   441→    }
+   442→    // Final update with metadata
+   443→    updateMessage(chatId, msgId, {
+   444→      content: fullContent,
+   445→      model,
+   446→      tokens,
+   447→      cost,
+   448→      duration,
+   449→      isStreaming: false,
+   450→    });
+   451→    setStreaming(false);
+   452→    streamingMsgIdRef.current = null;
+   453→  }, [updateMessage, setStreaming]);
+   454→
+   455→  const sendMessage = useCallback(async (text: string, personaPrefix?: string) => {
+   456→    if (!text.trim() || isStreaming) return;
+   457→
+   458→    let chatId = activeChatId;
+   459→    if (!chatId) {
+   460→      chatId = createChat(selectedModel, 'chat');
+   461→    }
+   462→
+   463→    // Add user message
+   464→    const userMsg: Message = {
+   465→      id: `msg-${Date.now()}-user`,
+   466→      role: 'user',
+   467→      content: text,
+   468→      timestamp: new Date(),
+   469→    };
+   470→    addMessage(chatId, userMsg);
+   471→
+   472→    // Create placeholder assistant message
+   473→    const assistantMsgId = `msg-${Date.now()}-assistant`;
+   474→    const assistantMsg: Message = {
+   475→      id: assistantMsgId,
+   476→      role: 'assistant',
+   477→      content: '',
+   478→      model: selectedModel,
+   479→      isStreaming: true,
+   480→      timestamp: new Date(),
+   481→    };
+   482→    addMessage(chatId, assistantMsg);
+   483→    streamingMsgIdRef.current = assistantMsgId;
+   484→    setStreaming(true);
+   485→
+   486→    // Create abort controller for this request
+   487→    const controller = new AbortController();
+   488→    abortControllerRef.current = controller;
+   489→
+   490→    try {
+   491→      // Call the REST API
+   492→      const allMessages = [...(activeChat?.messages || []), userMsg].map((m) => ({
+   493→        role: m.role,
+   494→        content: m.content,
+   495→      }));
+   496→
+   497→      // Add persona prefix as system message if present
+   498→      const systemPrefix = personaPrefix || currentPersona.prefix;
+   499→      if (systemPrefix) {
+   500→        allMessages.unshift({ role: 'system', content: systemPrefix });
+   501→      }
+   502→
+   503→      const res = await fetch('/api/chat', {
+   504→        method: 'POST',
+   505→        headers: { 'Content-Type': 'application/json' },
+   506→        body: JSON.stringify({
+   507→          messages: allMessages,
+   508→          model: selectedModel,
+   509→          mode: 'chat',
+   510→        }),
+   511→        signal: controller.signal,
+   512→      });
+   513→
+   514→      if (!res.ok) {
+   515→        const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
+   516→        throw new Error(errData.error || `HTTP ${res.status}`);
+   517→      }
+   518→
+   519→      const data = await res.json();
+   520→
+   521→      // Simulate streaming with the full response
+   522→      const content = data.content || data.message?.content || 'No response received.';
+   523→      const model = data.model || selectedModel;
+   524→      const tokens = data.tokens || data.usage?.total_tokens || Math.ceil(content.length / 4);
+   525→      const cost = data.cost || (tokens * 0.003);
+   526→      const duration = data.duration || 0;
+   527→
+   528→      await simulateStreaming(chatId, assistantMsgId, content, model, tokens, cost, duration);
+   529→    } catch (err: unknown) {
+   530→      if (controller.signal.aborted) return;
+   531→      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+   532→      
+   533→      // Fallback: show error message but also try socket.io
+   534→      updateMessage(chatId, assistantMsgId, {
+   535→        content: `I encountered an issue connecting to the AI service (${errorMessage}). Let me try an alternative approach...\n\n**Note:** MASSIVE NUMBER supports 10+ free providers: Google Gemini, DeepSeek, Meta Llama, Qwen, Mistral, Groq, Cerebras, Cohere, SambaNova, OpenRouter, and more. Configure your preferred providers in Settings → Providers.`,
+   536→        model: selectedModel,
+   537→        tokens: 0,
+   538→        cost: 0,
+   539→        duration: 0,
+   540→        isStreaming: false,
+   541→      });
+   542→      setStreaming(false);
+   543→      streamingMsgIdRef.current = null;
+   544→      addToast('Chat: Using fallback mode. Configure API keys in Settings.', 'info');
+   545→    }
+   546→  }, [
+   547→    isStreaming,
+   548→    activeChatId,
+   549→    selectedModel,
+   550→    activeChat,
+   551→    currentPersona,
+   552→    createChat,
+   553→    addMessage,
+   554→    updateMessage,
+   555→    setStreaming,
+   556→    simulateStreaming,
+   557→    addToast,
+   558→  ]);
+   559→
+   560→  const handleSend = useCallback(async () => {
+   561→    const text = input.trim();
+   562→    if (!text) return;
+   563→    setInput('');
+   564→    if (textareaRef.current) {
+   565→      textareaRef.current.style.height = 'auto';
+   566→    }
+   567→    await sendMessage(text);
+   568→  }, [input, sendMessage]);
+   569→
+   570→  const handleKeyDown = (e: React.KeyboardEvent) => {
+   571→    if (e.key === 'Enter' && !e.shiftKey) {
+   572→      e.preventDefault();
+   573→      handleSend();
+   574→    }
+   575→  };
+   576→
+   577→  const handleSuggestionClick = (text: string) => {
+   578→    setInput(text);
+   579→    setTimeout(() => textareaRef.current?.focus(), 50);
+   580→  };
+   581→
+   582→  const handleRegenerate = useCallback(async () => {
+   583→    if (!activeChat || isStreaming) return;
+   584→    const messages = activeChat.messages;
+   585→    // Find the last user message
+   586→    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+   587→    if (!lastUserMsg) return;
+   588→    await sendMessage(lastUserMsg.content, currentPersona.prefix);
+   589→  }, [activeChat, isStreaming, sendMessage, currentPersona]);
+   590→
+   591→  /* ───────── Export Functions ───────── */
+   592→
+   593→  const exportAsMarkdown = useCallback(() => {
+   594→    if (!activeChat) return;
+   595→    const lines: string[] = [`# ${activeChat.title}\n`];
+   596→    activeChat.messages.forEach((msg) => {
+   597→      if (msg.role === 'user') {
+   598→        lines.push(`## You\n\n${msg.content}\n`);
+   599→      } else if (msg.role === 'assistant') {
+   600→        lines.push(`## MASSIVE NUMBER${msg.model ? ` (${msg.model})` : ''}\n\n${msg.content}\n`);
+   601→        if (msg.tokens) lines.push(`*${msg.tokens} tokens | ${(msg.duration || 0) / 1000}s*\n`);
+   602→      }
+   603→    });
+   604→    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+   605→    const url = URL.createObjectURL(blob);
+   606→    const a = document.createElement('a');
+   607→    a.href = url;
+   608→    a.download = `${activeChat.title.replace(/\s+/g, '_')}.md`;
+   609→    a.click();
+   610→    URL.revokeObjectURL(url);
+   611→    addToast('Chat exported as Markdown', 'success');
+   612→  }, [activeChat, addToast]);
+   613→
+   614→  const exportAsJSON = useCallback(() => {
+   615→    if (!activeChat) return;
+   616→    const data = {
+   617→      title: activeChat.title,
+   618→      model: activeChat.model,
+   619→      mode: activeChat.mode,
+   620→      exportedAt: new Date().toISOString(),
+   621→      messages: activeChat.messages.map((m) => ({
+   622→        role: m.role,
+   623→        content: m.content,
+   624→        model: m.model,
+   625→        tokens: m.tokens,
+   626→        duration: m.duration,
+   627→        timestamp: m.timestamp,
+   628→      })),
+   629→    };
+   630→    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+   631→    const url = URL.createObjectURL(blob);
+   632→    const a = document.createElement('a');
+   633→    a.href = url;
+   634→    a.download = `${activeChat.title.replace(/\s+/g, '_')}.json`;
+   635→    a.click();
+   636→    URL.revokeObjectURL(url);
+   637→    addToast('Chat exported as JSON', 'success');
+   638→  }, [activeChat, addToast]);
+   639→
+   640→  const handleClearChat = useCallback(() => {
+   641→    clearChats();
+   642→    addToast('Chat cleared', 'info');
+   643→  }, [clearChats, addToast]);
+   644→
+   645→  // Find last assistant message for regenerate button
+   646→  const lastAssistantMsgId = activeChat
+   647→    ? [...activeChat.messages].reverse().find((m) => m.role === 'assistant' && !m.isStreaming)?.id
+   648→    : null;
+   649→
+   650→  return (
+   651→    <div className="flex flex-col h-full bg-background">
+   652→      {/* Chat header with export menu */}
+   653→      {activeChat && activeChat.messages.length > 0 && (
+   654→        <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border/30 bg-card/30">
+   655→          <div className="flex items-center gap-2">
+   656→            <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+   657→            <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+   658→              {activeChat.title}
+   659→            </span>
+   660→            <Badge variant="secondary" className="text-[8px] h-4 px-1.5 font-mono">
+   661→              {activeChat.messages.length} msgs
+   662→            </Badge>
+   663→          </div>
+   664→          <DropdownMenu>
+   665→            <DropdownMenuTrigger asChild>
+   666→              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+   667→                <MoreVertical className="h-4 w-4" />
+   668→              </Button>
+   669→            </DropdownMenuTrigger>
+   670→            <DropdownMenuContent align="end" className="w-48">
+   671→              <DropdownMenuItem onClick={exportAsMarkdown} className="text-xs">
+   672→                <FileText className="h-3.5 w-3.5 mr-2" />
+   673→                Export as Markdown
+   674→              </DropdownMenuItem>
+   675→              <DropdownMenuItem onClick={exportAsJSON} className="text-xs">
+   676→                <FileJson className="h-3.5 w-3.5 mr-2" />
+   677→                Export as JSON
+   678→              </DropdownMenuItem>
+   679→              <DropdownMenuSeparator />
+   680→              <DropdownMenuItem onClick={handleClearChat} className="text-xs text-red-400 focus:text-red-400">
+   681→                <Trash2 className="h-3.5 w-3.5 mr-2" />
+   682→                Clear Chat
+   683→              </DropdownMenuItem>
+   684→            </DropdownMenuContent>
+   685→          </DropdownMenu>
+   686→        </div>
+   687→      )}
+   688→
+   689→      {/* Messages area */}
+   690→      {activeChat && activeChat.messages.length > 0 ? (
+   691→        <ScrollArea className="flex-1">
+   692→          <div ref={scrollRef} className="max-w-3xl mx-auto py-4">
+   693→            <AnimatePresence initial={false}>
+   694→              {activeChat.messages.map((msg) => (
+   695→                <ChatMessage
+   696→                  key={msg.id}
+   697→                  message={msg}
+   698→                  isStreaming={msg.isStreaming}
+   699→                  isLastAssistant={msg.id === lastAssistantMsgId}
+   700→                  onRegenerate={msg.id === lastAssistantMsgId ? handleRegenerate : undefined}
+   701→                />
+   702→              ))}
+   703→            </AnimatePresence>
+   704→          </div>
+   705→        </ScrollArea>
+   706→      ) : (
+   707→        <div className="flex-1 overflow-auto">
+   708→          <EmptyState onSuggestionClick={handleSuggestionClick} />
+   709→        </div>
+   710→      )}
+   711→
+   712→      {/* Input area */}
+   713→      <div className="border-t border-border/50 bg-background/95 backdrop-blur-sm">
+   714→        <div className="max-w-3xl mx-auto px-4 py-3">
+   715→          {/* Top row: model selector + persona + toggles */}
+   716→          <div className="flex items-center gap-1 mb-2">
+   717→            <ModelSelector />
+   718→
+   719→            {/* Persona Selector */}
+   720→            <Popover>
+   721→              <PopoverTrigger asChild>
+   722→                <Button
+   723→                  variant="ghost"
+   724→                  size="sm"
+   725→                  className={`h-8 text-[10px] px-2 gap-1 ${
+   726→                    activePersona !== 'default'
+   727→                      ? 'text-amber-400 bg-amber-400/10'
+   728→                      : 'text-muted-foreground'
+   729→                  }`}
+   730→                >
+   731→                  {currentPersona.icon}
+   732→                  <span className="hidden sm:inline">{currentPersona.name}</span>
+   733→                  <ChevronDown className="h-2.5 w-2.5" />
+   734→                </Button>
+   735→              </PopoverTrigger>
+   736→              <PopoverContent className="w-64 p-2" align="start">
+   737→                <div className="space-y-0.5">
+   738→                  <p className="text-[10px] font-medium text-muted-foreground px-2 py-1 uppercase tracking-wider">
+   739→                    AI Persona
+   740→                  </p>
+   741→                  {personas.map((persona) => (
+   742→                    <button
+   743→                      key={persona.id}
+   744→                      onClick={() => setActivePersona(persona.id)}
+   745→                      className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-md text-left transition-colors ${
+   746→                        activePersona === persona.id
+   747→                          ? 'bg-emerald-500/10 text-emerald-400'
+   748→                          : 'hover:bg-muted/50 text-foreground'
+   749→                      }`}
+   750→                    >
+   751→                      <span className={`shrink-0 ${activePersona === persona.id ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+   752→                        {persona.icon}
+   753→                      </span>
+   754→                      <div className="flex-1 min-w-0">
+   755→                        <div className="text-xs font-medium">{persona.name}</div>
+   756→                        <div className="text-[9px] text-muted-foreground truncate">{persona.description}</div>
+   757→                      </div>
+   758→                      {activePersona === persona.id && (
+   759→                        <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+   760→                      )}
+   761→                    </button>
+   762→                  ))}
+   763→                </div>
+   764→              </PopoverContent>
+   765→            </Popover>
+   766→
+   767→            <div className="flex-1" />
+   768→            <TooltipProvider delayDuration={200}>
+   769→              <Tooltip>
+   770→                <TooltipTrigger asChild>
+   771→                  <Button
+   772→                    variant="ghost"
+   773→                    size="icon"
+   774→                    className={`h-8 w-8 ${
+   775→                      webGrounding ? 'text-emerald-400 bg-emerald-400/10' : 'text-muted-foreground'
+   776→                    }`}
+   777→                    onClick={() => setWebGrounding(!webGrounding)}
+   778→                  >
+   779→                    <Globe className="h-4 w-4" />
+   780→                  </Button>
+   781→                </TooltipTrigger>
+   782→                <TooltipContent>Web Grounding {webGrounding ? 'ON' : 'OFF'}</TooltipContent>
+   783→              </Tooltip>
+   784→              <Tooltip>
+   785→                <TooltipTrigger asChild>
+   786→                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+   787→                    <Paperclip className="h-4 w-4" />
+   788→                  </Button>
+   789→                </TooltipTrigger>
+   790→                <TooltipContent>Attach file</TooltipContent>
+   791→              </Tooltip>
+   792→              <Tooltip>
+   793→                <TooltipTrigger asChild>
+   794→                  <Button
+   795→                    variant="ghost"
+   796→                    size="icon"
+   797→                    className={`h-8 w-8 ${
+   798→                      isListening ? 'text-red-400 bg-red-400/10' : 'text-muted-foreground'
+   799→                    }`}
+   800→                    onClick={() => setIsListening(!isListening)}
+   801→                  >
+   802→                    <Mic className="h-4 w-4" />
+   803→                  </Button>
+   804→                </TooltipTrigger>
+   805→                <TooltipContent>Voice input {isListening ? '(listening...)' : ''}</TooltipContent>
+   806→              </Tooltip>
+   807→            </TooltipProvider>
+   808→          </div>
+   809→
+   810→          {/* Input row */}
+   811→          <div className="flex items-end gap-2">
+   812→            <Textarea
+   813→              ref={textareaRef}
+   814→              value={input}
+   815→              onChange={(e) => setInput(e.target.value)}
+   816→              onKeyDown={handleKeyDown}
+   817→              placeholder="Ask anything... (Shift+Enter for new line)"
+   818→              className="min-h-[40px] max-h-[200px] resize-none bg-card border-border/50 focus-visible:ring-emerald-500/30 placeholder:text-muted-foreground/60"
+   819→              rows={1}
+   820→              disabled={isStreaming}
+   821→            />
+   822→            <Button
+   823→              onClick={handleSend}
+   824→              disabled={!input.trim() || isStreaming}
+   825→              size="icon"
+   826→              className="h-10 w-10 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-all"
+   827→            >
+   828→              {isStreaming ? (
+   829→                <Loader2 className="h-4 w-4 animate-spin" />
+   830→              ) : (
+   831→                <Send className="h-4 w-4" />
+   832→              )}
+   833→            </Button>
+   834→          </div>
+   835→
+   836→          {/* Bottom hint with token counter */}
+   837→          <div className="flex items-center justify-between mt-1.5">
+   838→            <span className="text-[10px] text-muted-foreground/50">
+   839→              <MessageSquare className="h-3 w-3 inline mr-1" />
+   840→              Powered by MASSIVE NUMBER · Multi-model orchestration
+   841→            </span>
+   842→            {input.length > 0 && (
+   843→              <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+   844→                ≈{tokenCount} tokens
+   845→              </span>
+   846→            )}
+   847→          </div>
+   848→        </div>
+   849→      </div>
+   850→    </div>
+   851→  );
+   852→}
+   853→

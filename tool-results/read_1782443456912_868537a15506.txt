@@ -1,0 +1,916 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useState } from 'react';
+     4→     4→import { useEffect } from 'react';
+     5→     5→import {
+     6→     6→  Settings,
+     7→     7→  Key,
+     8→     8→  Palette,
+     9→     9→  Globe,
+    10→    10→  Bot,
+    11→    11→  Shield,
+    12→    12→  Zap,
+    13→    13→  Plus,
+    14→    14→  Trash2,
+    15→    15→  Eye,
+    16→    16→  EyeOff,
+    17→    17→  Check,
+    18→    18→  RefreshCw,
+    19→    19→  CreditCard,
+    20→    20→  Cpu,
+    21→    21→  Cloud,
+    22→    22→  MessageSquare,
+    23→    23→  Code,
+    24→    24→  Terminal,
+    25→    25→  Search,
+    26→    26→  Sparkles,
+    27→    27→} from 'lucide-react';
+    28→    28→import { Button } from '@/components/ui/button';
+    29→    29→import { Input } from '@/components/ui/input';
+    30→    30→import {
+    31→    31→  Card,
+    32→    32→  CardContent,
+    33→    33→  CardDescription,
+    34→    34→  CardHeader,
+    35→    35→  CardTitle,
+    36→    36→} from '@/components/ui/card';
+    37→    37→import {
+    38→    38→  Tabs,
+    39→    39→  TabsContent,
+    40→    40→  TabsList,
+    41→    41→  TabsTrigger,
+    42→    42→} from '@/components/ui/tabs';
+    43→    43→import { Badge } from '@/components/ui/badge';
+    44→    44→import { Switch } from '@/components/ui/switch';
+    45→    45→import { Label } from '@/components/ui/label';
+    46→    46→import { Separator } from '@/components/ui/separator';
+    47→    47→import { ScrollArea } from '@/components/ui/scroll-area';
+    48→    48→import {
+    49→    49→  Select,
+    50→    50→  SelectContent,
+    51→    51→  SelectItem,
+    52→    52→  SelectTrigger,
+    53→    53→  SelectValue,
+    54→    54→} from '@/components/ui/select';
+    55→    55→import {
+    56→    56→  Dialog,
+    57→    57→  DialogContent,
+    58→    58→  DialogDescription,
+    59→    59→  DialogHeader,
+    60→    60→  DialogTitle,
+    61→    61→  DialogTrigger,
+    62→    62→} from '@/components/ui/dialog';
+    63→    63→import { Slider } from '@/components/ui/slider';
+    64→    64→import { useModelStore } from '@/stores/model-store';
+    65→    65→
+    66→    66→// ── Provider Data ──────────────────────────────────────────────────────────
+    67→    67→
+    68→    68→interface ProviderInfo {
+    69→    69→  id: string;
+    70→    70→  name: string;
+    71→    71→  icon: React.ReactNode;
+    72→    72→  color: string;
+    73→    73→  connected: boolean;
+    74→    74→  enabled: boolean;
+    75→    75→  apiKey: string;
+    76→    76→  models: { id: string; name: string }[];
+    77→    77→}
+    78→    78→
+    79→    79→const INITIAL_PROVIDERS: ProviderInfo[] = [];
+    80→    80→
+    81→    81→// ── Provider icon map ────────────────────────────────────────────────────────
+    82→    82→
+    83→    83→const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
+    84→    84→  google: <Globe className="h-5 w-5" />,
+    85→    85→  deepseek: <Zap className="h-5 w-5" />,
+    86→    86→  meta: <Cpu className="h-5 w-5" />,
+    87→    87→  alibaba: <MessageSquare className="h-5 w-5" />,
+    88→    88→  mistral: <Bot className="h-5 w-5" />,
+    89→    89→  groq: <Zap className="h-5 w-5" />,
+    90→    90→  cerebras: <Cpu className="h-5 w-5" />,
+    91→    91→  cohere: <Cloud className="h-5 w-5" />,
+    92→    92→  sambanova: <Zap className="h-5 w-5" />,
+    93→    93→  openrouter: <Globe className="h-5 w-5" />,
+    94→    94→};
+    95→    95→
+    96→    96→// ── Component ───────────────────────────────────────────────────────────
+    97→    97→
+    98→    98→export function SettingsPanel() {
+    99→    99→  const { models, selectedModel, setSelectedModel, toggleModel } =
+   100→   100→    useModelStore();
+   101→   101→  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+   102→   102→
+   103→   103→  useEffect(() => {
+   104→   104→    fetch('/api/providers')
+   105→   105→      .then(res => res.json())
+   106→   106→      .then(data => {
+   107→   107→        const mapped = (data.providers || []).map((p: { id: string; name: string; provider: string; apiKey: string; models: Array<{ id: string; name: string }>; enabled: boolean }) => ({
+   108→   108→          id: p.provider || p.id,
+   109→   109→          name: p.name,
+   110→   110→          icon: PROVIDER_ICON_MAP[p.provider?.toLowerCase()] || <Cloud className="h-5 w-5" />,
+   111→   111→          color: 'text-muted-foreground',
+   112→   112→          connected: !!p.apiKey,
+   113→   113→          enabled: p.enabled,
+   114→   114→          apiKey: p.apiKey || '',
+   115→   115→          models: p.models || [],
+   116→   116→        }));
+   117→   117→        setProviders(mapped);
+   118→   118→      })
+   119→   119→      .catch(() => {});
+   120→   120→  }, []);
+   121→   121→  const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
+   122→   122→  const [addDialogOpen, setAddDialogOpen] = useState(false);
+   123→   123→  const [newProviderName, setNewProviderName] = useState('');
+   124→   124→  const [newProviderKey, setNewProviderKey] = useState('');
+   125→   125→
+   126→   126→  // General settings
+   127→   127→  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+   128→   128→  const [defaultModel, setDefaultModel] = useState('auto');
+   129→   129→  const [autoApprove, setAutoApprove] = useState(false);
+   130→   130→  const [voiceEnabled, setVoiceEnabled] = useState(true);
+   131→   131→  const [costOptimization, setCostOptimization] = useState(true);
+   132→   132→  const [webGrounding, setWebGrounding] = useState(false);
+   133→   133→  const [fontSize, setFontSize] = useState([14]);
+   134→   134→  const [tabSize, setTabSize] = useState('2');
+   135→   135→  const [wordWrap, setWordWrap] = useState(true);
+   136→   136→
+   137→   137→  // Helpers
+   138→   138→  const toggleProviderEnabled = (id: string) => {
+   139→   139→    setProviders((prev) =>
+   140→   140→      prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p))
+   141→   141→    );
+   142→   142→  };
+   143→   143→
+   144→   144→  const toggleShowApiKey = (id: string) => {
+   145→   145→    setShowApiKeys((prev) => ({ ...prev, [id]: !prev[id] }));
+   146→   146→  };
+   147→   147→
+   148→   148→  const removeProvider = (id: string) => {
+   149→   149→    setProviders((prev) => prev.filter((p) => p.id !== id));
+   150→   150→  };
+   151→   151→
+   152→   152→  const handleAddProvider = () => {
+   153→   153→    if (!newProviderName.trim() || !newProviderKey.trim()) return;
+   154→   154→    const newProvider: ProviderInfo = {
+   155→   155→      id: `custom-${Date.now()}`,
+   156→   156→      name: newProviderName.trim(),
+   157→   157→      icon: <Cloud className="h-5 w-5" />,
+   158→   158→      color: 'text-gray-400',
+   159→   159→      connected: true,
+   160→   160→      enabled: true,
+   161→   161→      apiKey: newProviderKey.trim(),
+   162→   162→      models: [],
+   163→   163→    };
+   164→   164→    setProviders((prev) => [...prev, newProvider]);
+   165→   165→    setNewProviderName('');
+   166→   166→    setNewProviderKey('');
+   167→   167→    setAddDialogOpen(false);
+   168→   168→  };
+   169→   169→
+   170→   170→  // ── Usage by model (derived from model store, all free) ─────────────────
+   171→   171→  const USAGE_BY_MODEL = models.map((m) => ({
+   172→   172→    model: m.name,
+   173→   173→    tokens: m.contextWindow,
+   174→   174→    cost: m.costPer1kTokens,
+   175→   175→    color: m.provider === 'google' ? 'bg-red-500' :
+   176→   176→           m.provider === 'deepseek' ? 'bg-cyan-500' :
+   177→   177→           m.provider === 'meta' ? 'bg-violet-500' :
+   178→   178→           m.provider === 'alibaba' ? 'bg-amber-500' :
+   179→   179→           m.provider === 'mistral' ? 'bg-orange-500' :
+   180→   180→           m.provider === 'groq' ? 'bg-emerald-500' :
+   181→   181→           m.provider === 'cerebras' ? 'bg-rose-500' :
+   182→   182→           m.provider === 'cohere' ? 'bg-teal-500' :
+   183→   183→           'bg-emerald-500',
+   184→   184→  }));
+   185→   185→
+   186→   186→  const maxTokens = Math.max(...USAGE_BY_MODEL.map((m) => m.tokens), 1);
+   187→   187→
+   188→   188→  // ── Speed rating helper ──────────────────────────────────────────────────
+   189→   189→  const speedStars = (speed: string) => {
+   190→   190→    const map: Record<string, number> = {
+   191→   191→      optimal: 4,
+   192→   192→      fast: 4,
+   193→   193→      medium: 3,
+   194→   194→      slow: 2,
+   195→   195→    };
+   196→   196→    const count = map[speed] ?? 3;
+   197→   197→    return '★'.repeat(count) + '☆'.repeat(5 - count);
+   198→   198→  };
+   199→   199→
+   200→   200→  // ── Auto-routing config (updated June 2026 — all free models) ────────────
+   201→   201→  const autoRouting: { task: string; icon: React.ReactNode; model: string }[] =
+   202→   202→    [
+   203→   203→      {
+   204→   204→        task: 'General Chat',
+   205→   205→        icon: <MessageSquare className="h-4 w-4" />,
+   206→   206→        model: 'gemini-2.5-flash',
+   207→   207→      },
+   208→   208→      {
+   209→   209→        task: 'Code Generation',
+   210→   210→        icon: <Code className="h-4 w-4" />,
+   211→   211→        model: 'qwen3-coder-480b',
+   212→   212→      },
+   213→   213→      {
+   214→   214→        task: 'Agent Tasks',
+   215→   215→        icon: <Bot className="h-4 w-4" />,
+   216→   216→        model: 'qwen3.7-max',
+   217→   217→      },
+   218→   218→      {
+   219→   219→        task: 'Web Search',
+   220→   220→        icon: <Search className="h-4 w-4" />,
+   221→   221→        model: 'gemini-2.5-flash',
+   222→   222→      },
+   223→   223→      {
+   224→   224→        task: 'Reasoning',
+   225→   225→        icon: <Sparkles className="h-4 w-4" />,
+   226→   226→        model: 'deepseek-r1',
+   227→   227→      },
+   228→   228→      {
+   229→   229→        task: 'Ultra Fast',
+   230→   230→        icon: <Zap className="h-4 w-4" />,
+   231→   231→        model: 'llama-4-scout-17b',
+   232→   232→      },
+   233→   233→    ];
+   234→   234→
+   235→   235→  // ─────────────────────────────────────────────────────────────────────────
+   236→   236→  return (
+   237→   237→    <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
+   238→   238→      {/* Header */}
+   239→   239→      <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+   240→   240→        <Settings className="h-5 w-5 text-zinc-400" />
+   241→   241→        <h2 className="text-lg font-semibold">Settings</h2>
+   242→   242→      </div>
+   243→   243→
+   244→   244→      {/* Tabs */}
+   245→   245→      <Tabs defaultValue="providers" className="flex flex-1 flex-col overflow-hidden">
+   246→   246→        <TabsList className="mx-4 mt-2 grid w-auto grid-cols-4 bg-zinc-900">
+   247→   247→          <TabsTrigger
+   248→   248→            value="providers"
+   249→   249→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   250→   250→          >
+   251→   251→            Providers
+   252→   252→          </TabsTrigger>
+   253→   253→          <TabsTrigger
+   254→   254→            value="models"
+   255→   255→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   256→   256→          >
+   257→   257→            Models
+   258→   258→          </TabsTrigger>
+   259→   259→          <TabsTrigger
+   260→   260→            value="general"
+   261→   261→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   262→   262→          >
+   263→   263→            General
+   264→   264→          </TabsTrigger>
+   265→   265→          <TabsTrigger
+   266→   266→            value="usage"
+   267→   267→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   268→   268→          >
+   269→   269→            Usage
+   270→   270→          </TabsTrigger>
+   271→   271→        </TabsList>
+   272→   272→
+   273→   273→        {/* ── Providers Tab ────────────────────────────────────────────── */}
+   274→   274→        <TabsContent value="providers" className="mt-0 flex-1 overflow-hidden">
+   275→   275→          <ScrollArea className="h-full">
+   276→   276→            <div className="space-y-3 p-4">
+   277→   277→              {/* Add provider button */}
+   278→   278→              <div className="flex items-center justify-between">
+   279→   279→                <p className="text-sm text-zinc-400">
+   280→   280→                  {providers.filter((p) => p.connected).length} of{' '}
+   281→   281→                  {providers.length} providers connected
+   282→   282→                </p>
+   283→   283→                <Dialog
+   284→   284→                  open={addDialogOpen}
+   285→   285→                  onOpenChange={setAddDialogOpen}
+   286→   286→                >
+   287→   287→                  <DialogTrigger asChild>
+   288→   288→                    <Button
+   289→   289→                      size="sm"
+   290→   290→                      className="bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+   291→   291→                    >
+   292→   292→                      <Plus className="mr-1 h-4 w-4" /> Add Provider
+   293→   293→                    </Button>
+   294→   294→                  </DialogTrigger>
+   295→   295→                  <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 sm:max-w-md">
+   296→   296→                    <DialogHeader>
+   297→   297→                      <DialogTitle>Add Custom Provider</DialogTitle>
+   298→   298→                      <DialogDescription className="text-zinc-400">
+   299→   299→                        Connect a new AI provider with an API key
+   300→   300→                      </DialogDescription>
+   301→   301→                    </DialogHeader>
+   302→   302→                    <div className="space-y-4 pt-2">
+   303→   303→                      <div className="space-y-2">
+   304→   304→                        <Label className="text-zinc-300">Provider Name</Label>
+   305→   305→                        <Input
+   306→   306→                          value={newProviderName}
+   307→   307→                          onChange={(e) => setNewProviderName(e.target.value)}
+   308→   308→                          placeholder="e.g. Cohere"
+   309→   309→                          className="border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-600"
+   310→   310→                        />
+   311→   311→                      </div>
+   312→   312→                      <div className="space-y-2">
+   313→   313→                        <Label className="text-zinc-300">API Key</Label>
+   314→   314→                        <Input
+   315→   315→                          type="password"
+   316→   316→                          value={newProviderKey}
+   317→   317→                          onChange={(e) => setNewProviderKey(e.target.value)}
+   318→   318→                          placeholder="Enter API key"
+   319→   319→                          className="border-zinc-700 bg-zinc-900 text-zinc-100 placeholder:text-zinc-600"
+   320→   320→                        />
+   321→   321→                      </div>
+   322→   322→                      <Button
+   323→   323→                        onClick={handleAddProvider}
+   324→   324→                        className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
+   325→   325→                      >
+   326→   326→                        <Check className="mr-1 h-4 w-4" /> Connect Provider
+   327→   327→                      </Button>
+   328→   328→                    </div>
+   329→   329→                  </DialogContent>
+   330→   330→                </Dialog>
+   331→   331→              </div>
+   332→   332→
+   333→   333→              {/* Provider cards */}
+   334→   334→              {providers.map((provider) => (
+   335→   335→                <Card
+   336→   336→                  key={provider.id}
+   337→   337→                  className="border-zinc-800 bg-zinc-900/60 transition-colors hover:bg-zinc-900"
+   338→   338→                >
+   339→   339→                  <CardHeader className="pb-3">
+   340→   340→                    <div className="flex items-center justify-between">
+   341→   341→                      <div className="flex items-center gap-3">
+   342→   342→                        <div
+   343→   343→                          className={`flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-800 ${provider.color}`}
+   344→   344→                        >
+   345→   345→                          {provider.icon}
+   346→   346→                        </div>
+   347→   347→                        <div>
+   348→   348→                          <CardTitle className="text-sm font-medium">
+   349→   349→                            {provider.name}
+   350→   350→                          </CardTitle>
+   351→   351→                          <CardDescription className="text-xs text-zinc-500">
+   352→   352→                            {provider.models.length} model
+   353→   353→                            {provider.models.length !== 1 ? 's' : ''} available
+   354→   354→                          </CardDescription>
+   355→   355→                        </div>
+   356→   356→                      </div>
+   357→   357→                      <div className="flex items-center gap-2">
+   358→   358→                        <Badge
+   359→   359→                          variant="outline"
+   360→   360→                          className={`text-[10px] ${
+   361→   361→                            provider.connected
+   362→   362→                              ? 'border-emerald-700 text-emerald-400'
+   363→   363→                              : 'border-zinc-700 text-zinc-500'
+   364→   364→                          }`}
+   365→   365→                        >
+   366→   366→                          {provider.connected ? 'Connected' : 'Disconnected'}
+   367→   367→                        </Badge>
+   368→   368→                        <Switch
+   369→   369→                          checked={provider.enabled}
+   370→   370→                          onCheckedChange={() =>
+   371→   371→                            toggleProviderEnabled(provider.id)
+   372→   372→                          }
+   373→   373→                        />
+   374→   374→                      </div>
+   375→   375→                    </div>
+   376→   376→                  </CardHeader>
+   377→   377→                  <CardContent className="space-y-3 pt-0">
+   378→   378→                    {/* Model badges */}
+   379→   379→                    <div className="flex flex-wrap gap-1">
+   380→   380→                      {provider.models.map((m) => (
+   381→   381→                        <Badge
+   382→   382→                          key={m.id}
+   383→   383→                          variant="secondary"
+   384→   384→                          className="bg-zinc-800 text-[10px] text-zinc-300"
+   385→   385→                        >
+   386→   386→                          {m.name}
+   387→   387→                        </Badge>
+   388→   388→                      ))}
+   389→   389→                    </div>
+   390→   390→
+   391→   391→                    {/* API key field */}
+   392→   392→                    <div className="flex items-center gap-2">
+   393→   393→                      <Key className="h-3.5 w-3.5 text-zinc-500" />
+   394→   394→                      <div className="relative flex-1">
+   395→   395→                        <Input
+   396→   396→                          type={
+   397→   397→                            showApiKeys[provider.id] ? 'text' : 'password'
+   398→   398→                          }
+   399→   399→                          value={provider.apiKey || 'No API key set'}
+   400→   400→                          readOnly
+   401→   401→                          className="h-8 border-zinc-700 bg-zinc-800 pr-9 text-xs text-zinc-400"
+   402→   402→                        />
+   403→   403→                        <Button
+   404→   404→                          variant="ghost"
+   405→   405→                          size="icon"
+   406→   406→                          className="absolute right-0.5 top-0.5 h-7 w-7 text-zinc-500 hover:text-zinc-300"
+   407→   407→                          onClick={() => toggleShowApiKey(provider.id)}
+   408→   408→                        >
+   409→   409→                          {showApiKeys[provider.id] ? (
+   410→   410→                            <EyeOff className="h-3.5 w-3.5" />
+   411→   411→                          ) : (
+   412→   412→                            <Eye className="h-3.5 w-3.5" />
+   413→   413→                          )}
+   414→   414→                        </Button>
+   415→   415→                      </div>
+   416→   416→                      <Button
+   417→   417→                        variant="ghost"
+   418→   418→                        size="icon"
+   419→   419→                        className="h-8 w-8 text-zinc-500 hover:text-red-400"
+   420→   420→                        onClick={() => removeProvider(provider.id)}
+   421→   421→                      >
+   422→   422→                        <Trash2 className="h-3.5 w-3.5" />
+   423→   423→                      </Button>
+   424→   424→                    </div>
+   425→   425→                  </CardContent>
+   426→   426→                </Card>
+   427→   427→              ))}
+   428→   428→            </div>
+   429→   429→          </ScrollArea>
+   430→   430→        </TabsContent>
+   431→   431→
+   432→   432→        {/* ── Models Tab ───────────────────────────────────────────────── */}
+   433→   433→        <TabsContent value="models" className="mt-0 flex-1 overflow-hidden">
+   434→   434→          <ScrollArea className="h-full">
+   435→   435→            <div className="space-y-4 p-4">
+   436→   436→              {/* Auto-routing section */}
+   437→   437→              <div>
+   438→   438→                <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-zinc-300">
+   439→   439→                  <Zap className="h-4 w-4 text-amber-400" /> Auto-Routing
+   440→   440→                  Configuration
+   441→   441→                </h3>
+   442→   442→                <Card className="border-zinc-800 bg-zinc-900/60">
+   443→   443→                  <CardContent className="divide-y divide-zinc-800 p-0">
+   444→   444→                    {autoRouting.map((r) => (
+   445→   445→                      <div
+   446→   446→                        key={r.task}
+   447→   447→                        className="flex items-center justify-between px-4 py-2.5"
+   448→   448→                      >
+   449→   449→                        <div className="flex items-center gap-2 text-sm text-zinc-300">
+   450→   450→                          {r.icon}
+   451→   451→                          {r.task}
+   452→   452→                        </div>
+   453→   453→                        <Select
+   454→   454→                          value={r.model}
+   455→   455→                          onValueChange={() => {
+   456→   456→                            /* configurable */
+   457→   457→                          }}
+   458→   458→                        >
+   459→   459→                          <SelectTrigger className="h-7 w-36 border-zinc-700 bg-zinc-800 text-xs text-zinc-300">
+   460→   460→                            <SelectValue />
+   461→   461→                          </SelectTrigger>
+   462→   462→                          <SelectContent className="border-zinc-700 bg-zinc-900">
+   463→   463→                            {models
+   464→   464→                              .filter((m) => m.id !== 'auto')
+   465→   465→                              .map((m) => (
+   466→   466→                                <SelectItem
+   467→   467→                                  key={m.id}
+   468→   468→                                  value={m.id}
+   469→   469→                                  className="text-xs text-zinc-300"
+   470→   470→                                >
+   471→   471→                                  {m.name}
+   472→   472→                                </SelectItem>
+   473→   473→                              ))}
+   474→   474→                          </SelectContent>
+   475→   475→                        </Select>
+   476→   476→                      </div>
+   477→   477→                    ))}
+   478→   478→                  </CardContent>
+   479→   479→                </Card>
+   480→   480→              </div>
+   481→   481→
+   482→   482→              <Separator className="bg-zinc-800" />
+   483→   483→
+   484→   484→              {/* Model cards grid */}
+   485→   485→              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+   486→   486→                {models.map((model) => (
+   487→   487→                  <Card
+   488→   488→                    key={model.id}
+   489→   489→                    className={`border-zinc-800 bg-zinc-900/60 transition-colors ${
+   490→   490→                      model.enabled ? 'hover:bg-zinc-900' : 'opacity-50'
+   491→   491→                    }`}
+   492→   492→                  >
+   493→   493→                    <CardHeader className="pb-2">
+   494→   494→                      <div className="flex items-start justify-between">
+   495→   495→                        <div>
+   496→   496→                          <CardTitle className="text-sm font-medium">
+   497→   497→                            {model.name}
+   498→   498→                          </CardTitle>
+   499→   499→                          <CardDescription className="text-[11px] text-zinc-500">
+   500→   500→                            {model.provider} · {model.description}
+   501→   501→                          </CardDescription>
+   502→   502→                        </div>
+   503→   503→                        <Switch
+   504→   504→                          checked={model.enabled}
+   505→   505→                          onCheckedChange={() => toggleModel(model.id)}
+   506→   506→                        />
+   507→   507→                      </div>
+   508→   508→                    </CardHeader>
+   509→   509→                    <CardContent className="space-y-2 pt-0">
+   510→   510→                      {/* Capability badges */}
+   511→   511→                      <div className="flex flex-wrap gap-1">
+   512→   512→                        {model.capabilities.map((cap) => (
+   513→   513→                          <Badge
+   514→   514→                            key={cap}
+   515→   515→                            variant="secondary"
+   516→   516→                            className="bg-zinc-800 text-[9px] text-zinc-400"
+   517→   517→                          >
+   518→   518→                            {cap}
+   519→   519→                          </Badge>
+   520→   520→                        ))}
+   521→   521→                      </div>
+   522→   522→                      {/* Stats row */}
+   523→   523→                      <div className="grid grid-cols-3 gap-2 text-[11px] text-zinc-400">
+   524→   524→                        <div>
+   525→   525→                          <span className="text-zinc-600">Cost</span>
+   526→   526→                          <br />${model.costPer1kTokens}/1K
+   527→   527→                        </div>
+   528→   528→                        <div>
+   529→   529→                          <span className="text-zinc-600">Context</span>
+   530→   530→                          <br />
+   531→   531→                          {model.contextWindow >= 1000000
+   532→   532→                            ? `${model.contextWindow / 1000000}M`
+   533→   533→                            : `${model.contextWindow / 1000}K`}
+   534→   534→                        </div>
+   535→   535→                        <div>
+   536→   536→                          <span className="text-zinc-600">Speed</span>
+   537→   537→                          <br />
+   538→   538→                          <span className="text-amber-400">
+   539→   539→                            {speedStars(model.speed)}
+   540→   540→                          </span>
+   541→   541→                        </div>
+   542→   542→                      </div>
+   543→   543→                    </CardContent>
+   544→   544→                  </Card>
+   545→   545→                ))}
+   546→   546→              </div>
+   547→   547→            </div>
+   548→   548→          </ScrollArea>
+   549→   549→        </TabsContent>
+   550→   550→
+   551→   551→        {/* ── General Tab ──────────────────────────────────────────────── */}
+   552→   552→        <TabsContent value="general" className="mt-0 flex-1 overflow-hidden">
+   553→   553→          <ScrollArea className="h-full">
+   554→   554→            <div className="space-y-6 p-4">
+   555→   555→              {/* Theme */}
+   556→   556→              <section className="space-y-3">
+   557→   557→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   558→   558→                  <Palette className="h-4 w-4" /> Appearance
+   559→   559→                </h3>
+   560→   560→                <Card className="border-zinc-800 bg-zinc-900/60">
+   561→   561→                  <CardContent className="space-y-4 p-4">
+   562→   562→                    <div className="flex items-center justify-between">
+   563→   563→                      <Label className="text-sm text-zinc-300">Theme</Label>
+   564→   564→                      <Select
+   565→   565→                        value={theme}
+   566→   566→                        onValueChange={(v) =>
+   567→   567→                          setTheme(v as 'dark' | 'light' | 'system')
+   568→   568→                        }
+   569→   569→                      >
+   570→   570→                        <SelectTrigger className="w-32 border-zinc-700 bg-zinc-800 text-sm text-zinc-300">
+   571→   571→                          <SelectValue />
+   572→   572→                        </SelectTrigger>
+   573→   573→                        <SelectContent className="border-zinc-700 bg-zinc-900">
+   574→   574→                          <SelectItem
+   575→   575→                            value="dark"
+   576→   576→                            className="text-zinc-300"
+   577→   577→                          >
+   578→   578→                            Dark
+   579→   579→                          </SelectItem>
+   580→   580→                          <SelectItem
+   581→   581→                            value="light"
+   582→   582→                            className="text-zinc-300"
+   583→   583→                          >
+   584→   584→                            Light
+   585→   585→                          </SelectItem>
+   586→   586→                          <SelectItem
+   587→   587→                            value="system"
+   588→   588→                            className="text-zinc-300"
+   589→   589→                          >
+   590→   590→                            System
+   591→   591→                          </SelectItem>
+   592→   592→                        </SelectContent>
+   593→   593→                      </Select>
+   594→   594→                    </div>
+   595→   595→
+   596→   596→                    <div className="space-y-2">
+   597→   597→                      <div className="flex items-center justify-between">
+   598→   598→                        <Label className="text-sm text-zinc-300">
+   599→   599→                          Font Size
+   600→   600→                        </Label>
+   601→   601→                        <span className="text-xs text-zinc-500">
+   602→   602→                          {fontSize[0]}px
+   603→   603→                        </span>
+   604→   604→                      </div>
+   605→   605→                      <Slider
+   606→   606→                        value={fontSize}
+   607→   607→                        onValueChange={setFontSize}
+   608→   608→                        min={10}
+   609→   609→                        max={24}
+   610→   610→                        step={1}
+   611→   611→                        className="[&_[role=slider]]:h-4 [&_[role=slider]]:w-4"
+   612→   612→                      />
+   613→   613→                    </div>
+   614→   614→                  </CardContent>
+   615→   615→                </Card>
+   616→   616→              </section>
+   617→   617→
+   618→   618→              {/* Default Model */}
+   619→   619→              <section className="space-y-3">
+   620→   620→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   621→   621→                  <Bot className="h-4 w-4" /> Model Preferences
+   622→   622→                </h3>
+   623→   623→                <Card className="border-zinc-800 bg-zinc-900/60">
+   624→   624→                  <CardContent className="space-y-4 p-4">
+   625→   625→                    <div className="flex items-center justify-between">
+   626→   626→                      <Label className="text-sm text-zinc-300">
+   627→   627→                        Default Model
+   628→   628→                      </Label>
+   629→   629→                      <Select
+   630→   630→                        value={defaultModel}
+   631→   631→                        onValueChange={(v) => {
+   632→   632→                          setDefaultModel(v);
+   633→   633→                          setSelectedModel(v);
+   634→   634→                        }}
+   635→   635→                      >
+   636→   636→                        <SelectTrigger className="w-48 border-zinc-700 bg-zinc-800 text-sm text-zinc-300">
+   637→   637→                          <SelectValue />
+   638→   638→                        </SelectTrigger>
+   639→   639→                        <SelectContent className="border-zinc-700 bg-zinc-900">
+   640→   640→                          {models
+   641→   641→                            .filter((m) => m.enabled)
+   642→   642→                            .map((m) => (
+   643→   643→                              <SelectItem
+   644→   644→                                key={m.id}
+   645→   645→                                value={m.id}
+   646→   646→                                className="text-zinc-300"
+   647→   647→                              >
+   648→   648→                                {m.name}
+   649→   649→                              </SelectItem>
+   650→   650→                            ))}
+   651→   651→                        </SelectContent>
+   652→   652→                      </Select>
+   653→   653→                    </div>
+   654→   654→
+   655→   655→                    <Separator className="bg-zinc-800" />
+   656→   656→
+   657→   657→                    <div className="flex items-center justify-between">
+   658→   658→                      <div className="space-y-0.5">
+   659→   659→                        <Label className="text-sm text-zinc-300">
+   660→   660→                          Cost Optimization
+   661→   661→                        </Label>
+   662→   662→                        <p className="text-[11px] text-zinc-500">
+   663→   663→                          Auto-route to the cheapest capable model
+   664→   664→                        </p>
+   665→   665→                      </div>
+   666→   666→                      <Switch
+   667→   667→                        checked={costOptimization}
+   668→   668→                        onCheckedChange={setCostOptimization}
+   669→   669→                      />
+   670→   670→                    </div>
+   671→   671→
+   672→   672→                    <div className="flex items-center justify-between">
+   673→   673→                      <div className="space-y-0.5">
+   674→   674→                        <Label className="text-sm text-zinc-300">
+   675→   675→                          Web Grounding
+   676→   676→                        </Label>
+   677→   677→                        <p className="text-[11px] text-zinc-500">
+   678→   678→                          Always search before coding
+   679→   679→                        </p>
+   680→   680→                      </div>
+   681→   681→                      <Switch
+   682→   682→                        checked={webGrounding}
+   683→   683→                        onCheckedChange={setWebGrounding}
+   684→   684→                      />
+   685→   685→                    </div>
+   686→   686→                  </CardContent>
+   687→   687→                </Card>
+   688→   688→              </section>
+   689→   689→
+   690→   690→              {/* Behavior */}
+   691→   691→              <section className="space-y-3">
+   692→   692→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   693→   693→                  <Shield className="h-4 w-4" /> Behavior
+   694→   694→                </h3>
+   695→   695→                <Card className="border-zinc-800 bg-zinc-900/60">
+   696→   696→                  <CardContent className="space-y-4 p-4">
+   697→   697→                    <div className="flex items-center justify-between">
+   698→   698→                      <div className="space-y-0.5">
+   699→   699→                        <Label className="text-sm text-zinc-300">
+   700→   700→                          Agent Auto-Approve
+   701→   701→                        </Label>
+   702→   702→                        <p className="text-[11px] text-zinc-500">
+   703→   703→                          Allow agents to run without confirmation
+   704→   704→                        </p>
+   705→   705→                      </div>
+   706→   706→                      <Switch
+   707→   707→                        checked={autoApprove}
+   708→   708→                        onCheckedChange={setAutoApprove}
+   709→   709→                      />
+   710→   710→                    </div>
+   711→   711→
+   712→   712→                    <div className="flex items-center justify-between">
+   713→   713→                      <div className="space-y-0.5">
+   714→   714→                        <Label className="text-sm text-zinc-300">
+   715→   715→                          Voice Enabled
+   716→   716→                        </Label>
+   717→   717→                        <p className="text-[11px] text-zinc-500">
+   718→   718→                          Enable voice-to-code input
+   719→   719→                        </p>
+   720→   720→                      </div>
+   721→   721→                      <Switch
+   722→   722→                        checked={voiceEnabled}
+   723→   723→                        onCheckedChange={setVoiceEnabled}
+   724→   724→                      />
+   725→   725→                    </div>
+   726→   726→                  </CardContent>
+   727→   727→                </Card>
+   728→   728→              </section>
+   729→   729→
+   730→   730→              {/* Editor */}
+   731→   731→              <section className="space-y-3">
+   732→   732→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+   733→   733→                  <Code className="h-4 w-4" /> Editor
+   734→   734→                </h3>
+   735→   735→                <Card className="border-zinc-800 bg-zinc-900/60">
+   736→   736→                  <CardContent className="space-y-4 p-4">
+   737→   737→                    <div className="flex items-center justify-between">
+   738→   738→                      <Label className="text-sm text-zinc-300">Tab Size</Label>
+   739→   739→                      <Select
+   740→   740→                        value={tabSize}
+   741→   741→                        onValueChange={setTabSize}
+   742→   742→                      >
+   743→   743→                        <SelectTrigger className="w-20 border-zinc-700 bg-zinc-800 text-sm text-zinc-300">
+   744→   744→                          <SelectValue />
+   745→   745→                        </SelectTrigger>
+   746→   746→                        <SelectContent className="border-zinc-700 bg-zinc-900">
+   747→   747→                          <SelectItem
+   748→   748→                            value="2"
+   749→   749→                            className="text-zinc-300"
+   750→   750→                          >
+   751→   751→                            2
+   752→   752→                          </SelectItem>
+   753→   753→                          <SelectItem
+   754→   754→                            value="4"
+   755→   755→                            className="text-zinc-300"
+   756→   756→                          >
+   757→   757→                            4
+   758→   758→                          </SelectItem>
+   759→   759→                          <SelectItem
+   760→   760→                            value="8"
+   761→   761→                            className="text-zinc-300"
+   762→   762→                          >
+   763→   763→                            8
+   764→   764→                          </SelectItem>
+   765→   765→                        </SelectContent>
+   766→   766→                      </Select>
+   767→   767→                    </div>
+   768→   768→
+   769→   769→                    <div className="flex items-center justify-between">
+   770→   770→                      <Label className="text-sm text-zinc-300">
+   771→   771→                        Word Wrap
+   772→   772→                      </Label>
+   773→   773→                      <Switch
+   774→   774→                        checked={wordWrap}
+   775→   775→                        onCheckedChange={setWordWrap}
+   776→   776→                      />
+   777→   777→                    </div>
+   778→   778→                  </CardContent>
+   779→   779→                </Card>
+   780→   780→              </section>
+   781→   781→            </div>
+   782→   782→          </ScrollArea>
+   783→   783→        </TabsContent>
+   784→   784→
+   785→   785→        {/* ── Usage Tab ───────────────────────────────────────────────── */}
+   786→   786→        <TabsContent value="usage" className="mt-0 flex-1 overflow-hidden">
+   787→   787→          <ScrollArea className="h-full">
+   788→   788→            <div className="space-y-6 p-4">
+   789→   789→              {/* Summary cards */}
+   790→   790→              <div className="grid grid-cols-2 gap-3">
+   791→   791→                <Card className="border-zinc-800 bg-zinc-900/60">
+   792→   792→                  <CardContent className="p-4">
+   793→   793→                    <div className="flex items-center gap-2 text-zinc-500">
+   794→   794→                      <RefreshCw className="h-4 w-4" />
+   795→   795→                      <span className="text-xs">Tokens Today</span>
+   796→   796→                    </div>
+   797→   797→                    <p className="mt-1 text-2xl font-bold text-zinc-100">
+   798→   798→                      47,283
+   799→   799→                    </p>
+   800→   800→                  </CardContent>
+   801→   801→                </Card>
+   802→   802→                <Card className="border-zinc-800 bg-zinc-900/60">
+   803→   803→                  <CardContent className="p-4">
+   804→   804→                    <div className="flex items-center gap-2 text-zinc-500">
+   805→   805→                      <CreditCard className="h-4 w-4" />
+   806→   806→                      <span className="text-xs">Cost Today</span>
+   807→   807→                    </div>
+   808→   808→                    <p className="mt-1 text-2xl font-bold text-emerald-400">
+   809→   809→                      $2.14
+   810→   810→                    </p>
+   811→   811→                  </CardContent>
+   812→   812→                </Card>
+   813→   813→              </div>
+   814→   814→
+   815→   815→              {/* Cost breakdown */}
+   816→   816→              <section className="space-y-3">
+   817→   817→                <h3 className="text-sm font-medium text-zinc-300">
+   818→   818→                  Context Window by Model
+   819→   819→                </h3>
+   820→   820→                <Card className="border-zinc-800 bg-zinc-900/60">
+   821→   821→                  <CardContent className="space-y-3 p-4">
+   822→   822→                    {USAGE_BY_MODEL.map((item) => (
+   823→   823→                      <div key={item.model} className="space-y-1">
+   824→   824→                        <div className="flex items-center justify-between text-xs">
+   825→   825→                          <span className="text-zinc-300">{item.model}</span>
+   826→   826→                          <span className="text-zinc-500">
+   827→   827→                            {item.tokens >= 1000000
+   828→   828→                              ? `${(item.tokens / 1000000).toFixed(0)}M`
+   829→   829→                              : `${(item.tokens / 1000).toFixed(0)}K`} ctx · {item.cost === 0 ? 'FREE' : `$${item.cost.toFixed(4)}/1K`}
+   830→   830→                          </span>
+   831→   831→                        </div>
+   832→   832→                        <div className="h-2 w-full rounded-full bg-zinc-800">
+   833→   833→                          <div
+   834→   834→                            className={`h-2 rounded-full ${item.color} transition-all duration-500`}
+   835→   835→                            style={{
+   836→   836→                              width: `${Math.min((item.tokens / maxTokens) * 100, 100)}%`,
+   837→   837→                            }}
+   838→   838→                          />
+   839→   839→                        </div>
+   840→   840→                      </div>
+   841→   841→                    ))}
+   842→   842→                  </CardContent>
+   843→   843→                </Card>
+   844→   844→              </section>
+   845→   845→
+   846→   846→              {/* Session stats */}
+   847→   847→              <section className="space-y-3">
+   848→   848→                <h3 className="text-sm font-medium text-zinc-300">
+   849→   849→                  Session Stats
+   850→   850→                </h3>
+   851→   851→                <Card className="border-zinc-800 bg-zinc-900/60">
+   852→   852→                  <CardContent className="grid grid-cols-2 gap-4 p-4">
+   853→   853→                    <div>
+   854→   854→                      <p className="text-[11px] text-zinc-500">
+   855→   855→                        Messages Sent
+   856→   856→                      </p>
+   857→   857→                      <p className="text-lg font-semibold text-zinc-100">24</p>
+   858→   858→                    </div>
+   859→   859→                    <div>
+   860→   860→                      <p className="text-[11px] text-zinc-500">
+   861→   861→                        Agent Runs
+   862→   862→                      </p>
+   863→   863→                      <p className="text-lg font-semibold text-zinc-100">3</p>
+   864→   864→                    </div>
+   865→   865→                    <div>
+   866→   866→                      <p className="text-[11px] text-zinc-500">Avg Response Time</p>
+   867→   867→                      <p className="text-lg font-semibold text-zinc-100">
+   868→   868→                        1.8s
+   869→   869→                      </p>
+   870→   870→                    </div>
+   871→   871→                    <div>
+   872→   872→                      <p className="text-[11px] text-zinc-500">Sessions Today</p>
+   873→   873→                      <p className="text-lg font-semibold text-zinc-100">2</p>
+   874→   874→                    </div>
+   875→   875→                  </CardContent>
+   876→   876→                </Card>
+   877→   877→              </section>
+   878→   878→
+   879→   879→              {/* Context window chart */}
+   880→   880→              <section className="space-y-3">
+   881→   881→                <h3 className="text-sm font-medium text-zinc-300">Provider Coverage</h3>
+   882→   882→                <Card className="border-zinc-800 bg-zinc-900/60">
+   883→   883→                  <CardContent className="space-y-3 p-4">
+   884→   884→                    {USAGE_BY_MODEL.map((item) => (
+   885→   885→                      <div key={item.model} className="flex-1">
+   886→   886→                        <div className="mb-1 flex items-center justify-between text-xs text-zinc-300">
+   887→   887→                          <span>{item.model}</span>
+   888→   888→                          <span className="text-zinc-500">
+   889→   889→                            {item.tokens >= 1000000
+   890→   890→                              ? `${(item.tokens / 1000000).toFixed(0)}M ctx`
+   891→   891→                              : `${(item.tokens / 1000).toFixed(0)}K ctx`}
+   892→   892→                          </span>
+   893→   893→                        </div>
+   894→   894→                        <div className="h-2 w-full rounded-full bg-zinc-800">
+   895→   895→                          <div
+   896→   896→                            className={`h-2 rounded-full ${item.color} transition-all duration-500`}
+   897→   897→                            style={{
+   898→   898→                              width: `${Math.min((item.tokens / maxTokens) * 100, 100)}%`,
+   899→   899→                            }}
+   900→   900→                          />
+   901→   901→                        </div>
+   902→   902→                      </div>
+   903→   903→                    ))}
+   904→   904→                  </CardContent>
+   905→   905→                </Card>
+   906→   906→              </section>
+   907→   907→            </div>
+   908→   908→          </ScrollArea>
+   909→   909→        </TabsContent>
+   910→   910→      </Tabs>
+   911→   911→    </div>
+   912→   912→  );
+   913→   913→}
+   914→   914→
+   915→   915→export default SettingsPanel;
+   916→   916→
