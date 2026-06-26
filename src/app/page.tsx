@@ -65,6 +65,7 @@ import { AccountPanel } from '@/components/nexus/account-panel';
 import { HistoryPanel } from '@/components/nexus/history-panel';
 import { LibraryPanel } from '@/components/nexus/library-panel';
 import { DevSurfacesPanel } from '@/components/nexus/dev-surfaces-panel';
+import { PanelErrorBoundary } from '@/components/nexus/panel-error-boundary';
 import { useUIStore, type PanelView } from '@/stores/ui-store';
 import { useChatStore } from '@/stores/chat-store';
 import { useAgentStore } from '@/stores/agent-store';
@@ -115,15 +116,22 @@ function TitleBar() {
   const [time, setTime] = useState('');
 
   useEffect(() => {
-    const socket = io('/?XTransformPort=3003', { transports: ['websocket', 'polling'] });
-    socket.on('connect', () => { setWsConnected(true); });
-    socket.on('disconnect', () => { setWsConnected(false); });
-    setTimeout(() => socket.disconnect(), 3000);
+    try {
+      const socket = io('/?XTransformPort=3003', { transports: ['websocket', 'polling'] });
+      socket.on('connect', () => { setWsConnected(true); });
+      socket.on('disconnect', () => { setWsConnected(false); });
+      setTimeout(() => socket.disconnect(), 3000);
 
-    const timer = setInterval(() => {
-      setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
-    }, 1000);
-    return () => { clearInterval(timer); socket.disconnect(); };
+      const timer = setInterval(() => {
+        setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+      }, 1000);
+      return () => { clearInterval(timer); socket.disconnect(); };
+    } catch {
+      const timer = setInterval(() => {
+        setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+      }, 1000);
+      return () => { clearInterval(timer); };
+    }
   }, []);
 
   return (
@@ -296,6 +304,34 @@ function ActivityBar({
 // ── Panel Content Router ────────────────────────────────────────────────
 
 function PanelContent({ view }: { view: PanelView }) {
+  // Only render the active panel to avoid triggering all dynamic imports
+  const getPanel = (): React.ReactNode => {
+    switch (view) {
+      case 'chat': return <ChatPanel />;
+      case 'editor': return <EditorPanel />;
+      case 'agent': return <AgentPanel />;
+      case 'search': return <SearchPanel />;
+      case 'terminal': return <TerminalPanel />;
+      case 'files': return <FileExplorer />;
+      case 'settings': return <SettingsPanel />;
+      case 'mcp': return <MCPHub />;
+      case 'git': return <GitPanel />;
+      case 'collab': return <CollabPanel />;
+      case 'spec': return <SpecPanel />;
+      case 'marketplace': return <MarketplacePanel />;
+      case 'competitive': return <CompetitivePanel />;
+      case 'templates': return <TemplatesPanel />;
+      case 'notifications': return <NotificationsPanel />;
+      case 'customization': return <CustomizationHub />;
+      case 'context': return <ContextMemory />;
+      case 'account': return <AccountPanel />;
+      case 'history': return <HistoryPanel />;
+      case 'library': return <LibraryPanel />;
+      case 'dev-surfaces': return <DevSurfacesPanel />;
+      default: return null;
+    }
+  };
+
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -306,27 +342,9 @@ function PanelContent({ view }: { view: PanelView }) {
         transition={{ duration: 0.15 }}
         className="h-full"
       >
-        {view === 'chat' && <ChatPanel />}
-        {view === 'editor' && <EditorPanel />}
-        {view === 'agent' && <AgentPanel />}
-        {view === 'search' && <SearchPanel />}
-        {view === 'terminal' && <TerminalPanel />}
-        {view === 'files' && <FileExplorer />}
-        {view === 'settings' && <SettingsPanel />}
-        {view === 'mcp' && <MCPHub />}
-        {view === 'git' && <GitPanel />}
-        {view === 'collab' && <CollabPanel />}
-        {view === 'spec' && <SpecPanel />}
-        {view === 'marketplace' && <MarketplacePanel />}
-        {view === 'competitive' && <CompetitivePanel />}
-        {view === 'templates' && <TemplatesPanel />}
-        {view === 'notifications' && <NotificationsPanel />}
-        {view === 'customization' && <CustomizationHub />}
-        {view === 'context' && <ContextMemory />}
-        {view === 'account' && <AccountPanel />}
-        {view === 'history' && <HistoryPanel />}
-        {view === 'library' && <LibraryPanel />}
-        {view === 'dev-surfaces' && <DevSurfacesPanel />}
+        <PanelErrorBoundary name={view}>
+          {getPanel()}
+        </PanelErrorBoundary>
       </motion.div>
     </AnimatePresence>
   );
