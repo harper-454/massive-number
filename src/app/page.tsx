@@ -43,28 +43,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ChatPanel } from '@/components/nexus/chat-panel';
-import { AgentPanel } from '@/components/nexus/agent-panel';
-import { SearchPanel } from '@/components/nexus/search-panel';
-import EditorPanel from '@/components/nexus/editor-panel';
-import TerminalPanel from '@/components/nexus/terminal-panel';
-import FileExplorer from '@/components/nexus/file-explorer';
-import { SettingsPanel } from '@/components/nexus/settings-panel';
-import { CommandPalette } from '@/components/nexus/command-palette';
-import { MCPHub } from '@/components/nexus/mcp-hub';
-import { GitPanel } from '@/components/nexus/git-panel';
-import { CollabPanel } from '@/components/nexus/collab-panel';
-import { SpecPanel } from '@/components/nexus/spec-panel';
-import { MarketplacePanel } from '@/components/nexus/marketplace-panel';
-import { CompetitivePanel } from '@/components/nexus/competitive-panel';
-import { TemplatesPanel } from '@/components/nexus/templates-panel';
-import { NotificationsPanel } from '@/components/nexus/notifications-panel';
-import { CustomizationHub } from '@/components/nexus/customization-hub';
-import { ContextMemory } from '@/components/nexus/context-memory';
-import { AccountPanel } from '@/components/nexus/account-panel';
-import { HistoryPanel } from '@/components/nexus/history-panel';
-import { LibraryPanel } from '@/components/nexus/library-panel';
-import { DevSurfacesPanel } from '@/components/nexus/dev-surfaces-panel';
+import dynamic from 'next/dynamic';
 import { PanelErrorBoundary } from '@/components/nexus/panel-error-boundary';
 import { useUIStore, type PanelView } from '@/stores/ui-store';
 import { useChatStore } from '@/stores/chat-store';
@@ -72,6 +51,42 @@ import { useAgentStore } from '@/stores/agent-store';
 import { useModelStore } from '@/stores/model-store';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io } from 'socket.io-client';
+
+// Dynamic imports — only loads what's needed, prevents OOM on compilation
+const ChatPanel = dynamic(() => import('@/components/nexus/chat-panel').then(m => ({ default: m.ChatPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const AgentPanel = dynamic(() => import('@/components/nexus/agent-panel').then(m => ({ default: m.AgentPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const SearchPanel = dynamic(() => import('@/components/nexus/search-panel').then(m => ({ default: m.SearchPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const EditorPanel = dynamic(() => import('@/components/nexus/editor-panel'), { ssr: false, loading: () => <PanelLoader /> });
+const TerminalPanel = dynamic(() => import('@/components/nexus/terminal-panel'), { ssr: false, loading: () => <PanelLoader /> });
+const FileExplorer = dynamic(() => import('@/components/nexus/file-explorer'), { ssr: false, loading: () => <PanelLoader /> });
+const SettingsPanel = dynamic(() => import('@/components/nexus/settings-panel').then(m => ({ default: m.SettingsPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const CommandPalette = dynamic(() => import('@/components/nexus/command-palette').then(m => ({ default: m.CommandPalette })), { ssr: false });
+const MCPHub = dynamic(() => import('@/components/nexus/mcp-hub').then(m => ({ default: m.MCPHub })), { ssr: false, loading: () => <PanelLoader /> });
+const GitPanel = dynamic(() => import('@/components/nexus/git-panel').then(m => ({ default: m.GitPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const CollabPanel = dynamic(() => import('@/components/nexus/collab-panel').then(m => ({ default: m.CollabPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const SpecPanel = dynamic(() => import('@/components/nexus/spec-panel').then(m => ({ default: m.SpecPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const MarketplacePanel = dynamic(() => import('@/components/nexus/marketplace-panel').then(m => ({ default: m.MarketplacePanel })), { ssr: false, loading: () => <PanelLoader /> });
+const CompetitivePanel = dynamic(() => import('@/components/nexus/competitive-panel').then(m => ({ default: m.CompetitivePanel })), { ssr: false, loading: () => <PanelLoader /> });
+const TemplatesPanel = dynamic(() => import('@/components/nexus/templates-panel').then(m => ({ default: m.TemplatesPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const NotificationsPanel = dynamic(() => import('@/components/nexus/notifications-panel').then(m => ({ default: m.NotificationsPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const CustomizationHub = dynamic(() => import('@/components/nexus/customization-hub').then(m => ({ default: m.CustomizationHub })), { ssr: false, loading: () => <PanelLoader /> });
+const ContextMemory = dynamic(() => import('@/components/nexus/context-memory').then(m => ({ default: m.ContextMemory })), { ssr: false, loading: () => <PanelLoader /> });
+const AccountPanel = dynamic(() => import('@/components/nexus/account-panel').then(m => ({ default: m.AccountPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const HistoryPanel = dynamic(() => import('@/components/nexus/history-panel').then(m => ({ default: m.HistoryPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const LibraryPanel = dynamic(() => import('@/components/nexus/library-panel').then(m => ({ default: m.LibraryPanel })), { ssr: false, loading: () => <PanelLoader /> });
+const DevSurfacesPanel = dynamic(() => import('@/components/nexus/dev-surfaces-panel').then(m => ({ default: m.DevSurfacesPanel })), { ssr: false, loading: () => <PanelLoader /> });
+
+// Simple loading component for panels
+function PanelLoader() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+        <span className="text-xs text-muted-foreground">Loading...</span>
+      </div>
+    </div>
+  );
+}
 
 // ── Navigation Items ─────────────────────────────────────────────────────
 
