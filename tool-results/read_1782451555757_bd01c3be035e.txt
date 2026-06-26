@@ -1,0 +1,1490 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback } from 'react';
+     4→import {
+     5→  User,
+     6→  Mail,
+     7→  Calendar,
+     8→  Shield,
+     9→  Crown,
+    10→  Settings,
+    11→  Activity,
+    12→  Monitor,
+    13→  Edit3,
+    14→  Check,
+    15→  X,
+    16→  Plus,
+    17→  Trash2,
+    18→  RefreshCw,
+    19→  LogIn,
+    20→  MessageSquare,
+    21→  BookOpen,
+    22→  Bot,
+    23→  Clock,
+    24→  Globe,
+    25→  ChevronRight,
+    26→  Star,
+    27→  Zap,
+    28→  Save,
+    29→  Loader2,
+    30→  AlertCircle,
+    31→  Key,
+    32→} from 'lucide-react';
+    33→import { Button } from '@/components/ui/button';
+    34→import { Input } from '@/components/ui/input';
+    35→import { Textarea } from '@/components/ui/textarea';
+    36→import {
+    37→  Card,
+    38→  CardContent,
+    39→  CardDescription,
+    40→  CardHeader,
+    41→  CardTitle,
+    42→} from '@/components/ui/card';
+    43→import {
+    44→  Tabs,
+    45→  TabsContent,
+    46→  TabsList,
+    47→  TabsTrigger,
+    48→} from '@/components/ui/tabs';
+    49→import { Badge } from '@/components/ui/badge';
+    50→import { Label } from '@/components/ui/label';
+    51→import { Separator } from '@/components/ui/separator';
+    52→import { ScrollArea } from '@/components/ui/scroll-area';
+    53→import { Skeleton } from '@/components/ui/skeleton';
+    54→import {
+    55→  Dialog,
+    56→  DialogContent,
+    57→  DialogDescription,
+    58→  DialogHeader,
+    59→  DialogTitle,
+    60→  DialogTrigger,
+    61→} from '@/components/ui/dialog';
+    62→import {
+    63→  Select,
+    64→  SelectContent,
+    65→  SelectItem,
+    66→  SelectTrigger,
+    67→  SelectValue,
+    68→} from '@/components/ui/select';
+    69→import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+    70→import { Progress } from '@/components/ui/progress';
+    71→
+    72→// ── Types ──────────────────────────────────────────────────────────────────
+    73→
+    74→interface AccountData {
+    75→  id: string;
+    76→  userId: string;
+    77→  displayName: string | null;
+    78→  email: string;
+    79→  avatarUrl: string | null;
+    80→  bio: string | null;
+    81→  role: string;
+    82→  plan: string;
+    83→  status: string;
+    84→  lastLoginAt: string | null;
+    85→  loginCount: number;
+    86→  preferences: string;
+    87→  createdAt: string;
+    88→  updatedAt: string;
+    89→}
+    90→
+    91→interface ActivityItem {
+    92→  id: string;
+    93→  action: string;
+    94→  entity: string | null;
+    95→  entityId: string | null;
+    96→  description: string | null;
+    97→  metadata: Record<string, unknown>;
+    98→  createdAt: string;
+    99→}
+   100→
+   101→interface AccountStats {
+   102→  loginCount: number;
+   103→  lastLogin: string | null;
+   104→  chatsCreated: number;
+   105→  libraryItems: number;
+   106→  agentsRun: number;
+   107→}
+   108→
+   109→interface PrefEntry {
+   110→  key: string;
+   111→  value: string;
+   112→}
+   113→
+   114→// ── Helpers ────────────────────────────────────────────────────────────────
+   115→
+   116→const planConfig: Record<string, { label: string; color: string; icon: React.ReactNode; features: string[] }> = {
+   117→  free: {
+   118→    label: 'Free',
+   119→    color: 'border-zinc-600 text-zinc-300',
+   120→    icon: <Zap className="h-3.5 w-3.5" />,
+   121→    features: ['5 chats/day', 'Basic models', '1 project'],
+   122→  },
+   123→  pro: {
+   124→    label: 'Pro',
+   125→    color: 'border-emerald-600 text-emerald-400',
+   126→    icon: <Star className="h-3.5 w-3.5" />,
+   127→    features: ['Unlimited chats', 'All models', '10 projects', 'Priority support'],
+   128→  },
+   129→  enterprise: {
+   130→    label: 'Enterprise',
+   131→    color: 'border-amber-500 text-amber-400',
+   132→    icon: <Crown className="h-3.5 w-3.5" />,
+   133→    features: ['Unlimited everything', 'Custom models', 'SSO/SAML', 'Dedicated support'],
+   134→  },
+   135→};
+   136→
+   137→const roleColors: Record<string, string> = {
+   138→  admin: 'border-red-500/50 text-red-400 bg-red-500/10',
+   139→  developer: 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10',
+   140→  user: 'border-zinc-600 text-zinc-300 bg-zinc-500/10',
+   141→};
+   142→
+   143→const activityIcons: Record<string, React.ReactNode> = {
+   144→  login: <LogIn className="h-3.5 w-3.5" />,
+   145→  chat: <MessageSquare className="h-3.5 w-3.5" />,
+   146→  library: <BookOpen className="h-3.5 w-3.5" />,
+   147→  agent: <Bot className="h-3.5 w-3.5" />,
+   148→  settings: <Settings className="h-3.5 w-3.5" />,
+   149→  default: <Activity className="h-3.5 w-3.5" />,
+   150→};
+   151→
+   152→function getInitials(name: string | null): string {
+   153→  if (!name) return '??';
+   154→  return name
+   155→    .split(' ')
+   156→    .map((w) => w[0])
+   157→    .join('')
+   158→    .toUpperCase()
+   159→    .slice(0, 2);
+   160→}
+   161→
+   162→function formatDate(dateStr: string | null): string {
+   163→  if (!dateStr) return 'Never';
+   164→  const d = new Date(dateStr);
+   165→  return d.toLocaleDateString('en-US', {
+   166→    year: 'numeric',
+   167→    month: 'short',
+   168→    day: 'numeric',
+   169→  });
+   170→}
+   171→
+   172→function formatDateTime(dateStr: string | null): string {
+   173→  if (!dateStr) return 'Never';
+   174→  const d = new Date(dateStr);
+   175→  return d.toLocaleString('en-US', {
+   176→    year: 'numeric',
+   177→    month: 'short',
+   178→    day: 'numeric',
+   179→    hour: '2-digit',
+   180→    minute: '2-digit',
+   181→  });
+   182→}
+   183→
+   184→function timeAgo(dateStr: string): string {
+   185→  const d = new Date(dateStr);
+   186→  const now = new Date();
+   187→  const diffMs = now.getTime() - d.getTime();
+   188→  const diffMins = Math.floor(diffMs / 60000);
+   189→  if (diffMins < 1) return 'just now';
+   190→  if (diffMins < 60) return `${diffMins}m ago`;
+   191→  const diffHours = Math.floor(diffMins / 60);
+   192→  if (diffHours < 24) return `${diffHours}h ago`;
+   193→  const diffDays = Math.floor(diffHours / 24);
+   194→  if (diffDays < 30) return `${diffDays}d ago`;
+   195→  return formatDate(dateStr);
+   196→}
+   197→
+   198→// ── Component ──────────────────────────────────────────────────────────────
+   199→
+   200→export function AccountPanel() {
+   201→  // ── State ──────────────────────────────────────────────────────────────
+   202→  const [account, setAccount] = useState<AccountData | null>(null);
+   203→  const [activities, setActivities] = useState<ActivityItem[]>([]);
+   204→  const [stats, setStats] = useState<AccountStats>({
+   205→    loginCount: 0,
+   206→    lastLogin: null,
+   207→    chatsCreated: 0,
+   208→    libraryItems: 0,
+   209→    agentsRun: 0,
+   210→  });
+   211→  const [loading, setLoading] = useState(true);
+   212→  const [activityLoading, setActivityLoading] = useState(true);
+   213→  const [error, setError] = useState<string | null>(null);
+   214→
+   215→  // Editing state
+   216→  const [editingField, setEditingField] = useState<string | null>(null);
+   217→  const [editValue, setEditValue] = useState('');
+   218→  const [saving, setSaving] = useState(false);
+   219→
+   220→  // Preferences state
+   221→  const [preferences, setPreferences] = useState<PrefEntry[]>([]);
+   222→  const [newPrefKey, setNewPrefKey] = useState('');
+   223→  const [newPrefValue, setNewPrefValue] = useState('');
+   224→  const [prefSaving, setPrefSaving] = useState(false);
+   225→
+   226→  // Plan upgrade dialog
+   227→  const [upgradeOpen, setUpgradeOpen] = useState(false);
+   228→
+   229→  // Session info
+   230→  const [sessionInfo, setSessionInfo] = useState({
+   231→    userAgent: '',
+   232→    language: '',
+   233→    platform: '',
+   234→    screenSize: '',
+   235→    timezone: '',
+   236→    cookiesEnabled: false,
+   237→    online: true,
+   238→    currentUrl: '',
+   239→    sessionStarted: '',
+   240→  });
+   241→
+   242→  // ── Data fetching ──────────────────────────────────────────────────────
+   243→
+   244→  const fetchAccount = useCallback(async () => {
+   245→    try {
+   246→      setLoading(true);
+   247→      setError(null);
+   248→      const res = await fetch('/api/account');
+   249→      if (!res.ok) throw new Error('Failed to fetch account');
+   250→      const data = await res.json();
+   251→      setAccount(data.account);
+   252→
+   253→      // Parse preferences
+   254→      try {
+   255→        const prefs = JSON.parse(data.account.preferences || '{}');
+   256→        const prefEntries: PrefEntry[] = Object.entries(prefs).map(
+   257→          ([key, value]) => ({ key, value: String(value) })
+   258→        );
+   259→        setPreferences(prefEntries);
+   260→      } catch {
+   261→        setPreferences([]);
+   262→      }
+   263→    } catch (err) {
+   264→      setError(err instanceof Error ? err.message : 'Unknown error');
+   265→    } finally {
+   266→      setLoading(false);
+   267→    }
+   268→  }, []);
+   269→
+   270→  const fetchActivities = useCallback(async () => {
+   271→    try {
+   272→      setActivityLoading(true);
+   273→      const res = await fetch('/api/activity?limit=20');
+   274→      if (!res.ok) throw new Error('Failed to fetch activities');
+   275→      const data = await res.json();
+   276→      setActivities(data.activities || []);
+   277→    } catch {
+   278→      // Silently handle activity fetch errors
+   279→    } finally {
+   280→      setActivityLoading(false);
+   281→    }
+   282→  }, []);
+   283→
+   284→  const fetchStats = useCallback(async () => {
+   285→    try {
+   286→      // Fetch stats from multiple endpoints
+   287→      const [chatsRes, libraryRes, agentsRes] = await Promise.allSettled([
+   288→        fetch('/api/history'),
+   289→        fetch('/api/library'),
+   290→        fetch('/api/agents'),
+   291→      ]);
+   292→
+   293→      let chatsCreated = 0;
+   294→      let libraryItems = 0;
+   295→      let agentsRun = 0;
+   296→
+   297→      if (chatsRes.status === 'fulfilled' && chatsRes.value.ok) {
+   298→        const chatsData = await chatsRes.value.json();
+   299→        chatsCreated = Array.isArray(chatsData.chats) ? chatsData.chats.length : 0;
+   300→      }
+   301→      if (libraryRes.status === 'fulfilled' && libraryRes.value.ok) {
+   302→        const libData = await libraryRes.value.json();
+   303→        libraryItems = Array.isArray(libData.items) ? libData.items.length : 0;
+   304→      }
+   305→      if (agentsRes.status === 'fulfilled' && agentsRes.value.ok) {
+   306→        const agentsData = await agentsRes.value.json();
+   307→        agentsRun = Array.isArray(agentsData.agents) ? agentsData.agents.length : 0;
+   308→      }
+   309→
+   310→      setStats((prev) => ({
+   311→        ...prev,
+   312→        chatsCreated,
+   313→        libraryItems,
+   314→        agentsRun,
+   315→      }));
+   316→    } catch {
+   317→      // Silently handle stats errors
+   318→    }
+   319→  }, []);
+   320→
+   321→  // ── Effects ────────────────────────────────────────────────────────────
+   322→
+   323→  useEffect(() => {
+   324→    fetchAccount();
+   325→    fetchActivities();
+   326→  }, [fetchAccount, fetchActivities]);
+   327→
+   328→  useEffect(() => {
+   329→    if (account) {
+   330→      setStats((prev) => ({
+   331→        ...prev,
+   332→        loginCount: account.loginCount,
+   333→        lastLogin: account.lastLoginAt,
+   334→      }));
+   335→      fetchStats();
+   336→    }
+   337→  }, [account, fetchStats]);
+   338→
+   339→  useEffect(() => {
+   340→    // Capture session info on mount
+   341→    if (typeof window !== 'undefined') {
+   342→      setSessionInfo({
+   343→        userAgent: navigator.userAgent,
+   344→        language: navigator.language,
+   345→        platform: navigator.platform,
+   346→        screenSize: `${window.screen.width} × ${window.screen.height}`,
+   347→        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+   348→        cookiesEnabled: navigator.cookieEnabled,
+   349→        online: navigator.onLine,
+   350→        currentUrl: window.location.href,
+   351→        sessionStarted: new Date().toISOString(),
+   352→      });
+   353→    }
+   354→  }, []);
+   355→
+   356→  // ── Handlers ───────────────────────────────────────────────────────────
+   357→
+   358→  const startEditing = (field: string, value: string) => {
+   359→    setEditingField(field);
+   360→    setEditValue(value || '');
+   361→  };
+   362→
+   363→  const cancelEditing = () => {
+   364→    setEditingField(null);
+   365→    setEditValue('');
+   366→  };
+   367→
+   368→  const saveField = async (field: string) => {
+   369→    if (!account) return;
+   370→    try {
+   371→      setSaving(true);
+   372→      const res = await fetch('/api/account', {
+   373→        method: 'PUT',
+   374→        headers: { 'Content-Type': 'application/json' },
+   375→        body: JSON.stringify({
+   376→          userId: account.userId,
+   377→          [field]: field === 'email' ? editValue : editValue,
+   378→        }),
+   379→      });
+   380→      if (!res.ok) throw new Error('Failed to update');
+   381→      const data = await res.json();
+   382→      setAccount(data.account);
+   383→      setEditingField(null);
+   384→      setEditValue('');
+   385→    } catch {
+   386→      // Keep editing on error
+   387→    } finally {
+   388→      setSaving(false);
+   389→    }
+   390→  };
+   391→
+   392→  const savePreferences = async () => {
+   393→    if (!account) return;
+   394→    try {
+   395→      setPrefSaving(true);
+   396→      const prefsObj: Record<string, string> = {};
+   397→      preferences.forEach((p) => {
+   398→        prefsObj[p.key] = p.value;
+   399→      });
+   400→      const res = await fetch('/api/account', {
+   401→        method: 'PUT',
+   402→        headers: { 'Content-Type': 'application/json' },
+   403→        body: JSON.stringify({
+   404→          userId: account.userId,
+   405→          preferences: prefsObj,
+   406→        }),
+   407→      });
+   408→      if (!res.ok) throw new Error('Failed to save preferences');
+   409→      const data = await res.json();
+   410→      setAccount(data.account);
+   411→    } catch {
+   412→      // Handle error silently
+   413→    } finally {
+   414→      setPrefSaving(false);
+   415→    }
+   416→  };
+   417→
+   418→  const addPreference = () => {
+   419→    if (!newPrefKey.trim()) return;
+   420→    setPreferences((prev) => [
+   421→      ...prev,
+   422→      { key: newPrefKey.trim(), value: newPrefValue },
+   423→    ]);
+   424→    setNewPrefKey('');
+   425→    setNewPrefValue('');
+   426→  };
+   427→
+   428→  const removePreference = (key: string) => {
+   429→    setPreferences((prev) => prev.filter((p) => p.key !== key));
+   430→  };
+   431→
+   432→  const updatePreference = (key: string, value: string) => {
+   433→    setPreferences((prev) =>
+   434→      prev.map((p) => (p.key === key ? { ...p, value } : p))
+   435→    );
+   436→  };
+   437→
+   438→  const handleUpgradePlan = async (plan: string) => {
+   439→    if (!account) return;
+   440→    try {
+   441→      const res = await fetch('/api/account', {
+   442→        method: 'PUT',
+   443→        headers: { 'Content-Type': 'application/json' },
+   444→        body: JSON.stringify({ userId: account.userId, plan }),
+   445→      });
+   446→      if (!res.ok) throw new Error('Failed to update plan');
+   447→      const data = await res.json();
+   448→      setAccount(data.account);
+   449→      setUpgradeOpen(false);
+   450→    } catch {
+   451→      // Handle error silently
+   452→    }
+   453→  };
+   454→
+   455→  // ── Helpers ────────────────────────────────────────────────────────────
+   456→
+   457→  const getInitials = (name: string | null) => {
+   458→    if (!name) return '??';
+   459→    return name
+   460→      .split(' ')
+   461→      .map((n) => n[0])
+   462→      .join('')
+   463→      .toUpperCase()
+   464→      .slice(0, 2);
+   465→  };
+   466→
+   467→  const activityIcon = (action: string) => {
+   468→    const map: Record<string, React.ReactNode> = {
+   469→      login: <LogIn className="h-3.5 w-3.5" />,
+   470→      chat: <MessageSquare className="h-3.5 w-3.5" />,
+   471→      library: <BookOpen className="h-3.5 w-3.5" />,
+   472→      agent: <Bot className="h-3.5 w-3.5" />,
+   473→      settings: <Settings className="h-3.5 w-3.5" />,
+   474→    };
+   475→    return map[action] || <Activity className="h-3.5 w-3.5" />;
+   476→  };
+   477→
+   478→  const activityColor = (action: string) => {
+   479→    const map: Record<string, string> = {
+   480→      login: 'text-emerald-400',
+   481→      chat: 'text-blue-400',
+   482→      library: 'text-amber-400',
+   483→      agent: 'text-violet-400',
+   484→      settings: 'text-zinc-400',
+   485→    };
+   486→    return map[action] || 'text-zinc-400';
+   487→  };
+   488→
+   489→  const activityBg = (action: string) => {
+   490→    const map: Record<string, string> = {
+   491→      login: 'bg-emerald-500/10',
+   492→      chat: 'bg-blue-500/10',
+   493→      library: 'bg-amber-500/10',
+   494→      agent: 'bg-violet-500/10',
+   495→      settings: 'bg-zinc-500/10',
+   496→    };
+   497→    return map[action] || 'bg-zinc-500/10';
+   498→  };
+   499→
+   500→  // ── Loading skeleton ───────────────────────────────────────────────────
+   501→
+   502→  if (loading) {
+   503→    return (
+   504→      <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
+   505→        <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+   506→          <User className="h-5 w-5 text-zinc-400" />
+   507→          <h2 className="text-lg font-semibold">Account</h2>
+   508→        </div>
+   509→        <div className="space-y-4 p-4">
+   510→          <Card className="border-zinc-800 bg-zinc-900/60">
+   511→            <CardContent className="p-6">
+   512→              <div className="flex items-center gap-4">
+   513→                <Skeleton className="h-20 w-20 rounded-full bg-zinc-800" />
+   514→                <div className="space-y-2">
+   515→                  <Skeleton className="h-6 w-40 bg-zinc-800" />
+   516→                  <Skeleton className="h-4 w-56 bg-zinc-800" />
+   517→                  <Skeleton className="h-4 w-32 bg-zinc-800" />
+   518→                </div>
+   519→              </div>
+   520→            </CardContent>
+   521→          </Card>
+   522→          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+   523→            {[...Array(5)].map((_, i) => (
+   524→              <Skeleton key={i} className="h-24 rounded-lg bg-zinc-800" />
+   525→            ))}
+   526→          </div>
+   527→        </div>
+   528→      </div>
+   529→    );
+   530→  }
+   531→
+   532→  // ── Error state ────────────────────────────────────────────────────────
+   533→
+   534→  if (error && !account) {
+   535→    return (
+   536→      <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
+   537→        <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+   538→          <User className="h-5 w-5 text-zinc-400" />
+   539→          <h2 className="text-lg font-semibold">Account</h2>
+   540→        </div>
+   541→        <div className="flex flex-1 items-center justify-center p-4">
+   542→          <Card className="border-red-900/50 bg-zinc-900/60 w-full max-w-md">
+   543→            <CardContent className="flex flex-col items-center gap-4 p-6">
+   544→              <AlertCircle className="h-10 w-10 text-red-400" />
+   545→              <p className="text-sm text-zinc-300">{error}</p>
+   546→              <Button
+   547→                onClick={fetchAccount}
+   548→                className="bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+   549→              >
+   550→                <RefreshCw className="mr-2 h-4 w-4" /> Retry
+   551→              </Button>
+   552→            </CardContent>
+   553→          </Card>
+   554→        </div>
+   555→      </div>
+   556→    );
+   557→  }
+   558→
+   559→  if (!account) return null;
+   560→
+   561→  // ── Render ─────────────────────────────────────────────────────────────
+   562→
+   563→  return (
+   564→    <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
+   565→      {/* Header */}
+   566→      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+   567→        <div className="flex items-center gap-2">
+   568→          <User className="h-5 w-5 text-zinc-400" />
+   569→          <h2 className="text-lg font-semibold">Account</h2>
+   570→        </div>
+   571→        <Button
+   572→          variant="ghost"
+   573→          size="sm"
+   574→          onClick={() => {
+   575→            fetchAccount();
+   576→            fetchActivities();
+   577→            fetchStats();
+   578→          }}
+   579→          className="text-zinc-400 hover:text-zinc-200"
+   580→        >
+   581→          <RefreshCw className="h-4 w-4" />
+   582→        </Button>
+   583→      </div>
+   584→
+   585→      {/* Tabs */}
+   586→      <Tabs defaultValue="profile" className="flex flex-1 flex-col overflow-hidden">
+   587→        <TabsList className="mx-4 mt-2 grid w-auto grid-cols-4 bg-zinc-900">
+   588→          <TabsTrigger
+   589→            value="profile"
+   590→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   591→          >
+   592→            Profile
+   593→          </TabsTrigger>
+   594→          <TabsTrigger
+   595→            value="plan"
+   596→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   597→          >
+   598→            Plan
+   599→          </TabsTrigger>
+   600→          <TabsTrigger
+   601→            value="preferences"
+   602→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   603→          >
+   604→            Preferences
+   605→          </TabsTrigger>
+   606→          <TabsTrigger
+   607→            value="activity"
+   608→            className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+   609→          >
+   610→            Activity
+   611→          </TabsTrigger>
+   612→        </TabsList>
+   613→
+   614→        {/* ── Profile Tab ──────────────────────────────────────────────── */}
+   615→        <TabsContent value="profile" className="mt-0 flex-1 overflow-hidden">
+   616→          <ScrollArea className="h-full">
+   617→            <div className="space-y-4 p-4">
+   618→              {/* Profile Card */}
+   619→              <Card className="border-zinc-800 bg-zinc-900/60">
+   620→                <CardContent className="p-6">
+   621→                  <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+   622→                    {/* Avatar */}
+   623→                    <div className="relative">
+   624→                      {account.avatarUrl ? (
+   625→                        <Avatar className="h-20 w-20 border-2 border-zinc-700">
+   626→                          <AvatarImage
+   627→                            src={account.avatarUrl}
+   628→                            alt={account.displayName || 'Avatar'}
+   629→                          />
+   630→                          <AvatarFallback className="bg-zinc-800 text-lg text-zinc-300">
+   631→                            {getInitials(account.displayName)}
+   632→                          </AvatarFallback>
+   633→                        </Avatar>
+   634→                      ) : (
+   635→                        <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-zinc-700 bg-zinc-800 text-xl font-semibold text-emerald-400">
+   636→                          {getInitials(account.displayName)}
+   637→                        </div>
+   638→                      )}
+   639→                      {account.status === 'active' && (
+   640→                        <div className="absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full border-2 border-zinc-900 bg-emerald-500" />
+   641→                      )}
+   642→                    </div>
+   643→
+   644→                    {/* Info */}
+   645→                    <div className="flex-1 text-center sm:text-left">
+   646→                      <div className="flex flex-col items-center gap-2 sm:flex-row">
+   647→                        {/* Display Name */}
+   648→                        {editingField === 'displayName' ? (
+   649→                          <div className="flex items-center gap-2">
+   650→                            <Input
+   651→                              value={editValue}
+   652→                              onChange={(e) => setEditValue(e.target.value)}
+   653→                              className="h-8 w-48 border-zinc-700 bg-zinc-800 text-sm text-zinc-100"
+   654→                              placeholder="Display name"
+   655→                              autoFocus
+   656→                            />
+   657→                            <Button
+   658→                              size="icon"
+   659→                              variant="ghost"
+   660→                              className="h-7 w-7 text-emerald-400 hover:text-emerald-300"
+   661→                              onClick={() => saveField('displayName')}
+   662→                              disabled={saving}
+   663→                            >
+   664→                              {saving ? (
+   665→                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   666→                              ) : (
+   667→                                <Check className="h-3.5 w-3.5" />
+   668→                              )}
+   669→                            </Button>
+   670→                            <Button
+   671→                              size="icon"
+   672→                              variant="ghost"
+   673→                              className="h-7 w-7 text-zinc-500 hover:text-zinc-300"
+   674→                              onClick={cancelEditing}
+   675→                            >
+   676→                              <X className="h-3.5 w-3.5" />
+   677→                            </Button>
+   678→                          </div>
+   679→                        ) : (
+   680→                          <h3
+   681→                            className="text-xl font-semibold cursor-pointer group flex items-center gap-2"
+   682→                            onClick={() =>
+   683→                              startEditing(
+   684→                                'displayName',
+   685→                                account.displayName || ''
+   686→                              )
+   687→                            }
+   688→                          >
+   689→                            {account.displayName || 'Unnamed'}
+   690→                            <Edit3 className="h-3.5 w-3.5 text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100" />
+   691→                          </h3>
+   692→                        )}
+   693→                      </div>
+   694→
+   695→                      {/* Badges */}
+   696→                      <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+   697→                        <Badge
+   698→                          variant="outline"
+   699→                          className={`text-[10px] ${
+   700→                            account.role === 'admin'
+   701→                              ? 'border-red-500/50 text-red-400'
+   702→                              : account.role === 'developer'
+   703→                                ? 'border-emerald-600 text-emerald-400'
+   704→                                : 'border-zinc-600 text-zinc-400'
+   705→                          }`}
+   706→                        >
+   707→                          <Shield className="mr-1 h-3 w-3" />
+   708→                          {account.role.charAt(0).toUpperCase() +
+   709→                            account.role.slice(1)}
+   710→                        </Badge>
+   711→                        <Badge
+   712→                          variant="outline"
+   713→                          className={`text-[10px] ${
+   714→                            planConfig[account.plan]?.color ||
+   715→                            'border-zinc-600 text-zinc-400'
+   716→                          }`}
+   717→                        >
+   718→                          {planConfig[account.plan]?.icon}
+   719→                          <span className="ml-1">
+   720→                            {planConfig[account.plan]?.label || account.plan}
+   721→                          </span>
+   722→                        </Badge>
+   723→                        <Badge
+   724→                          variant="outline"
+   725→                          className={`text-[10px] ${
+   726→                            account.status === 'active'
+   727→                              ? 'border-emerald-600 text-emerald-400'
+   728→                              : 'border-zinc-600 text-zinc-500'
+   729→                          }`}
+   730→                        >
+   731→                          <div
+   732→                            className={`mr-1 h-1.5 w-1.5 rounded-full ${
+   733→                              account.status === 'active'
+   734→                                ? 'bg-emerald-400'
+   735→                                : 'bg-zinc-500'
+   736→                            }`}
+   737→                          />
+   738→                          {account.status.charAt(0).toUpperCase() +
+   739→                            account.status.slice(1)}
+   740→                        </Badge>
+   741→                      </div>
+   742→
+   743→                      {/* Email */}
+   744→                      <div className="mt-3 flex items-center justify-center gap-2 sm:justify-start">
+   745→                        <Mail className="h-3.5 w-3.5 text-zinc-500" />
+   746→                        {editingField === 'email' ? (
+   747→                          <div className="flex items-center gap-2">
+   748→                            <Input
+   749→                              type="email"
+   750→                              value={editValue}
+   751→                              onChange={(e) => setEditValue(e.target.value)}
+   752→                              className="h-7 w-52 border-zinc-700 bg-zinc-800 text-xs text-zinc-100"
+   753→                              placeholder="Email address"
+   754→                              autoFocus
+   755→                            />
+   756→                            <Button
+   757→                              size="icon"
+   758→                              variant="ghost"
+   759→                              className="h-6 w-6 text-emerald-400 hover:text-emerald-300"
+   760→                              onClick={() => saveField('email')}
+   761→                              disabled={saving}
+   762→                            >
+   763→                              {saving ? (
+   764→                                <Loader2 className="h-3 w-3 animate-spin" />
+   765→                              ) : (
+   766→                                <Check className="h-3 w-3" />
+   767→                              )}
+   768→                            </Button>
+   769→                            <Button
+   770→                              size="icon"
+   771→                              variant="ghost"
+   772→                              className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+   773→                              onClick={cancelEditing}
+   774→                            >
+   775→                              <X className="h-3 w-3" />
+   776→                            </Button>
+   777→                          </div>
+   778→                        ) : (
+   779→                          <span
+   780→                            className="cursor-pointer text-sm text-zinc-400 hover:text-zinc-300"
+   781→                            onClick={() =>
+   782→                              startEditing('email', account.email)
+   783→                            }
+   784→                          >
+   785→                            {account.email}
+   786→                          </span>
+   787→                        )}
+   788→                      </div>
+   789→
+   790→                      {/* Bio */}
+   791→                      <div className="mt-2 flex items-start justify-center gap-2 sm:justify-start">
+   792→                        {editingField === 'bio' ? (
+   793→                          <div className="flex-1 space-y-2">
+   794→                            <Textarea
+   795→                              value={editValue}
+   796→                              onChange={(e) => setEditValue(e.target.value)}
+   797→                              className="min-h-[60px] border-zinc-700 bg-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-600"
+   798→                              placeholder="Tell us about yourself..."
+   799→                              autoFocus
+   800→                            />
+   801→                            <div className="flex gap-2">
+   802→                              <Button
+   803→                                size="sm"
+   804→                                className="h-7 bg-emerald-600 text-white hover:bg-emerald-700"
+   805→                                onClick={() => saveField('bio')}
+   806→                                disabled={saving}
+   807→                              >
+   808→                                {saving ? (
+   809→                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+   810→                                ) : (
+   811→                                  <Check className="mr-1 h-3 w-3" />
+   812→                                )}
+   813→                                Save
+   814→                              </Button>
+   815→                              <Button
+   816→                                size="sm"
+   817→                                variant="ghost"
+   818→                                className="h-7 text-zinc-400 hover:text-zinc-200"
+   819→                                onClick={cancelEditing}
+   820→                              >
+   821→                                Cancel
+   822→                              </Button>
+   823→                            </div>
+   824→                          </div>
+   825→                        ) : (
+   826→                          <span
+   827→                            className="cursor-pointer text-sm text-zinc-500 hover:text-zinc-400"
+   828→                            onClick={() => startEditing('bio', account.bio || '')}
+   829→                          >
+   830→                            {account.bio || 'No bio — click to add'}
+   831→                          </span>
+   832→                        )}
+   833→                      </div>
+   834→
+   835→                      {/* Avatar URL */}
+   836→                      <div className="mt-2 flex items-center justify-center gap-2 sm:justify-start">
+   837→                        {editingField === 'avatarUrl' ? (
+   838→                          <div className="flex items-center gap-2">
+   839→                            <Input
+   840→                              value={editValue}
+   841→                              onChange={(e) => setEditValue(e.target.value)}
+   842→                              className="h-7 w-52 border-zinc-700 bg-zinc-800 text-xs text-zinc-100"
+   843→                              placeholder="Avatar URL"
+   844→                              autoFocus
+   845→                            />
+   846→                            <Button
+   847→                              size="icon"
+   848→                              variant="ghost"
+   849→                              className="h-6 w-6 text-emerald-400 hover:text-emerald-300"
+   850→                              onClick={() => saveField('avatarUrl')}
+   851→                              disabled={saving}
+   852→                            >
+   853→                              {saving ? (
+   854→                                <Loader2 className="h-3 w-3 animate-spin" />
+   855→                              ) : (
+   856→                                <Check className="h-3 w-3" />
+   857→                              )}
+   858→                            </Button>
+   859→                            <Button
+   860→                              size="icon"
+   861→                              variant="ghost"
+   862→                              className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+   863→                              onClick={cancelEditing}
+   864→                            >
+   865→                              <X className="h-3 w-3" />
+   866→                            </Button>
+   867→                          </div>
+   868→                        ) : (
+   869→                          <span
+   870→                            className="cursor-pointer text-xs text-zinc-600 hover:text-zinc-400"
+   871→                            onClick={() =>
+   872→                              startEditing('avatarUrl', account.avatarUrl || '')
+   873→                            }
+   874→                          >
+   875→                            {account.avatarUrl
+   876→                              ? 'Change avatar'
+   877→                              : 'Set avatar URL'}
+   878→                          </span>
+   879→                        )}
+   880→                      </div>
+   881→
+   882→                      {/* Member since */}
+   883→                      <div className="mt-3 flex items-center justify-center gap-2 sm:justify-start">
+   884→                        <Calendar className="h-3.5 w-3.5 text-zinc-600" />
+   885→                        <span className="text-xs text-zinc-500">
+   886→                          Member since {formatDate(account.createdAt)}
+   887→                        </span>
+   888→                      </div>
+   889→                    </div>
+   890→                  </div>
+   891→                </CardContent>
+   892→              </Card>
+   893→
+   894→              <Separator className="bg-zinc-800" />
+   895→
+   896→              {/* Account Stats */}
+   897→              <div>
+   898→                <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-300">
+   899→                  <Activity className="h-4 w-4 text-amber-400" /> Account Stats
+   900→                </h3>
+   901→                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+   902→                  {[
+   903→                    {
+   904→                      label: 'Logins',
+   905→                      value: stats.loginCount,
+   906→                      icon: <LogIn className="h-4 w-4" />,
+   907→                      color: 'text-emerald-400',
+   908→                      bg: 'bg-emerald-500/10',
+   909→                    },
+   910→                    {
+   911→                      label: 'Last Login',
+   912→                      value: timeAgo(stats.lastLogin || ''),
+   913→                      icon: <Clock className="h-4 w-4" />,
+   914→                      color: 'text-blue-400',
+   915→                      bg: 'bg-blue-500/10',
+   916→                    },
+   917→                    {
+   918→                      label: 'Chats',
+   919→                      value: stats.chatsCreated,
+   920→                      icon: <MessageSquare className="h-4 w-4" />,
+   921→                      color: 'text-violet-400',
+   922→                      bg: 'bg-violet-500/10',
+   923→                    },
+   924→                    {
+   925→                      label: 'Library Items',
+   926→                      value: stats.libraryItems,
+   927→                      icon: <BookOpen className="h-4 w-4" />,
+   928→                      color: 'text-amber-400',
+   929→                      bg: 'bg-amber-500/10',
+   930→                    },
+   931→                    {
+   932→                      label: 'Agents Run',
+   933→                      value: stats.agentsRun,
+   934→                      icon: <Bot className="h-4 w-4" />,
+   935→                      color: 'text-rose-400',
+   936→                      bg: 'bg-rose-500/10',
+   937→                    },
+   938→                  ].map((stat) => (
+   939→                    <Card
+   940→                      key={stat.label}
+   941→                      className="border-zinc-800 bg-zinc-900/60"
+   942→                    >
+   943→                      <CardContent className="p-3">
+   944→                        <div className="flex items-center gap-2">
+   945→                          <div
+   946→                            className={`flex h-8 w-8 items-center justify-center rounded-md ${stat.bg} ${stat.color}`}
+   947→                          >
+   948→                            {stat.icon}
+   949→                          </div>
+   950→                          <div>
+   951→                            <p className="text-lg font-semibold">
+   952→                              {stat.value}
+   953→                            </p>
+   954→                            <p className="text-[10px] text-zinc-500">
+   955→                              {stat.label}
+   956→                            </p>
+   957→                          </div>
+   958→                        </div>
+   959→                      </CardContent>
+   960→                    </Card>
+   961→                  ))}
+   962→                </div>
+   963→              </div>
+   964→
+   965→              <Separator className="bg-zinc-800" />
+   966→
+   967→              {/* Session Info */}
+   968→              <div>
+   969→                <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-300">
+   970→                  <Monitor className="h-4 w-4 text-emerald-400" /> Session Info
+   971→                </h3>
+   972→                <Card className="border-zinc-800 bg-zinc-900/60">
+   973→                  <CardContent className="divide-y divide-zinc-800 p-0">
+   974→                    {[
+   975→                      {
+   976→                        label: 'Platform',
+   977→                        value: sessionInfo.platform,
+   978→                        icon: <Monitor className="h-3.5 w-3.5" />,
+   979→                      },
+   980→                      {
+   981→                        label: 'Screen',
+   982→                        value: sessionInfo.screenSize,
+   983→                        icon: <Globe className="h-3.5 w-3.5" />,
+   984→                      },
+   985→                      {
+   986→                        label: 'Timezone',
+   987→                        value: sessionInfo.timezone,
+   988→                        icon: <Clock className="h-3.5 w-3.5" />,
+   989→                      },
+   990→                      {
+   991→                        label: 'Language',
+   992→                        value: sessionInfo.language,
+   993→                        icon: <Globe className="h-3.5 w-3.5" />,
+   994→                      },
+   995→                      {
+   996→                        label: 'Cookies',
+   997→                        value: sessionInfo.cookiesEnabled ? 'Enabled' : 'Disabled',
+   998→                        icon: <Key className="h-3.5 w-3.5" />,
+   999→                      },
+  1000→                      {
+  1001→                        label: 'Connection',
+  1002→                        value: sessionInfo.online ? 'Online' : 'Offline',
+  1003→                        icon: <Activity className="h-3.5 w-3.5" />,
+  1004→                      },
+  1005→                    ].map((item) => (
+  1006→                      <div
+  1007→                        key={item.label}
+  1008→                        className="flex items-center justify-between px-4 py-2.5"
+  1009→                      >
+  1010→                        <div className="flex items-center gap-2 text-sm text-zinc-400">
+  1011→                          {item.icon}
+  1012→                          {item.label}
+  1013→                        </div>
+  1014→                        <span className="text-sm text-zinc-300">
+  1015→                          {item.value}
+  1016→                        </span>
+  1017→                      </div>
+  1018→                    ))}
+  1019→                  </CardContent>
+  1020→                </Card>
+  1021→
+  1022→                {/* User Agent (truncated) */}
+  1023→                <div className="mt-2">
+  1024→                  <Label className="text-xs text-zinc-500">User Agent</Label>
+  1025→                  <p className="mt-0.5 break-all text-[10px] leading-relaxed text-zinc-600">
+  1026→                    {sessionInfo.userAgent}
+  1027→                  </p>
+  1028→                </div>
+  1029→              </div>
+  1030→            </div>
+  1031→          </ScrollArea>
+  1032→        </TabsContent>
+  1033→
+  1034→        {/* ── Plan Tab ──────────────────────────────────────────────────── */}
+  1035→        <TabsContent value="plan" className="mt-0 flex-1 overflow-hidden">
+  1036→          <ScrollArea className="h-full">
+  1037→            <div className="space-y-4 p-4">
+  1038→              {/* Current Plan */}
+  1039→              <Card className="border-zinc-800 bg-zinc-900/60">
+  1040→                <CardHeader className="pb-3">
+  1041→                  <CardTitle className="flex items-center gap-2 text-sm font-medium">
+  1042→                    <Crown className="h-4 w-4 text-amber-400" />
+  1043→                    Current Plan
+  1044→                  </CardTitle>
+  1045→                </CardHeader>
+  1046→                <CardContent>
+  1047→                  <div className="flex items-center gap-4">
+  1048→                    <div
+  1049→                      className={`flex h-14 w-14 items-center justify-center rounded-xl border ${
+  1050→                        account.plan === 'enterprise'
+  1051→                          ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+  1052→                          : account.plan === 'pro'
+  1053→                            ? 'border-emerald-600/30 bg-emerald-500/10 text-emerald-400'
+  1054→                            : 'border-zinc-700 bg-zinc-800 text-zinc-400'
+  1055→                      }`}
+  1056→                    >
+  1057→                      {planConfig[account.plan]?.icon || <Zap className="h-6 w-6" />}
+  1058→                    </div>
+  1059→                    <div>
+  1060→                      <h3 className="text-xl font-semibold">
+  1061→                        {planConfig[account.plan]?.label || account.plan}
+  1062→                      </h3>
+  1063→                      <p className="text-xs text-zinc-500">
+  1064→                        Active since {formatDate(account.createdAt)}
+  1065→                      </p>
+  1066→                    </div>
+  1067→                  </div>
+  1068→
+  1069→                  {/* Plan features */}
+  1070→                  <div className="mt-4 space-y-1.5">
+  1071→                    {(planConfig[account.plan]?.features || []).map(
+  1072→                      (feature) => (
+  1073→                        <div
+  1074→                          key={feature}
+  1075→                          className="flex items-center gap-2 text-xs text-zinc-400"
+  1076→                        >
+  1077→                          <Check className="h-3 w-3 text-emerald-400" />
+  1078→                          {feature}
+  1079→                        </div>
+  1080→                      )
+  1081→                    )}
+  1082→                  </div>
+  1083→
+  1084→                  {account.plan !== 'enterprise' && (
+  1085→                    <Button
+  1086→                      className="mt-4 w-full bg-emerald-600 text-white hover:bg-emerald-700"
+  1087→                      onClick={() => setUpgradeOpen(true)}
+  1088→                    >
+  1089→                      <Crown className="mr-2 h-4 w-4" /> Upgrade Plan
+  1090→                    </Button>
+  1091→                  )}
+  1092→                </CardContent>
+  1093→              </Card>
+  1094→
+  1095→              <Separator className="bg-zinc-800" />
+  1096→
+  1097→              {/* Plan Comparison */}
+  1098→              <div>
+  1099→                <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-300">
+  1100→                  <Star className="h-4 w-4 text-amber-400" /> Plan Comparison
+  1101→                </h3>
+  1102→                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+  1103→                  {Object.entries(planConfig).map(([key, plan]) => (
+  1104→                    <Card
+  1105→                      key={key}
+  1106→                      className={`border bg-zinc-900/60 transition-colors ${
+  1107→                        account.plan === key
+  1108→                          ? 'border-emerald-600/50 ring-1 ring-emerald-600/20'
+  1109→                          : 'border-zinc-800 hover:bg-zinc-900'
+  1110→                      }`}
+  1111→                    >
+  1112→                      <CardHeader className="pb-2">
+  1113→                        <div className="flex items-center justify-between">
+  1114→                          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+  1115→                            {plan.icon}
+  1116→                            {plan.label}
+  1117→                          </CardTitle>
+  1118→                          {account.plan === key && (
+  1119→                            <Badge className="bg-emerald-600 text-[10px] text-white">
+  1120→                              Current
+  1121→                            </Badge>
+  1122→                          )}
+  1123→                        </div>
+  1124→                      </CardHeader>
+  1125→                      <CardContent className="space-y-2 pt-0">
+  1126→                        {plan.features.map((f) => (
+  1127→                          <div
+  1128→                            key={f}
+  1129→                            className="flex items-center gap-1.5 text-xs text-zinc-400"
+  1130→                          >
+  1131→                            <ChevronRight className="h-3 w-3 text-zinc-600" />
+  1132→                            {f}
+  1133→                          </div>
+  1134→                        ))}
+  1135→                        {account.plan !== key && (
+  1136→                          <Button
+  1137→                            size="sm"
+  1138→                            variant="outline"
+  1139→                            className="mt-2 w-full border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800"
+  1140→                            onClick={() => handleUpgradePlan(key)}
+  1141→                          >
+  1142→                            Switch to {plan.label}
+  1143→                          </Button>
+  1144→                        )}
+  1145→                      </CardContent>
+  1146→                    </Card>
+  1147→                  ))}
+  1148→                </div>
+  1149→              </div>
+  1150→
+  1151→              {/* Usage overview */}
+  1152→              <Separator className="bg-zinc-800" />
+  1153→              <div>
+  1154→                <h3 className="mb-3 text-sm font-medium text-zinc-300">
+  1155→                  Usage Overview
+  1156→                </h3>
+  1157→                <Card className="border-zinc-800 bg-zinc-900/60">
+  1158→                  <CardContent className="space-y-4 p-4">
+  1159→                    {[
+  1160→                      {
+  1161→                        label: 'Chats',
+  1162→                        current: stats.chatsCreated,
+  1163→                        max: account.plan === 'free' ? 5 : account.plan === 'pro' ? 100 : Infinity,
+  1164→                        color: 'bg-emerald-500',
+  1165→                      },
+  1166→                      {
+  1167→                        label: 'Library Items',
+  1168→                        current: stats.libraryItems,
+  1169→                        max: account.plan === 'free' ? 3 : account.plan === 'pro' ? 50 : Infinity,
+  1170→                        color: 'bg-amber-500',
+  1171→                      },
+  1172→                      {
+  1173→                        label: 'Agent Runs',
+  1174→                        current: stats.agentsRun,
+  1175→                        max: account.plan === 'free' ? 10 : account.plan === 'pro' ? 200 : Infinity,
+  1176→                        color: 'bg-violet-500',
+  1177→                      },
+  1178→                    ].map((usage) => {
+  1179→                      const pct =
+  1180→                        usage.max === Infinity
+  1181→                          ? 25
+  1182→                          : Math.min(
+  1183→                              (usage.current / usage.max) * 100,
+  1184→                              100
+  1185→                            );
+  1186→                      return (
+  1187→                        <div key={usage.label}>
+  1188→                          <div className="mb-1 flex items-center justify-between text-xs">
+  1189→                            <span className="text-zinc-400">
+  1190→                              {usage.label}
+  1191→                            </span>
+  1192→                            <span className="text-zinc-500">
+  1193→                              {usage.current}
+  1194→                              {usage.max !== Infinity && ` / ${usage.max}`}
+  1195→                              {usage.max === Infinity && ' / ∞'}
+  1196→                            </span>
+  1197→                          </div>
+  1198→                          <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+  1199→                            <div
+  1200→                              className={`h-full rounded-full transition-all ${usage.color}`}
+  1201→                              style={{ width: `${pct}%` }}
+  1202→                            />
+  1203→                          </div>
+  1204→                        </div>
+  1205→                      );
+  1206→                    })}
+  1207→                  </CardContent>
+  1208→                </Card>
+  1209→              </div>
+  1210→            </div>
+  1211→          </ScrollArea>
+  1212→        </TabsContent>
+  1213→
+  1214→        {/* ── Preferences Tab ───────────────────────────────────────────── */}
+  1215→        <TabsContent
+  1216→          value="preferences"
+  1217→          className="mt-0 flex-1 overflow-hidden"
+  1218→        >
+  1219→          <ScrollArea className="h-full">
+  1220→            <div className="space-y-4 p-4">
+  1221→              <div className="flex items-center justify-between">
+  1222→                <div>
+  1223→                  <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+  1224→                    <Settings className="h-4 w-4 text-emerald-400" /> JSON
+  1225→                    Preferences
+  1226→                  </h3>
+  1227→                  <p className="mt-0.5 text-xs text-zinc-500">
+  1228→                    Manage key-value preference pairs stored in your account
+  1229→                  </p>
+  1230→                </div>
+  1231→                <Button
+  1232→                  size="sm"
+  1233→                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+  1234→                  onClick={savePreferences}
+  1235→                  disabled={prefSaving}
+  1236→                >
+  1237→                  {prefSaving ? (
+  1238→                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+  1239→                  ) : (
+  1240→                    <Save className="mr-1 h-3.5 w-3.5" />
+  1241→                  )}
+  1242→                  Save All
+  1243→                </Button>
+  1244→              </div>
+  1245→
+  1246→              {/* Existing preferences */}
+  1247→              {preferences.length > 0 ? (
+  1248→                <Card className="border-zinc-800 bg-zinc-900/60">
+  1249→                  <CardContent className="divide-y divide-zinc-800 p-0">
+  1250→                    {preferences.map((pref, idx) => (
+  1251→                      <div
+  1252→                        key={pref.key}
+  1253→                        className="flex items-center gap-3 px-4 py-2.5"
+  1254→                      >
+  1255→                        <span className="w-6 text-center text-[10px] text-zinc-600">
+  1256→                          {idx + 1}
+  1257→                        </span>
+  1258→                        <div className="flex flex-1 items-center gap-2">
+  1259→                          <Input
+  1260→                            value={pref.key}
+  1261→                            readOnly
+  1262→                            className="h-7 w-36 border-zinc-700 bg-zinc-800 text-xs text-zinc-400"
+  1263→                          />
+  1264→                          <Input
+  1265→                            value={pref.value}
+  1266→                            onChange={(e) =>
+  1267→                              updatePreference(pref.key, e.target.value)
+  1268→                            }
+  1269→                            className="h-7 flex-1 border-zinc-700 bg-zinc-800 text-xs text-zinc-100"
+  1270→                          />
+  1271→                        </div>
+  1272→                        <Button
+  1273→                          variant="ghost"
+  1274→                          size="icon"
+  1275→                          className="h-7 w-7 text-zinc-500 hover:text-red-400"
+  1276→                          onClick={() => removePreference(pref.key)}
+  1277→                        >
+  1278→                          <Trash2 className="h-3.5 w-3.5" />
+  1279→                        </Button>
+  1280→                      </div>
+  1281→                    ))}
+  1282→                  </CardContent>
+  1283→                </Card>
+  1284→              ) : (
+  1285→                <Card className="border-zinc-800 bg-zinc-900/60">
+  1286→                  <CardContent className="flex flex-col items-center gap-2 p-8">
+  1287→                    <Settings className="h-8 w-8 text-zinc-700" />
+  1288→                    <p className="text-sm text-zinc-500">No preferences set</p>
+  1289→                    <p className="text-xs text-zinc-600">
+  1290→                      Add key-value pairs below
+  1291→                    </p>
+  1292→                  </CardContent>
+  1293→                </Card>
+  1294→              )}
+  1295→
+  1296→              {/* Add new preference */}
+  1297→              <Card className="border-zinc-800 bg-zinc-900/60">
+  1298→                <CardHeader className="pb-2">
+  1299→                  <CardTitle className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+  1300→                    <Plus className="h-3.5 w-3.5" /> Add Preference
+  1301→                  </CardTitle>
+  1302→                </CardHeader>
+  1303→                <CardContent>
+  1304→                  <div className="flex items-center gap-2">
+  1305→                    <Input
+  1306→                      value={newPrefKey}
+  1307→                      onChange={(e) => setNewPrefKey(e.target.value)}
+  1308→                      placeholder="Key"
+  1309→                      className="h-8 w-32 border-zinc-700 bg-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-600"
+  1310→                    />
+  1311→                    <Input
+  1312→                      value={newPrefValue}
+  1313→                      onChange={(e) => setNewPrefValue(e.target.value)}
+  1314→                      placeholder="Value"
+  1315→                      className="h-8 flex-1 border-zinc-700 bg-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-600"
+  1316→                      onKeyDown={(e) => {
+  1317→                        if (e.key === 'Enter') addPreference();
+  1318→                      }}
+  1319→                    />
+  1320→                    <Button
+  1321→                      size="sm"
+  1322→                      variant="outline"
+  1323→                      className="h-8 border-zinc-700 text-xs text-zinc-300 hover:bg-zinc-800"
+  1324→                      onClick={addPreference}
+  1325→                      disabled={!newPrefKey.trim()}
+  1326→                    >
+  1327→                      <Plus className="mr-1 h-3 w-3" /> Add
+  1328→                    </Button>
+  1329→                  </div>
+  1330→                </CardContent>
+  1331→              </Card>
+  1332→
+  1333→              {/* Raw JSON preview */}
+  1334→              <Card className="border-zinc-800 bg-zinc-900/60">
+  1335→                <CardHeader className="pb-2">
+  1336→                  <CardTitle className="text-xs font-medium text-zinc-500">
+  1337→                    Raw JSON Preview
+  1338→                  </CardTitle>
+  1339→                </CardHeader>
+  1340→                <CardContent>
+  1341→                  <pre className="max-h-32 overflow-auto rounded-md bg-zinc-900 p-3 text-[10px] leading-relaxed text-zinc-500">
+  1342→                    {JSON.stringify(
+  1343→                      Object.fromEntries(
+  1344→                        preferences.map((p) => [p.key, p.value])
+  1345→                      ),
+  1346→                      null,
+  1347→                      2
+  1348→                    )}
+  1349→                  </pre>
+  1350→                </CardContent>
+  1351→              </Card>
+  1352→            </div>
+  1353→          </ScrollArea>
+  1354→        </TabsContent>
+  1355→
+  1356→        {/* ── Activity Tab ──────────────────────────────────────────────── */}
+  1357→        <TabsContent value="activity" className="mt-0 flex-1 overflow-hidden">
+  1358→          <ScrollArea className="h-full">
+  1359→            <div className="space-y-4 p-4">
+  1360→              <div className="flex items-center justify-between">
+  1361→                <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-300">
+  1362→                  <Activity className="h-4 w-4 text-amber-400" /> Recent
+  1363→                  Activity
+  1364→                </h3>
+  1365→                <Button
+  1366→                  variant="ghost"
+  1367→                  size="sm"
+  1368→                  onClick={fetchActivities}
+  1369→                  className="text-zinc-400 hover:text-zinc-200"
+  1370→                >
+  1371→                  <RefreshCw className="h-3.5 w-3.5" />
+  1372→                </Button>
+  1373→              </div>
+  1374→
+  1375→              {activityLoading ? (
+  1376→                <div className="space-y-3">
+  1377→                  {[...Array(5)].map((_, i) => (
+  1378→                    <div key={i} className="flex items-center gap-3">
+  1379→                      <Skeleton className="h-8 w-8 rounded-full bg-zinc-800" />
+  1380→                      <div className="flex-1 space-y-1">
+  1381→                        <Skeleton className="h-4 w-3/4 bg-zinc-800" />
+  1382→                        <Skeleton className="h-3 w-1/4 bg-zinc-800" />
+  1383→                      </div>
+  1384→                    </div>
+  1385→                  ))}
+  1386→                </div>
+  1387→              ) : activities.length > 0 ? (
+  1388→                <Card className="border-zinc-800 bg-zinc-900/60">
+  1389→                  <CardContent className="divide-y divide-zinc-800 p-0">
+  1390→                    {activities.map((act) => (
+  1391→                      <div
+  1392→                        key={act.id}
+  1393→                        className="flex items-center gap-3 px-4 py-3"
+  1394→                      >
+  1395→                        <div
+  1396→                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${activityBg(act.action)} ${activityColor(act.action)}`}
+  1397→                        >
+  1398→                          {activityIcon(act.action)}
+  1399→                        </div>
+  1400→                        <div className="flex-1 min-w-0">
+  1401→                          <p className="text-sm text-zinc-300">
+  1402→                            <span className="font-medium">{act.action}</span>
+  1403→                            {act.entity && (
+  1404→                              <span className="text-zinc-500">
+  1405→                                {' '}
+  1406→                                · {act.entity}
+  1407→                              </span>
+  1408→                            )}
+  1409→                          </p>
+  1410→                          {act.description && (
+  1411→                            <p className="truncate text-xs text-zinc-500">
+  1412→                              {act.description}
+  1413→                            </p>
+  1414→                          )}
+  1415→                        </div>
+  1416→                        <div className="shrink-0 text-right">
+  1417→                          <span className="text-[10px] text-zinc-600">
+  1418→                            {timeAgo(act.createdAt)}
+  1419→                          </span>
+  1420→                        </div>
+  1421→                      </div>
+  1422→                    ))}
+  1423→                  </CardContent>
+  1424→                </Card>
+  1425→              ) : (
+  1426→                <Card className="border-zinc-800 bg-zinc-900/60">
+  1427→                  <CardContent className="flex flex-col items-center gap-2 p-8">
+  1428→                    <Activity className="h-8 w-8 text-zinc-700" />
+  1429→                    <p className="text-sm text-zinc-500">No activity yet</p>
+  1430→                    <p className="text-xs text-zinc-600">
+  1431→                      Activity will appear here as you use the platform
+  1432→                    </p>
+  1433→                  </CardContent>
+  1434→                </Card>
+  1435→              )}
+  1436→            </div>
+  1437→          </ScrollArea>
+  1438→        </TabsContent>
+  1439→      </Tabs>
+  1440→
+  1441→      {/* Upgrade Dialog */}
+  1442→      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+  1443→        <DialogContent className="border-zinc-800 bg-zinc-950 text-zinc-100 sm:max-w-md">
+  1444→          <DialogHeader>
+  1445→            <DialogTitle className="flex items-center gap-2">
+  1446→              <Crown className="h-5 w-5 text-amber-400" />
+  1447→              Upgrade Your Plan
+  1448→            </DialogTitle>
+  1449→            <DialogDescription className="text-zinc-400">
+  1450→              Choose a plan that fits your needs
+  1451→            </DialogDescription>
+  1452→          </DialogHeader>
+  1453→          <div className="space-y-3 pt-2">
+  1454→            {Object.entries(planConfig)
+  1455→              .filter(([key]) => key !== account.plan)
+  1456→              .map(([key, plan]) => (
+  1457→                <Card
+  1458→                  key={key}
+  1459→                  className="cursor-pointer border-zinc-800 bg-zinc-900/60 transition-colors hover:bg-zinc-900 hover:border-zinc-700"
+  1460→                  onClick={() => handleUpgradePlan(key)}
+  1461→                >
+  1462→                  <CardContent className="flex items-center justify-between p-4">
+  1463→                    <div className="flex items-center gap-3">
+  1464→                      <div
+  1465→                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+  1466→                          key === 'enterprise'
+  1467→                            ? 'bg-amber-500/10 text-amber-400'
+  1468→                            : 'bg-emerald-500/10 text-emerald-400'
+  1469→                        }`}
+  1470→                      >
+  1471→                        {plan.icon}
+  1472→                      </div>
+  1473→                      <div>
+  1474→                        <p className="text-sm font-medium">{plan.label}</p>
+  1475→                        <p className="text-xs text-zinc-500">
+  1476→                          {plan.features.slice(0, 2).join(' · ')}
+  1477→                        </p>
+  1478→                      </div>
+  1479→                    </div>
+  1480→                    <ChevronRight className="h-4 w-4 text-zinc-600" />
+  1481→                  </CardContent>
+  1482→                </Card>
+  1483→              ))}
+  1484→          </div>
+  1485→        </DialogContent>
+  1486→      </Dialog>
+  1487→    </div>
+  1488→  );
+  1489→}
+  1490→

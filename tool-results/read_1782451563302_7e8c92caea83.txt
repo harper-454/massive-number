@@ -1,0 +1,1293 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback, useRef } from 'react';
+     4→import {
+     5→  Search,
+     6→  FolderOpen,
+     7→  FolderPlus,
+     8→  Pin,
+     9→  Archive,
+    10→  Trash2,
+    11→  Clock,
+    12→  MessageSquare,
+    13→  MoreVertical,
+    14→  ChevronDown,
+    15→  ChevronRight,
+    16→  Pencil,
+    17→  FolderInput,
+    18→  PinOff,
+    19→  ArchiveRestore,
+    20→  Loader2,
+    21→  Inbox,
+    22→  Hash,
+    23→  CalendarDays,
+    24→  ArrowUpDown,
+    25→  X,
+    26→  Check,
+    27→  Bot,
+    28→  User,
+    29→} from 'lucide-react';
+    30→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    31→import { Button } from '@/components/ui/button';
+    32→import { Input } from '@/components/ui/input';
+    33→import { Badge } from '@/components/ui/badge';
+    34→import { ScrollArea } from '@/components/ui/scroll-area';
+    35→import { Separator } from '@/components/ui/separator';
+    36→import {
+    37→  DropdownMenu,
+    38→  DropdownMenuContent,
+    39→  DropdownMenuItem,
+    40→  DropdownMenuSeparator,
+    41→  DropdownMenuTrigger,
+    42→} from '@/components/ui/dropdown-menu';
+    43→import {
+    44→  Dialog,
+    45→  DialogContent,
+    46→  DialogHeader,
+    47→  DialogTitle,
+    48→  DialogFooter,
+    49→} from '@/components/ui/dialog';
+    50→import {
+    51→  Select,
+    52→  SelectContent,
+    53→  SelectItem,
+    54→  SelectTrigger,
+    55→  SelectValue,
+    56→} from '@/components/ui/select';
+    57→import { Skeleton } from '@/components/ui/skeleton';
+    58→import { motion, AnimatePresence } from 'framer-motion';
+    59→
+    60→/* ───────── Types ───────── */
+    61→
+    62→interface ChatFolder {
+    63→  id: string;
+    64→  name: string;
+    65→  color: string;
+    66→  icon?: string | null;
+    67→  sortOrder: number;
+    68→  _count?: { chats: number };
+    69→}
+    70→
+    71→interface PreviewMessage {
+    72→  id: string;
+    73→  role: string;
+    74→  content: string;
+    75→  createdAt: string;
+    76→}
+    77→
+    78→interface ChatHistoryItem {
+    79→  id: string;
+    80→  title: string;
+    81→  model: string;
+    82→  mode: string;
+    83→  persona: string;
+    84→  folderId: string | null;
+    85→  folder: { id: string; name: string; color: string } | null;
+    86→  pinned: boolean;
+    87→  archived: boolean;
+    88→  messageCount: number;
+    89→  preview: string | null;
+    90→  previewMessages: PreviewMessage[];
+    91→  projectId: string | null;
+    92→  createdAt: string;
+    93→  updatedAt: string;
+    94→}
+    95→
+    96→interface HistoryResponse {
+    97→  chats: ChatHistoryItem[];
+    98→  folders: ChatFolder[];
+    99→  total: number;
+   100→  limit: number;
+   101→  offset: number;
+   102→}
+   103→
+   104→type DateFilter = 'today' | 'week' | 'month' | 'all';
+   105→type SortOption = 'updatedAt' | 'createdAt' | 'messageCount';
+   106→type FilterMode = 'all' | 'pinned' | 'archived';
+   107→
+   108→/* ───────── Helpers ───────── */
+   109→
+   110→const MODEL_COLORS: Record<string, string> = {
+   111→  auto: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30',
+   112→  'gemini-2.5-flash': 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+   113→  'gemini-3-flash': 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+   114→  'deepseek-v4-flash': 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+   115→  'deepseek-r1': 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+   116→  'llama-4-scout-17b': 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+   117→  'llama-4-maverick-17b': 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+   118→  'qwen3-coder-480b': 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+   119→  'qwen3.7-max': 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+   120→  'mistral-large': 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+   121→  codestral: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+   122→  'gpt-oss-120b': 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+   123→  'cerebras-glm-4.7': 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+   124→  'command-r-plus': 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+   125→  'deepseek-r1-sambanova': 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+   126→  'openrouter-free': 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+   127→};
+   128→
+   129→function getModelBadgeClass(model: string): string {
+   130→  return MODEL_COLORS[model] || 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30';
+   131→}
+   132→
+   133→function formatRelativeTime(dateStr: string): string {
+   134→  const date = new Date(dateStr);
+   135→  const now = new Date();
+   136→  const diffMs = now.getTime() - date.getTime();
+   137→  const diffSec = Math.floor(diffMs / 1000);
+   138→  const diffMin = Math.floor(diffSec / 60);
+   139→  const diffHr = Math.floor(diffMin / 60);
+   140→  const diffDay = Math.floor(diffHr / 24);
+   141→
+   142→  if (diffSec < 60) return 'just now';
+   143→  if (diffMin < 60) return `${diffMin}m ago`;
+   144→  if (diffHr < 24) return `${diffHr}h ago`;
+   145→  if (diffDay < 7) return `${diffDay}d ago`;
+   146→  if (diffDay < 30) return `${Math.floor(diffDay / 7)}w ago`;
+   147→  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+   148→}
+   149→
+   150→function getModelDisplayName(model: string): string {
+   151→  const names: Record<string, string> = {
+   152→    auto: 'Auto',
+   153→    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+   154→    'gemini-3-flash': 'Gemini 3 Flash',
+   155→    'deepseek-v4-flash': 'DeepSeek V4',
+   156→    'deepseek-r1': 'DeepSeek R1',
+   157→    'llama-4-scout-17b': 'Llama 4 Scout',
+   158→    'llama-4-maverick-17b': 'Llama 4 Maverick',
+   159→    'qwen3-coder-480b': 'Qwen3 Coder',
+   160→    'qwen3.7-max': 'Qwen3.7 Max',
+   161→    'mistral-large': 'Mistral Large',
+   162→    codestral: 'Codestral',
+   163→    'gpt-oss-120b': 'GPT-OSS',
+   164→    'cerebras-glm-4.7': 'GLM 4.7',
+   165→    'command-r-plus': 'Command R+',
+   166→    'deepseek-r1-sambanova': 'DeepSeek R1 SN',
+   167→    'openrouter-free': 'OpenRouter',
+   168→  };
+   169→  return names[model] || model;
+   170→}
+   171→
+   172→/* ───────── Sub-Components ───────── */
+   173→
+   174→function ChatListItem({
+   175→  chat,
+   176→  isSelected,
+   177→  onSelect,
+   178→  onAction,
+   179→}: {
+   180→  chat: ChatHistoryItem;
+   181→  isSelected: boolean;
+   182→  onSelect: () => void;
+   183→  onAction: (action: string, chatId: string) => void;
+   184→}) {
+   185→  return (
+   186→    <motion.div
+   187→      initial={{ opacity: 0, x: -8 }}
+   188→      animate={{ opacity: 1, x: 0 }}
+   189→      transition={{ duration: 0.15 }}
+   190→      className={`group relative rounded-lg border transition-all cursor-pointer ${
+   191→        isSelected
+   192→          ? 'bg-zinc-800/80 border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+   193→          : 'bg-zinc-900/40 border-zinc-800/50 hover:bg-zinc-800/60 hover:border-zinc-700/60'
+   194→      }`}
+   195→      onClick={onSelect}
+   196→    >
+   197→      <div className="p-3">
+   198→        <div className="flex items-start gap-2">
+   199→          {/* Pin indicator */}
+   200→          {chat.pinned && (
+   201→            <Pin className="h-3 w-3 text-amber-400 shrink-0 mt-1 rotate-45" />
+   202→          )}
+   203→
+   204→          {/* Chat info */}
+   205→          <div className="flex-1 min-w-0">
+   206→            <div className="flex items-center gap-2 mb-1">
+   207→              <h3 className={`text-sm font-medium truncate ${
+   208→                isSelected ? 'text-emerald-300' : 'text-zinc-200'
+   209→              }`}>
+   210→                {chat.title}
+   211→              </h3>
+   212→              {chat.archived && (
+   213→                <Archive className="h-3 w-3 text-zinc-500 shrink-0" />
+   214→              )}
+   215→            </div>
+   216→
+   217→            <div className="flex items-center gap-2 flex-wrap">
+   218→              {/* Model badge */}
+   219→              <Badge
+   220→                variant="outline"
+   221→                className={`text-[10px] h-4 px-1.5 font-mono border ${getModelBadgeClass(chat.model)}`}
+   222→              >
+   223→                {getModelDisplayName(chat.model)}
+   224→              </Badge>
+   225→
+   226→              {/* Message count */}
+   227→              <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+   228→                <MessageSquare className="h-2.5 w-2.5" />
+   229→                {chat.messageCount}
+   230→              </span>
+   231→
+   232→              {/* Folder badge */}
+   233→              {chat.folder && (
+   234→                <span
+   235→                  className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full"
+   236→                  style={{
+   237→                    backgroundColor: `${chat.folder.color}15`,
+   238→                    color: chat.folder.color,
+   239→                  }}
+   240→                >
+   241→                  <FolderOpen className="h-2.5 w-2.5" />
+   242→                  {chat.folder.name}
+   243→                </span>
+   244→              )}
+   245→            </div>
+   246→
+   247→            {/* Preview text */}
+   248→            {chat.preview && (
+   249→              <p className="text-xs text-zinc-500 line-clamp-1 mt-1.5 leading-relaxed">
+   250→                {chat.preview}
+   251→              </p>
+   252→            )}
+   253→
+   254→            {/* Timestamp */}
+   255→            <div className="flex items-center gap-1 mt-1.5">
+   256→              <Clock className="h-2.5 w-2.5 text-zinc-600" />
+   257→              <span className="text-[10px] text-zinc-600">
+   258→                {formatRelativeTime(chat.updatedAt)}
+   259→              </span>
+   260→            </div>
+   261→          </div>
+   262→
+   263→          {/* Actions */}
+   264→          <DropdownMenu>
+   265→            <DropdownMenuTrigger asChild>
+   266→              <Button
+   267→                variant="ghost"
+   268→                size="icon"
+   269→                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-zinc-500 hover:text-zinc-300"
+   270→                onClick={(e) => e.stopPropagation()}
+   271→              >
+   272→                <MoreVertical className="h-3.5 w-3.5" />
+   273→              </Button>
+   274→            </DropdownMenuTrigger>
+   275→            <DropdownMenuContent
+   276→              align="end"
+   277→              className="w-48 bg-zinc-900 border-zinc-800"
+   278→            >
+   279→              <DropdownMenuItem
+   280→                className="text-zinc-300 focus:text-zinc-100 focus:bg-zinc-800"
+   281→                onClick={(e) => {
+   282→                  e.stopPropagation();
+   283→                  onAction('rename', chat.id);
+   284→                }}
+   285→              >
+   286→                <Pencil className="h-3.5 w-3.5 mr-2" />
+   287→                Rename
+   288→              </DropdownMenuItem>
+   289→              <DropdownMenuItem
+   290→                className="text-zinc-300 focus:text-zinc-100 focus:bg-zinc-800"
+   291→                onClick={(e) => {
+   292→                  e.stopPropagation();
+   293→                  onAction('moveToFolder', chat.id);
+   294→                }}
+   295→              >
+   296→                <FolderInput className="h-3.5 w-3.5 mr-2" />
+   297→                Move to Folder
+   298→              </DropdownMenuItem>
+   299→              <DropdownMenuSeparator className="bg-zinc-800" />
+   300→              <DropdownMenuItem
+   301→                className="text-zinc-300 focus:text-zinc-100 focus:bg-zinc-800"
+   302→                onClick={(e) => {
+   303→                  e.stopPropagation();
+   304→                  onAction(chat.pinned ? 'unpin' : 'pin', chat.id);
+   305→                }}
+   306→              >
+   307→                {chat.pinned ? (
+   308→                  <PinOff className="h-3.5 w-3.5 mr-2" />
+   309→                ) : (
+   310→                  <Pin className="h-3.5 w-3.5 mr-2" />
+   311→                )}
+   312→                {chat.pinned ? 'Unpin' : 'Pin'}
+   313→              </DropdownMenuItem>
+   314→              <DropdownMenuItem
+   315→                className="text-zinc-300 focus:text-zinc-100 focus:bg-zinc-800"
+   316→                onClick={(e) => {
+   317→                  e.stopPropagation();
+   318→                  onAction(chat.archived ? 'unarchive' : 'archive', chat.id);
+   319→                }}
+   320→              >
+   321→                {chat.archived ? (
+   322→                  <ArchiveRestore className="h-3.5 w-3.5 mr-2" />
+   323→                ) : (
+   324→                  <Archive className="h-3.5 w-3.5 mr-2" />
+   325→                )}
+   326→                {chat.archived ? 'Unarchive' : 'Archive'}
+   327→              </DropdownMenuItem>
+   328→              <DropdownMenuSeparator className="bg-zinc-800" />
+   329→              <DropdownMenuItem
+   330→                className="text-red-400 focus:text-red-300 focus:bg-red-500/10"
+   331→                onClick={(e) => {
+   332→                  e.stopPropagation();
+   333→                  onAction('delete', chat.id);
+   334→                }}
+   335→              >
+   336→                <Trash2 className="h-3.5 w-3.5 mr-2" />
+   337→                Delete
+   338→              </DropdownMenuItem>
+   339→            </DropdownMenuContent>
+   340→          </DropdownMenu>
+   341→        </div>
+   342→      </div>
+   343→    </motion.div>
+   344→  );
+   345→}
+   346→
+   347→function FolderTreeItem({
+   348→  folder,
+   349→  isActive,
+   350→  chatCount,
+   351→  onClick,
+   352→  onAction,
+   353→}: {
+   354→  folder: ChatFolder;
+   355→  isActive: boolean;
+   356→  chatCount: number;
+   357→  onClick: () => void;
+   358→  onAction: (action: string, folderId: string) => void;
+   359→}) {
+   360→  const [collapsed, setCollapsed] = useState(false);
+   361→
+   362→  return (
+   363→    <div>
+   364→      <div
+   365→        className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all ${
+   366→          isActive
+   367→            ? 'bg-zinc-800/80 text-zinc-100'
+   368→            : 'text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200'
+   369→        }`}
+   370→        onClick={() => {
+   371→          setCollapsed(!collapsed);
+   372→          onClick();
+   373→        }}
+   374→      >
+   375→        <button
+   376→          className="h-4 w-4 flex items-center justify-center shrink-0"
+   377→          onClick={(e) => {
+   378→            e.stopPropagation();
+   379→            setCollapsed(!collapsed);
+   380→          }}
+   381→        >
+   382→          {collapsed ? (
+   383→            <ChevronRight className="h-3 w-3" />
+   384→          ) : (
+   385→            <ChevronDown className="h-3 w-3" />
+   386→          )}
+   387→        </button>
+   388→        <div
+   389→          className="h-2.5 w-2.5 rounded-sm shrink-0"
+   390→          style={{ backgroundColor: folder.color }}
+   391→        />
+   392→        <span className="text-xs font-medium truncate flex-1">{folder.name}</span>
+   393→        <span className="text-[10px] text-zinc-600 tabular-nums">{chatCount}</span>
+   394→        <DropdownMenu>
+   395→          <DropdownMenuTrigger asChild>
+   396→            <Button
+   397→              variant="ghost"
+   398→              size="icon"
+   399→              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-zinc-500 hover:text-zinc-300"
+   400→              onClick={(e) => e.stopPropagation()}
+   401→            >
+   402→              <MoreVertical className="h-3 w-3" />
+   403→            </Button>
+   404→          </DropdownMenuTrigger>
+   405→          <DropdownMenuContent
+   406→            align="end"
+   407→            className="w-40 bg-zinc-900 border-zinc-800"
+   408→          >
+   409→            <DropdownMenuItem
+   410→              className="text-zinc-300 focus:text-zinc-100 focus:bg-zinc-800"
+   411→              onClick={(e) => {
+   412→                e.stopPropagation();
+   413→                onAction('rename', folder.id);
+   414→              }}
+   415→            >
+   416→              <Pencil className="h-3.5 w-3.5 mr-2" />
+   417→              Rename
+   418→            </DropdownMenuItem>
+   419→            <DropdownMenuSeparator className="bg-zinc-800" />
+   420→            <DropdownMenuItem
+   421→              className="text-red-400 focus:text-red-300 focus:bg-red-500/10"
+   422→              onClick={(e) => {
+   423→                e.stopPropagation();
+   424→                onAction('delete', folder.id);
+   425→              }}
+   426→            >
+   427→              <Trash2 className="h-3.5 w-3.5 mr-2" />
+   428→              Delete
+   429→            </DropdownMenuItem>
+   430→          </DropdownMenuContent>
+   431→        </DropdownMenu>
+   432→      </div>
+   433→    </div>
+   434→  );
+   435→}
+   436→
+   437→function ChatSkeleton() {
+   438→  return (
+   439→    <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/40 p-3">
+   440→      <div className="flex items-start gap-2">
+   441→        <div className="flex-1 space-y-2">
+   442→          <Skeleton className="h-4 w-3/4 bg-zinc-800/60" />
+   443→          <div className="flex items-center gap-2">
+   444→            <Skeleton className="h-4 w-16 bg-zinc-800/60" />
+   445→            <Skeleton className="h-3 w-8 bg-zinc-800/60" />
+   446→          </div>
+   447→          <Skeleton className="h-3 w-full bg-zinc-800/60" />
+   448→        </div>
+   449→      </div>
+   450→    </div>
+   451→  );
+   452→}
+   453→
+   454→function PreviewPane({ chat }: { chat: ChatHistoryItem }) {
+   455→  return (
+   456→    <div className="flex flex-col h-full">
+   457→      {/* Header */}
+   458→      <div className="p-3 border-b border-zinc-800/60">
+   459→        <div className="flex items-center gap-2 mb-1">
+   460→          {chat.pinned && <Pin className="h-3 w-3 text-amber-400 rotate-45" />}
+   461→          <h3 className="text-sm font-semibold text-zinc-100 truncate">
+   462→            {chat.title}
+   463→          </h3>
+   464→        </div>
+   465→        <div className="flex items-center gap-2 flex-wrap">
+   466→          <Badge
+   467→            variant="outline"
+   468→            className={`text-[10px] h-4 px-1.5 font-mono border ${getModelBadgeClass(chat.model)}`}
+   469→          >
+   470→            {getModelDisplayName(chat.model)}
+   471→          </Badge>
+   472→          <span className="flex items-center gap-1 text-[10px] text-zinc-500">
+   473→            <MessageSquare className="h-2.5 w-2.5" />
+   474→            {chat.messageCount} messages
+   475→          </span>
+   476→          {chat.folder && (
+   477→            <span
+   478→              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full"
+   479→              style={{
+   480→                backgroundColor: `${chat.folder.color}15`,
+   481→                color: chat.folder.color,
+   482→              }}
+   483→            >
+   484→              <FolderOpen className="h-2.5 w-2.5" />
+   485→              {chat.folder.name}
+   486→            </span>
+   487→          )}
+   488→        </div>
+   489→        <div className="flex items-center gap-3 mt-2 text-[10px] text-zinc-600">
+   490→          <span className="flex items-center gap-1">
+   491→            <CalendarDays className="h-2.5 w-2.5" />
+   492→            Created {new Date(chat.createdAt).toLocaleDateString()}
+   493→          </span>
+   494→          <span className="flex items-center gap-1">
+   495→            <Clock className="h-2.5 w-2.5" />
+   496→            Updated {formatRelativeTime(chat.updatedAt)}
+   497→          </span>
+   498→        </div>
+   499→      </div>
+   500→
+   501→      {/* Preview messages */}
+   502→      <ScrollArea className="flex-1">
+   503→        <div className="p-3 space-y-3">
+   504→          {chat.previewMessages.length > 0 ? (
+   505→            chat.previewMessages.map((msg) => (
+   506→              <div key={msg.id} className="flex gap-2">
+   507→                <div className={`h-5 w-5 rounded flex items-center justify-center shrink-0 mt-0.5 ${
+   508→                  msg.role === 'user'
+   509→                    ? 'bg-zinc-700/60'
+   510→                    : 'bg-emerald-500/15'
+   511→                }`}>
+   512→                  {msg.role === 'user' ? (
+   513→                    <User className="h-3 w-3 text-zinc-400" />
+   514→                  ) : (
+   515→                    <Bot className="h-3 w-3 text-emerald-400" />
+   516→                  )}
+   517→                </div>
+   518→                <div className="flex-1 min-w-0">
+   519→                  <p className="text-xs text-zinc-400 font-medium mb-0.5">
+   520→                    {msg.role === 'user' ? 'You' : 'Assistant'}
+   521→                  </p>
+   522→                  <p className="text-xs text-zinc-500 leading-relaxed line-clamp-3">
+   523→                    {msg.content}
+   524→                  </p>
+   525→                </div>
+   526→              </div>
+   527→            ))
+   528→          ) : (
+   529→            <div className="text-center py-6">
+   530→              <MessageSquare className="h-6 w-6 text-zinc-700 mx-auto mb-2" />
+   531→              <p className="text-xs text-zinc-600">No messages yet</p>
+   532→            </div>
+   533→          )}
+   534→        </div>
+   535→      </ScrollArea>
+   536→    </div>
+   537→  );
+   538→}
+   539→
+   540→/* ───────── Main Component ───────── */
+   541→
+   542→export function HistoryPanel() {
+   543→  // Data state
+   544→  const [chats, setChats] = useState<ChatHistoryItem[]>([]);
+   545→  const [folders, setFolders] = useState<ChatFolder[]>([]);
+   546→  const [total, setTotal] = useState(0);
+   547→  const [isLoading, setIsLoading] = useState(true);
+   548→  const [isLoadingMore, setIsLoadingMore] = useState(false);
+   549→
+   550→  // Filter/sort state
+   551→  const [searchQuery, setSearchQuery] = useState('');
+   552→  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+   553→  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+   554→  const [sortBy, setSortBy] = useState<SortOption>('updatedAt');
+   555→  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+   556→  const [modelFilter, setModelFilter] = useState<string>('all');
+   557→
+   558→  // Pagination
+   559→  const [offset, setOffset] = useState(0);
+   560→  const PAGE_SIZE = 20;
+   561→
+   562→  // Selection
+   563→  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+   564→
+   565→  // Dialogs
+   566→  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+   567→  const [renameValue, setRenameValue] = useState('');
+   568→  const [renameTarget, setRenameTarget] = useState<{ type: 'chat' | 'folder'; id: string } | null>(null);
+   569→  const [createFolderDialogOpen, setCreateFolderDialogOpen] = useState(false);
+   570→  const [newFolderName, setNewFolderName] = useState('');
+   571→  const [newFolderColor, setNewFolderColor] = useState('#10b981');
+   572→  const [moveToFolderDialogOpen, setMoveToFolderDialogOpen] = useState(false);
+   573→  const [moveChatId, setMoveChatId] = useState<string | null>(null);
+   574→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   575→  const [deleteTarget, setDeleteTarget] = useState<{ type: 'chat' | 'folder'; id: string } | null>(null);
+   576→
+   577→  // Folder sidebar collapse
+   578→  const [foldersCollapsed, setFoldersCollapsed] = useState(false);
+   579→
+   580→  // Debounced search
+   581→  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+   582→
+   583→  const selectedChat = chats.find((c) => c.id === selectedChatId) ?? null;
+   584→
+   585→  /* ───────── Data Fetching ───────── */
+   586→
+   587→  const fetchChats = useCallback(
+   588→    async (append = false) => {
+   589→      if (!append) setIsLoading(true);
+   590→      else setIsLoadingMore(true);
+   591→
+   592→      try {
+   593→        const params = new URLSearchParams({
+   594→          limit: PAGE_SIZE.toString(),
+   595→          offset: append ? offset.toString() : '0',
+   596→          sortBy,
+   597→          dateRange: dateFilter,
+   598→        });
+   599→
+   600→        if (searchQuery) params.set('search', searchQuery);
+   601→        if (activeFolderId) params.set('folderId', activeFolderId);
+   602→        if (filterMode === 'pinned') params.set('pinned', 'true');
+   603→        if (filterMode === 'archived') params.set('archived', 'true');
+   604→        if (modelFilter !== 'all') params.set('model', modelFilter);
+   605→
+   606→        const res = await fetch(`/api/history?${params}`);
+   607→        if (!res.ok) throw new Error('Failed to fetch');
+   608→
+   609→        const data: HistoryResponse = await res.json();
+   610→
+   611→        if (append) {
+   612→          setChats((prev) => [...prev, ...data.chats]);
+   613→        } else {
+   614→          setChats(data.chats);
+   615→        }
+   616→        setFolders(data.folders);
+   617→        setTotal(data.total);
+   618→      } catch (err) {
+   619→        console.error('Failed to fetch chat history:', err);
+   620→      } finally {
+   621→        setIsLoading(false);
+   622→        setIsLoadingMore(false);
+   623→      }
+   624→    },
+   625→    [searchQuery, activeFolderId, dateFilter, sortBy, filterMode, modelFilter, offset]
+   626→  );
+   627→
+   628→  useEffect(() => {
+   629→    setOffset(0);
+   630→    fetchChats(false);
+   631→  }, [searchQuery, activeFolderId, dateFilter, sortBy, filterMode, modelFilter]);
+   632→
+   633→  /* ───────── API Actions ───────── */
+   634→
+   635→  const updateChat = async (chatId: string, updates: Record<string, unknown>) => {
+   636→    try {
+   637→      const res = await fetch('/api/history', {
+   638→        method: 'PUT',
+   639→        headers: { 'Content-Type': 'application/json' },
+   640→        body: JSON.stringify({ chatId, ...updates }),
+   641→      });
+   642→      if (!res.ok) throw new Error('Failed to update');
+   643→      fetchChats();
+   644→    } catch (err) {
+   645→      console.error('Failed to update chat:', err);
+   646→    }
+   647→  };
+   648→
+   649→  const deleteChat = async (chatId: string) => {
+   650→    try {
+   651→      const res = await fetch('/api/history', {
+   652→        method: 'DELETE',
+   653→        headers: { 'Content-Type': 'application/json' },
+   654→        body: JSON.stringify({ chatId }),
+   655→      });
+   656→      if (!res.ok) throw new Error('Failed to delete');
+   657→      if (selectedChatId === chatId) setSelectedChatId(null);
+   658→      fetchChats();
+   659→    } catch (err) {
+   660→      console.error('Failed to delete chat:', err);
+   661→    }
+   662→  };
+   663→
+   664→  const createFolder = async (name: string, color: string) => {
+   665→    try {
+   666→      const res = await fetch('/api/chat-folders', {
+   667→        method: 'POST',
+   668→        headers: { 'Content-Type': 'application/json' },
+   669→        body: JSON.stringify({ name, color }),
+   670→      });
+   671→      if (!res.ok) throw new Error('Failed to create folder');
+   672→      fetchChats();
+   673→    } catch (err) {
+   674→      console.error('Failed to create folder:', err);
+   675→    }
+   676→  };
+   677→
+   678→  const updateFolder = async (folderId: string, updates: Record<string, unknown>) => {
+   679→    try {
+   680→      const res = await fetch('/api/chat-folders', {
+   681→        method: 'PUT',
+   682→        headers: { 'Content-Type': 'application/json' },
+   683→        body: JSON.stringify({ folderId, ...updates }),
+   684→      });
+   685→      if (!res.ok) throw new Error('Failed to update folder');
+   686→      fetchChats();
+   687→    } catch (err) {
+   688→      console.error('Failed to update folder:', err);
+   689→    }
+   690→  };
+   691→
+   692→  const deleteFolder = async (folderId: string) => {
+   693→    try {
+   694→      const res = await fetch('/api/chat-folders', {
+   695→        method: 'DELETE',
+   696→        headers: { 'Content-Type': 'application/json' },
+   697→        body: JSON.stringify({ folderId }),
+   698→      });
+   699→      if (!res.ok) throw new Error('Failed to delete folder');
+   700→      if (activeFolderId === folderId) setActiveFolderId(null);
+   701→      fetchChats();
+   702→    } catch (err) {
+   703→      console.error('Failed to delete folder:', err);
+   704→    }
+   705→  };
+   706→
+   707→  /* ───────── Action Handlers ───────── */
+   708→
+   709→  const handleChatAction = (action: string, chatId: string) => {
+   710→    const chat = chats.find((c) => c.id === chatId);
+   711→    switch (action) {
+   712→      case 'rename':
+   713→        setRenameTarget({ type: 'chat', id: chatId });
+   714→        setRenameValue(chat?.title || '');
+   715→        setRenameDialogOpen(true);
+   716→        break;
+   717→      case 'pin':
+   718→        updateChat(chatId, { pinned: true });
+   719→        break;
+   720→      case 'unpin':
+   721→        updateChat(chatId, { pinned: false });
+   722→        break;
+   723→      case 'archive':
+   724→        updateChat(chatId, { archived: true });
+   725→        break;
+   726→      case 'unarchive':
+   727→        updateChat(chatId, { archived: false });
+   728→        break;
+   729→      case 'delete':
+   730→        setDeleteTarget({ type: 'chat', id: chatId });
+   731→        setDeleteDialogOpen(true);
+   732→        break;
+   733→      case 'moveToFolder':
+   734→        setMoveChatId(chatId);
+   735→        setMoveToFolderDialogOpen(true);
+   736→        break;
+   737→    }
+   738→  };
+   739→
+   740→  const handleFolderAction = (action: string, folderId: string) => {
+   741→    const folder = folders.find((f) => f.id === folderId);
+   742→    switch (action) {
+   743→      case 'rename':
+   744→        setRenameTarget({ type: 'folder', id: folderId });
+   745→        setRenameValue(folder?.name || '');
+   746→        setRenameDialogOpen(true);
+   747→        break;
+   748→      case 'delete':
+   749→        setDeleteTarget({ type: 'folder', id: folderId });
+   750→        setDeleteDialogOpen(true);
+   751→        break;
+   752→    }
+   753→  };
+   754→
+   755→  const handleSearchChange = (value: string) => {
+   756→    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+   757→    searchTimeoutRef.current = setTimeout(() => {
+   758→      setSearchQuery(value);
+   759→    }, 300);
+   760→  };
+   761→
+   762→  const handleLoadMore = () => {
+   763→    const newOffset = offset + PAGE_SIZE;
+   764→    setOffset(newOffset);
+   765→    fetchChats(true);
+   766→  };
+   767→
+   768→  const handleRenameConfirm = () => {
+   769→    if (!renameTarget || !renameValue.trim()) return;
+   770→    if (renameTarget.type === 'chat') {
+   771→      updateChat(renameTarget.id, { title: renameValue.trim() });
+   772→    } else {
+   773→      updateFolder(renameTarget.id, { name: renameValue.trim() });
+   774→    }
+   775→    setRenameDialogOpen(false);
+   776→    setRenameTarget(null);
+   777→  };
+   778→
+   779→  const handleDeleteConfirm = () => {
+   780→    if (!deleteTarget) return;
+   781→    if (deleteTarget.type === 'chat') {
+   782→      deleteChat(deleteTarget.id);
+   783→    } else {
+   784→      deleteFolder(deleteTarget.id);
+   785→    }
+   786→    setDeleteDialogOpen(false);
+   787→    setDeleteTarget(null);
+   788→  };
+   789→
+   790→  const handleMoveToFolder = (folderId: string) => {
+   791→    if (!moveChatId) return;
+   792→    updateChat(moveChatId, { folderId: folderId === '__none__' ? null : folderId });
+   793→    setMoveToFolderDialogOpen(false);
+   794→    setMoveChatId(null);
+   795→  };
+   796→
+   797→  // Unique models from chats for filter
+   798→  const availableModels = Array.from(new Set(chats.map((c) => c.model)));
+   799→
+   800→  // Count chats per folder
+   801→  const folderChatCounts = folders.reduce<Record<string, number>>((acc, f) => {
+   802→    acc[f.id] = f._count?.chats ?? 0;
+   803→    return acc;
+   804→  }, {});
+   805→  const uncategorizedCount = chats.filter((c) => !c.folderId).length;
+   806→
+   807→  const hasMore = chats.length < total;
+   808→
+   809→  return (
+   810→    <div className="flex h-full">
+   811→      {/* ── Folder Sidebar ── */}
+   812→      <div className={`flex flex-col border-r border-zinc-800/60 bg-zinc-950/60 transition-all ${
+   813→        foldersCollapsed ? 'w-10' : 'w-48'
+   814→      }`}>
+   815→        {/* Sidebar header */}
+   816→        <div className="flex items-center justify-between p-2 border-b border-zinc-800/60">
+   817→          {!foldersCollapsed && (
+   818→            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+   819→              Folders
+   820→            </span>
+   821→          )}
+   822→          <div className="flex items-center gap-0.5">
+   823→            {!foldersCollapsed && (
+   824→              <Button
+   825→                variant="ghost"
+   826→                size="icon"
+   827→                className="h-5 w-5 text-zinc-500 hover:text-zinc-300"
+   828→                onClick={() => {
+   829→                  setNewFolderName('');
+   830→                  setNewFolderColor('#10b981');
+   831→                  setCreateFolderDialogOpen(true);
+   832→                }}
+   833→              >
+   834→                <FolderPlus className="h-3 w-3" />
+   835→              </Button>
+   836→            )}
+   837→            <Button
+   838→              variant="ghost"
+   839→              size="icon"
+   840→              className="h-5 w-5 text-zinc-500 hover:text-zinc-300"
+   841→              onClick={() => setFoldersCollapsed(!foldersCollapsed)}
+   842→            >
+   843→              {foldersCollapsed ? (
+   844→                <ChevronRight className="h-3 w-3" />
+   845→              ) : (
+   846→                <ChevronDown className="h-3 w-3" />
+   847→              )}
+   848→            </Button>
+   849→          </div>
+   850→        </div>
+   851→
+   852→        {!foldersCollapsed && (
+   853→          <ScrollArea className="flex-1">
+   854→            <div className="p-1.5 space-y-0.5">
+   855→              {/* All chats */}
+   856→              <div
+   857→                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all ${
+   858→                  !activeFolderId && filterMode === 'all'
+   859→                    ? 'bg-zinc-800/80 text-zinc-100'
+   860→                    : 'text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200'
+   861→                }`}
+   862→                onClick={() => {
+   863→                  setActiveFolderId(null);
+   864→                  setFilterMode('all');
+   865→                }}
+   866→              >
+   867→                <Inbox className="h-3.5 w-3.5 shrink-0" />
+   868→                <span className="text-xs font-medium truncate flex-1">All Chats</span>
+   869→                <span className="text-[10px] text-zinc-600 tabular-nums">{total}</span>
+   870→              </div>
+   871→
+   872→              {/* Pinned */}
+   873→              <div
+   874→                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all ${
+   875→                  filterMode === 'pinned'
+   876→                    ? 'bg-zinc-800/80 text-amber-400'
+   877→                    : 'text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200'
+   878→                }`}
+   879→                onClick={() => {
+   880→                  setActiveFolderId(null);
+   881→                  setFilterMode('pinned');
+   882→                }}
+   883→              >
+   884→                <Pin className="h-3.5 w-3.5 shrink-0 rotate-45" />
+   885→                <span className="text-xs font-medium truncate flex-1">Pinned</span>
+   886→              </div>
+   887→
+   888→              {/* Archived */}
+   889→              <div
+   890→                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all ${
+   891→                  filterMode === 'archived'
+   892→                    ? 'bg-zinc-800/80 text-zinc-200'
+   893→                    : 'text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200'
+   894→                }`}
+   895→                onClick={() => {
+   896→                  setActiveFolderId(null);
+   897→                  setFilterMode('archived');
+   898→                }}
+   899→              >
+   900→                <Archive className="h-3.5 w-3.5 shrink-0" />
+   901→                <span className="text-xs font-medium truncate flex-1">Archived</span>
+   902→              </div>
+   903→
+   904→              <Separator className="my-1.5 bg-zinc-800/60" />
+   905→
+   906→              {/* Uncategorized */}
+   907→              <div
+   908→                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-all ${
+   909→                  activeFolderId === 'uncategorized'
+   910→                    ? 'bg-zinc-800/80 text-zinc-100'
+   911→                    : 'text-zinc-400 hover:bg-zinc-800/40 hover:text-zinc-200'
+   912→                }`}
+   913→                onClick={() => {
+   914→                  setActiveFolderId('uncategorized');
+   915→                  setFilterMode('all');
+   916→                }}
+   917→              >
+   918→                <Hash className="h-3.5 w-3.5 shrink-0" />
+   919→                <span className="text-xs font-medium truncate flex-1">Uncategorized</span>
+   920→                <span className="text-[10px] text-zinc-600 tabular-nums">{uncategorizedCount}</span>
+   921→              </div>
+   922→
+   923→              {/* Folder items */}
+   924→              {folders.map((folder) => (
+   925→                <FolderTreeItem
+   926→                  key={folder.id}
+   927→                  folder={folder}
+   928→                  isActive={activeFolderId === folder.id}
+   929→                  chatCount={folderChatCounts[folder.id] || 0}
+   930→                  onClick={() => {
+   931→                    setActiveFolderId(folder.id);
+   932→                    setFilterMode('all');
+   933→                  }}
+   934→                  onAction={handleFolderAction}
+   935→                />
+   936→              ))}
+   937→            </div>
+   938→          </ScrollArea>
+   939→        )}
+   940→      </div>
+   941→
+   942→      {/* ── Main Content ── */}
+   943→      <div className="flex-1 flex flex-col min-w-0">
+   944→        {/* Search & Filters Bar */}
+   945→        <div className="p-3 border-b border-zinc-800/60 space-y-2">
+   946→          {/* Search */}
+   947→          <div className="relative">
+   948→            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+   949→            <Input
+   950→              placeholder="Search chats..."
+   951→              className="pl-8 h-8 text-xs bg-zinc-900/60 border-zinc-800/60 text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-500/40 focus:ring-emerald-500/20"
+   952→              onChange={(e) => handleSearchChange(e.target.value)}
+   953→            />
+   954→          </div>
+   955→
+   956→          {/* Filter row */}
+   957→          <div className="flex items-center gap-1.5 flex-wrap">
+   958→            {/* Date filter */}
+   959→            <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
+   960→              <SelectTrigger className="h-6 w-[90px] text-[10px] bg-zinc-900/60 border-zinc-800/60 text-zinc-400">
+   961→                <CalendarDays className="h-3 w-3 mr-1" />
+   962→                <SelectValue />
+   963→              </SelectTrigger>
+   964→              <SelectContent className="bg-zinc-900 border-zinc-800">
+   965→                <SelectItem value="all" className="text-xs text-zinc-300">All Time</SelectItem>
+   966→                <SelectItem value="today" className="text-xs text-zinc-300">Today</SelectItem>
+   967→                <SelectItem value="week" className="text-xs text-zinc-300">This Week</SelectItem>
+   968→                <SelectItem value="month" className="text-xs text-zinc-300">This Month</SelectItem>
+   969→              </SelectContent>
+   970→            </Select>
+   971→
+   972→            {/* Sort */}
+   973→            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+   974→              <SelectTrigger className="h-6 w-[110px] text-[10px] bg-zinc-900/60 border-zinc-800/60 text-zinc-400">
+   975→                <ArrowUpDown className="h-3 w-3 mr-1" />
+   976→                <SelectValue />
+   977→              </SelectTrigger>
+   978→              <SelectContent className="bg-zinc-900 border-zinc-800">
+   979→                <SelectItem value="updatedAt" className="text-xs text-zinc-300">Last Updated</SelectItem>
+   980→                <SelectItem value="createdAt" className="text-xs text-zinc-300">Created Date</SelectItem>
+   981→                <SelectItem value="messageCount" className="text-xs text-zinc-300">Message Count</SelectItem>
+   982→              </SelectContent>
+   983→            </Select>
+   984→
+   985→            {/* Model filter */}
+   986→            {availableModels.length > 1 && (
+   987→              <Select value={modelFilter} onValueChange={setModelFilter}>
+   988→                <SelectTrigger className="h-6 w-[100px] text-[10px] bg-zinc-900/60 border-zinc-800/60 text-zinc-400">
+   989→                  <Bot className="h-3 w-3 mr-1" />
+   990→                  <SelectValue />
+   991→                </SelectTrigger>
+   992→                <SelectContent className="bg-zinc-900 border-zinc-800">
+   993→                  <SelectItem value="all" className="text-xs text-zinc-300">All Models</SelectItem>
+   994→                  {availableModels.map((m) => (
+   995→                    <SelectItem key={m} value={m} className="text-xs text-zinc-300">
+   996→                      {getModelDisplayName(m)}
+   997→                    </SelectItem>
+   998→                  ))}
+   999→                </SelectContent>
+  1000→              </Select>
+  1001→            )}
+  1002→
+  1003→            {/* Active filter badges */}
+  1004→            {filterMode === 'pinned' && (
+  1005→              <Badge className="text-[10px] h-5 px-1.5 bg-amber-500/15 text-amber-400 border-amber-500/30 border hover:bg-amber-500/25 cursor-pointer"
+  1006→                onClick={() => setFilterMode('all')}
+  1007→              >
+  1008→                Pinned <X className="h-2.5 w-2.5 ml-1" />
+  1009→              </Badge>
+  1010→            )}
+  1011→            {filterMode === 'archived' && (
+  1012→              <Badge className="text-[10px] h-5 px-1.5 bg-zinc-500/15 text-zinc-400 border-zinc-500/30 border hover:bg-zinc-500/25 cursor-pointer"
+  1013→                onClick={() => setFilterMode('all')}
+  1014→              >
+  1015→                Archived <X className="h-2.5 w-2.5 ml-1" />
+  1016→              </Badge>
+  1017→            )}
+  1018→
+  1019→            <span className="text-[10px] text-zinc-600 ml-auto tabular-nums">
+  1020→              {total} chat{total !== 1 ? 's' : ''}
+  1021→            </span>
+  1022→          </div>
+  1023→        </div>
+  1024→
+  1025→        {/* Chat List + Preview */}
+  1026→        <div className="flex-1 flex min-h-0">
+  1027→          {/* Chat list */}
+  1028→          <ScrollArea className={`${selectedChat ? 'w-1/2' : 'w-full'} border-r border-zinc-800/40`}>
+  1029→            <div className="p-2 space-y-1.5">
+  1030→              <AnimatePresence mode="popLayout">
+  1031→                {isLoading ? (
+  1032→                  Array.from({ length: 6 }).map((_, i) => <ChatSkeleton key={i} />)
+  1033→                ) : chats.length === 0 ? (
+  1034→                  <motion.div
+  1035→                    initial={{ opacity: 0 }}
+  1036→                    animate={{ opacity: 1 }}
+  1037→                    className="flex flex-col items-center justify-center py-12 text-center"
+  1038→                  >
+  1039→                    <div className="h-12 w-12 rounded-xl bg-zinc-800/60 flex items-center justify-center mb-3">
+  1040→                      <MessageSquare className="h-5 w-5 text-zinc-600" />
+  1041→                    </div>
+  1042→                    <p className="text-sm text-zinc-500 mb-1">No chats found</p>
+  1043→                    <p className="text-xs text-zinc-600 max-w-[200px]">
+  1044→                      {searchQuery
+  1045→                        ? 'Try a different search term'
+  1046→                        : filterMode === 'archived'
+  1047→                        ? 'No archived chats'
+  1048→                        : filterMode === 'pinned'
+  1049→                        ? 'No pinned chats'
+  1050→                        : 'Start a conversation to see it here'}
+  1051→                    </p>
+  1052→                  </motion.div>
+  1053→                ) : (
+  1054→                  chats.map((chat) => (
+  1055→                    <ChatListItem
+  1056→                      key={chat.id}
+  1057→                      chat={chat}
+  1058→                      isSelected={selectedChatId === chat.id}
+  1059→                      onSelect={() =>
+  1060→                        setSelectedChatId(selectedChatId === chat.id ? null : chat.id)
+  1061→                      }
+  1062→                      onAction={handleChatAction}
+  1063→                    />
+  1064→                  ))
+  1065→                )}
+  1066→              </AnimatePresence>
+  1067→
+  1068→              {/* Load more */}
+  1069→              {!isLoading && hasMore && (
+  1070→                <div className="flex justify-center py-3">
+  1071→                  <Button
+  1072→                    variant="ghost"
+  1073→                    size="sm"
+  1074→                    className="text-xs text-zinc-500 hover:text-zinc-300"
+  1075→                    onClick={handleLoadMore}
+  1076→                    disabled={isLoadingMore}
+  1077→                  >
+  1078→                    {isLoadingMore ? (
+  1079→                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+  1080→                    ) : null}
+  1081→                    Load More ({total - chats.length} remaining)
+  1082→                  </Button>
+  1083→                </div>
+  1084→              )}
+  1085→            </div>
+  1086→          </ScrollArea>
+  1087→
+  1088→          {/* Preview pane */}
+  1089→          <AnimatePresence>
+  1090→            {selectedChat && (
+  1091→              <motion.div
+  1092→                initial={{ width: 0, opacity: 0 }}
+  1093→                animate={{ width: '50%', opacity: 1 }}
+  1094→                exit={{ width: 0, opacity: 0 }}
+  1095→                transition={{ duration: 0.2 }}
+  1096→                className="overflow-hidden"
+  1097→              >
+  1098→                <div className="flex flex-col h-full bg-zinc-950/40">
+  1099→                  {/* Preview header */}
+  1100→                  <div className="flex items-center justify-between p-2 border-b border-zinc-800/60">
+  1101→                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+  1102→                      Preview
+  1103→                    </span>
+  1104→                    <Button
+  1105→                      variant="ghost"
+  1106→                      size="icon"
+  1107→                      className="h-5 w-5 text-zinc-500 hover:text-zinc-300"
+  1108→                      onClick={() => setSelectedChatId(null)}
+  1109→                    >
+  1110→                      <X className="h-3 w-3" />
+  1111→                    </Button>
+  1112→                  </div>
+  1113→                  <PreviewPane chat={selectedChat} />
+  1114→                </div>
+  1115→              </motion.div>
+  1116→            )}
+  1117→          </AnimatePresence>
+  1118→        </div>
+  1119→      </div>
+  1120→
+  1121→      {/* ── Rename Dialog ── */}
+  1122→      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+  1123→        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 sm:max-w-sm">
+  1124→          <DialogHeader>
+  1125→            <DialogTitle className="text-zinc-100">
+  1126→              Rename {renameTarget?.type === 'chat' ? 'Chat' : 'Folder'}
+  1127→            </DialogTitle>
+  1128→          </DialogHeader>
+  1129→          <Input
+  1130→            value={renameValue}
+  1131→            onChange={(e) => setRenameValue(e.target.value)}
+  1132→            className="bg-zinc-800/60 border-zinc-700 text-zinc-200"
+  1133→            onKeyDown={(e) => {
+  1134→              if (e.key === 'Enter') handleRenameConfirm();
+  1135→            }}
+  1136→          />
+  1137→          <DialogFooter>
+  1138→            <Button
+  1139→              variant="ghost"
+  1140→              size="sm"
+  1141→              className="text-zinc-400 hover:text-zinc-200"
+  1142→              onClick={() => setRenameDialogOpen(false)}
+  1143→            >
+  1144→              Cancel
+  1145→            </Button>
+  1146→            <Button
+  1147→              size="sm"
+  1148→              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+  1149→              onClick={handleRenameConfirm}
+  1150→              disabled={!renameValue.trim()}
+  1151→            >
+  1152→              <Check className="h-3.5 w-3.5 mr-1" />
+  1153→              Rename
+  1154→            </Button>
+  1155→          </DialogFooter>
+  1156→        </DialogContent>
+  1157→      </Dialog>
+  1158→
+  1159→      {/* ── Create Folder Dialog ── */}
+  1160→      <Dialog open={createFolderDialogOpen} onOpenChange={setCreateFolderDialogOpen}>
+  1161→        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 sm:max-w-sm">
+  1162→          <DialogHeader>
+  1163→            <DialogTitle className="text-zinc-100">Create Folder</DialogTitle>
+  1164→          </DialogHeader>
+  1165→          <div className="space-y-3">
+  1166→            <Input
+  1167→              placeholder="Folder name"
+  1168→              value={newFolderName}
+  1169→              onChange={(e) => setNewFolderName(e.target.value)}
+  1170→              className="bg-zinc-800/60 border-zinc-700 text-zinc-200"
+  1171→              onKeyDown={(e) => {
+  1172→                if (e.key === 'Enter' && newFolderName.trim()) {
+  1173→                  createFolder(newFolderName.trim(), newFolderColor);
+  1174→                  setCreateFolderDialogOpen(false);
+  1175→                }
+  1176→              }}
+  1177→            />
+  1178→            <div className="flex items-center gap-2">
+  1179→              <span className="text-xs text-zinc-500">Color:</span>
+  1180→              <div className="flex gap-1.5">
+  1181→                {['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'].map(
+  1182→                  (color) => (
+  1183→                    <button
+  1184→                      key={color}
+  1185→                      className={`h-5 w-5 rounded-full transition-all ${
+  1186→                        newFolderColor === color ? 'ring-2 ring-white/30 scale-110' : ''
+  1187→                      }`}
+  1188→                      style={{ backgroundColor: color }}
+  1189→                      onClick={() => setNewFolderColor(color)}
+  1190→                    />
+  1191→                  )
+  1192→                )}
+  1193→              </div>
+  1194→            </div>
+  1195→          </div>
+  1196→          <DialogFooter>
+  1197→            <Button
+  1198→              variant="ghost"
+  1199→              size="sm"
+  1200→              className="text-zinc-400 hover:text-zinc-200"
+  1201→              onClick={() => setCreateFolderDialogOpen(false)}
+  1202→            >
+  1203→              Cancel
+  1204→            </Button>
+  1205→            <Button
+  1206→              size="sm"
+  1207→              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+  1208→              onClick={() => {
+  1209→                if (newFolderName.trim()) {
+  1210→                  createFolder(newFolderName.trim(), newFolderColor);
+  1211→                  setCreateFolderDialogOpen(false);
+  1212→                }
+  1213→              }}
+  1214→              disabled={!newFolderName.trim()}
+  1215→            >
+  1216→              <FolderPlus className="h-3.5 w-3.5 mr-1" />
+  1217→              Create
+  1218→            </Button>
+  1219→          </DialogFooter>
+  1220→        </DialogContent>
+  1221→      </Dialog>
+  1222→
+  1223→      {/* ── Move to Folder Dialog ── */}
+  1224→      <Dialog open={moveToFolderDialogOpen} onOpenChange={setMoveToFolderDialogOpen}>
+  1225→        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 sm:max-w-sm">
+  1226→          <DialogHeader>
+  1227→            <DialogTitle className="text-zinc-100">Move to Folder</DialogTitle>
+  1228→          </DialogHeader>
+  1229→          <ScrollArea className="max-h-60">
+  1230→            <div className="space-y-1">
+  1231→              <div
+  1232→                className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-zinc-800/60 transition-colors"
+  1233→                onClick={() => handleMoveToFolder('__none__')}
+  1234→              >
+  1235→                <Hash className="h-3.5 w-3.5 text-zinc-500" />
+  1236→                <span className="text-sm text-zinc-300">No Folder</span>
+  1237→              </div>
+  1238→              {folders.map((folder) => (
+  1239→                <div
+  1240→                  key={folder.id}
+  1241→                  className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-zinc-800/60 transition-colors"
+  1242→                  onClick={() => handleMoveToFolder(folder.id)}
+  1243→                >
+  1244→                  <div
+  1245→                    className="h-3 w-3 rounded-sm"
+  1246→                    style={{ backgroundColor: folder.color }}
+  1247→                  />
+  1248→                  <span className="text-sm text-zinc-300">{folder.name}</span>
+  1249→                </div>
+  1250→              ))}
+  1251→            </div>
+  1252→          </ScrollArea>
+  1253→        </DialogContent>
+  1254→      </Dialog>
+  1255→
+  1256→      {/* ── Delete Confirmation Dialog ── */}
+  1257→      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  1258→        <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 sm:max-w-sm">
+  1259→          <DialogHeader>
+  1260→            <DialogTitle className="text-zinc-100">
+  1261→              Delete {deleteTarget?.type === 'chat' ? 'Chat' : 'Folder'}
+  1262→            </DialogTitle>
+  1263→          </DialogHeader>
+  1264→          <p className="text-sm text-zinc-400">
+  1265→            {deleteTarget?.type === 'chat'
+  1266→              ? 'Are you sure you want to delete this chat? This action cannot be undone and will delete all messages.'
+  1267→              : 'Are you sure you want to delete this folder? Chats inside will be moved to Uncategorized.'}
+  1268→          </p>
+  1269→          <DialogFooter>
+  1270→            <Button
+  1271→              variant="ghost"
+  1272→              size="sm"
+  1273→              className="text-zinc-400 hover:text-zinc-200"
+  1274→              onClick={() => setDeleteDialogOpen(false)}
+  1275→            >
+  1276→              Cancel
+  1277→            </Button>
+  1278→            <Button
+  1279→              size="sm"
+  1280→              variant="destructive"
+  1281→              className="bg-red-600 hover:bg-red-500 text-white"
+  1282→              onClick={handleDeleteConfirm}
+  1283→            >
+  1284→              <Trash2 className="h-3.5 w-3.5 mr-1" />
+  1285→              Delete
+  1286→            </Button>
+  1287→          </DialogFooter>
+  1288→        </DialogContent>
+  1289→      </Dialog>
+  1290→    </div>
+  1291→  );
+  1292→}
+  1293→
