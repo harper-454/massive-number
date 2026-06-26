@@ -1,100 +1,137 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
 
-// Simulated git state
-const gitState = {
-  branch: "main",
-  remote: "origin/git@github.com:user/massive-number.git",
-  status: [
-    { file: "src/app/page.tsx", status: "modified", additions: 24, deletions: 8 },
-    { file: "src/components/nexus/chat-panel.tsx", status: "modified", additions: 156, deletions: 23 },
-    { file: "src/stores/chat-store.ts", status: "added", additions: 89, deletions: 0 },
-    { file: "prisma/schema.prisma", status: "modified", additions: 45, deletions: 12 },
-  ],
-  recentCommits: [
-    { hash: "a3f2c1d", message: "feat: add MCP integration hub", author: "developer", date: "2026-06-26", additions: 342, deletions: 23 },
-    { hash: "b7e4f2a", message: "fix: chat streaming with REST API fallback", author: "developer", date: "2026-06-25", additions: 89, deletions: 45 },
-    { hash: "c1d9e3b", message: "feat: multi-model selector with 7 providers", author: "developer", date: "2026-06-24", additions: 567, deletions: 12 },
-    { hash: "d5a2c4e", message: "feat: agent mode with 6-step pipeline", author: "developer", date: "2026-06-24", additions: 445, deletions: 0 },
-    { hash: "e8b3d5f", message: "initial: MASSIVE NUMBER platform foundation", author: "developer", date: "2026-06-24", additions: 2890, deletions: 0 },
-  ],
-  branches: ["main", "develop", "feature/mcp-hub", "feature/voice-code", "fix/streaming"],
-};
-
-// Commit history for log command
-let commitHistory = [...gitState.recentCommits];
-
-// Generate a short hash
-function generateHash(): string {
-  return Math.random().toString(36).substring(2, 9);
-}
-
-// GET - Get git status
+// GET - Return git status from database (stored File changes, AgentRuns as commits)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const detail = searchParams.get('detail'); // 'status', 'log', 'branches', 'diff'
+    const projectId = searchParams.get('projectId');
+
+    // Find first project if none specified
+    let project = projectId
+      ? await db.project.findUnique({ where: { id: projectId } })
+      : await db.project.findFirst();
+
+    if (!project) {
+      // No projects in database — return empty git state
+      return NextResponse.json({
+        branch: 'main',
+        remote: null,
+        status: [],
+        recentCommits: [],
+        branches: ['main'],
+        summary: {
+          filesChanged: 0,
+          totalAdditions: 0,
+          totalDeletions: 0,
+          ahead: 0,
+          behind: 0,
+        },
+      });
+    }
 
     if (detail === 'log') {
+      const commits = await db.agentRun.findMany({
+        where: { projectId: project.id },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+
       return NextResponse.json({
-        branch: gitState.branch,
-        commits: commitHistory,
-        total: commitHistory.length,
+        branch: 'main',
+        commits: commits.map((c) => ({
+          hash: c.id.slice(0, 7),
+          message: c.name + (c.description ? `: ${c.description}` : ''),
+          author: 'developer',
+          date: c.createdAt.toISOString().split('T')[0],
+          additions: c.tokens,
+          deletions: 0,
+          status: c.status,
+        })),
+        total: commits.length,
       });
     }
 
     if (detail === 'branches') {
       return NextResponse.json({
-        current: gitState.branch,
-        branches: gitState.branches.map((b) => ({
-          name: b,
-          current: b === gitState.branch,
-          lastCommit: commitHistory.find((_) => true)?.hash || 'unknown',
-        })),
+        current: 'main',
+        branches: [{ name: 'main', current: true, lastCommit: 'latest' }],
       });
     }
 
     if (detail === 'diff') {
       const file = searchParams.get('file');
       if (file) {
-        const fileStatus = gitState.status.find((s) => s.file === file);
-        if (!fileStatus) {
+        const fileRecord = await db.file.findFirst({
+          where: { projectId: project.id, path: file },
+        });
+        if (!fileRecord) {
           return NextResponse.json(
             { error: `No changes found for file: ${file}` },
             { status: 404 }
           );
         }
         return NextResponse.json({
-          file: fileStatus.file,
-          status: fileStatus.status,
-          diff: generateDiff(fileStatus),
+          file: fileRecord.path,
+          status: 'modified',
+          content: fileRecord.content,
+          language: fileRecord.language,
         });
       }
-      // Return all diffs
+
+      // Return all changed files
+      const files = await db.file.findMany({
+        where: { projectId: project.id },
+        orderBy: { updatedAt: 'desc' },
+      });
       return NextResponse.json({
-        branch: gitState.branch,
-        diffs: gitState.status.map((s) => ({
-          file: s.file,
-          status: s.status,
-          diff: generateDiff(s),
+        branch: 'main',
+        diffs: files.map((f) => ({
+          file: f.path,
+          status: 'modified',
+          language: f.language,
+          lastModified: f.updatedAt,
         })),
       });
     }
 
     // Default: return full status
-    const totalAdditions = gitState.status.reduce((sum, s) => sum + s.additions, 0);
-    const totalDeletions = gitState.status.reduce((sum, s) => sum + s.deletions, 0);
+    const changedFiles = await db.file.findMany({
+      where: { projectId: project.id },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const recentCommits = await db.agentRun.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
 
     return NextResponse.json({
-      branch: gitState.branch,
-      remote: gitState.remote,
-      status: gitState.status,
-      recentCommits: gitState.recentCommits,
-      branches: gitState.branches,
+      branch: 'main',
+      remote: project.path || null,
+      status: changedFiles.map((f) => ({
+        file: f.path,
+        status: 'modified',
+        language: f.language,
+        lastModified: f.updatedAt,
+      })),
+      recentCommits: recentCommits.map((c) => ({
+        hash: c.id.slice(0, 7),
+        message: c.name + (c.description ? `: ${c.description}` : ''),
+        author: 'developer',
+        date: c.createdAt.toISOString().split('T')[0],
+        additions: c.tokens,
+        deletions: 0,
+        status: c.status,
+      })),
+      branches: ['main'],
       summary: {
-        filesChanged: gitState.status.length,
-        totalAdditions,
-        totalDeletions,
-        ahead: 2,
+        filesChanged: changedFiles.length,
+        totalAdditions: changedFiles.reduce((sum, f) => sum + f.content.split('\n').length, 0),
+        totalDeletions: 0,
+        ahead: recentCommits.length,
         behind: 0,
       },
     });
@@ -107,7 +144,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Execute git commands
+// POST - Execute git commands and log to Activity table
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -120,6 +157,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const projectId = args?.projectId;
+    let project = projectId
+      ? await db.project.findUnique({ where: { id: projectId } })
+      : await db.project.findFirst();
+
     switch (command) {
       case 'commit': {
         const message = args?.message || args?.m;
@@ -130,38 +172,81 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const hash = generateHash();
-        const totalAdditions = gitState.status.reduce((sum, s) => sum + s.additions, 0);
-        const totalDeletions = gitState.status.reduce((sum, s) => sum + s.deletions, 0);
+        if (!project) {
+          return NextResponse.json(
+            { error: 'No project found. Create a project first.' },
+            { status: 404 }
+          );
+        }
 
-        const newCommit = {
-          hash,
-          message,
-          author: "developer",
-          date: new Date().toISOString().split('T')[0],
-          additions: totalAdditions,
-          deletions: totalDeletions,
-        };
+        // Log the commit as an AgentRun
+        const changedFiles = await db.file.findMany({
+          where: { projectId: project.id },
+        });
 
-        commitHistory.unshift(newCommit);
-        // Clear staged changes after commit
-        gitState.status = [];
+        const totalAdditions = changedFiles.reduce(
+          (sum, f) => sum + f.content.split('\n').length,
+          0
+        );
+
+        const agentRun = await db.agentRun.create({
+          data: {
+            projectId: project.id,
+            name: `commit: ${message}`,
+            description: message,
+            status: 'completed',
+            tokens: totalAdditions,
+            cost: 0,
+            duration: 0,
+          },
+        });
+
+        // Log activity
+        await db.activity.create({
+          data: {
+            action: 'git_commit',
+            entity: 'AgentRun',
+            entityId: agentRun.id,
+            description: `Committed: ${message}`,
+            metadata: JSON.stringify({
+              filesChanged: changedFiles.length,
+              additions: totalAdditions,
+            }),
+          },
+        });
 
         return NextResponse.json({
           success: true,
-          commit: newCommit,
-          filesChanged: 4,
-          output: `[${gitState.branch} ${hash}] ${message}\n 4 files changed, ${totalAdditions} insertions(+), ${totalDeletions} deletions(-)`,
+          commit: {
+            hash: agentRun.id.slice(0, 7),
+            message,
+            author: 'developer',
+            date: agentRun.createdAt.toISOString().split('T')[0],
+            additions: totalAdditions,
+            deletions: 0,
+          },
+          filesChanged: changedFiles.length,
+          output: `[main ${agentRun.id.slice(0, 7)}] ${message}\n ${changedFiles.length} files changed, ${totalAdditions} insertions(+)`,
         });
       }
 
       case 'push': {
         const remote = args?.remote || 'origin';
-        const branch = args?.branch || gitState.branch;
+        const branch = args?.branch || 'main';
+
+        await db.activity.create({
+          data: {
+            action: 'git_push',
+            entity: 'Project',
+            entityId: project?.id || '',
+            description: `Pushed to ${remote}/${branch}`,
+            metadata: JSON.stringify({ remote, branch }),
+          },
+        });
 
         return NextResponse.json({
           success: true,
-          output: `Enumerating objects: 12, done.\nCounting objects: 100% (12/12), done.\nDelta compression using up to 8 threads\nCompressing objects: 100% (7/7), done.\nWriting objects: 100% (7/7), 3.24 KiB | 3.24 MiB/s, done.\nTo ${remote}\n   ${branch}: ${commitHistory[0]?.hash}\n   ${branch}: ${generateHash()}\nDone.`,
+          output: `Pushing to ${remote}/${branch}...`,
           remote,
           branch,
         });
@@ -169,152 +254,57 @@ export async function POST(request: NextRequest) {
 
       case 'pull': {
         const remote = args?.remote || 'origin';
-        const branch = args?.branch || gitState.branch;
+        const branch = args?.branch || 'main';
+
+        await db.activity.create({
+          data: {
+            action: 'git_pull',
+            entity: 'Project',
+            entityId: project?.id || '',
+            description: `Pulled from ${remote}/${branch}`,
+            metadata: JSON.stringify({ remote, branch }),
+          },
+        });
 
         return NextResponse.json({
           success: true,
-          output: `From ${remote}\n * [new ref]         refs/heads/${branch} -> ${branch}\nAlready up to date.`,
+          output: `Already up to date.`,
           remote,
           branch,
           updated: false,
         });
       }
 
-      case 'checkout': {
-        const targetBranch = args?.branch || args?._?.[0];
-        if (!targetBranch) {
-          return NextResponse.json(
-            { error: 'Branch name is required (use args.branch)' },
-            { status: 400 }
-          );
-        }
-
-        if (!gitState.branches.includes(targetBranch)) {
-          // Create new branch with -b flag
-          if (args?.create || args?.b) {
-            gitState.branches.push(targetBranch);
-            gitState.branch = targetBranch;
-            return NextResponse.json({
-              success: true,
-              output: `Switched to a new branch '${targetBranch}'`,
-              branch: targetBranch,
-            });
-          }
-          return NextResponse.json(
-            { error: `Branch '${targetBranch}' not found. Use args.b: true to create it.` },
-            { status: 404 }
-          );
-        }
-
-        gitState.branch = targetBranch;
-        return NextResponse.json({
-          success: true,
-          output: `Switched to branch '${targetBranch}'`,
-          branch: targetBranch,
-        });
-      }
-
-      case 'branch': {
-        const action = args?.action;
-        if (action === 'create' || args?.create) {
-          const name = args?.name;
-          if (!name) {
-            return NextResponse.json(
-              { error: 'Branch name is required (use args.name)' },
-              { status: 400 }
-            );
-          }
-          gitState.branches.push(name);
-          return NextResponse.json({
-            success: true,
-            output: `Created branch '${name}'`,
-            branch: name,
-          });
-        }
-        if (action === 'delete' || args?.delete) {
-          const name = args?.name;
-          if (!name) {
-            return NextResponse.json(
-              { error: 'Branch name is required (use args.name)' },
-              { status: 400 }
-            );
-          }
-          if (name === gitState.branch) {
-            return NextResponse.json(
-              { error: `Cannot delete the current branch '${name}'` },
-              { status: 400 }
-            );
-          }
-          const idx = gitState.branches.indexOf(name);
-          if (idx === -1) {
-            return NextResponse.json(
-              { error: `Branch '${name}' not found` },
-              { status: 404 }
-            );
-          }
-          gitState.branches.splice(idx, 1);
-          return NextResponse.json({
-            success: true,
-            output: `Deleted branch '${name}'`,
-          });
-        }
-
-        // List branches
-        return NextResponse.json({
-          current: gitState.branch,
-          branches: gitState.branches.map((b) => ({
-            name: b,
-            current: b === gitState.branch,
-          })),
-        });
-      }
-
-      case 'stash': {
-        const stashAction = args?.action || 'push';
-        if (stashAction === 'push') {
-          const stashEntry = {
-            id: 0,
-            message: args?.message || 'WIP on ' + gitState.branch,
-            branch: gitState.branch,
-            files: gitState.status.map((s) => s.file),
-          };
-          gitState.status = [];
-          return NextResponse.json({
-            success: true,
-            output: `Saved working directory and index state ${stashEntry.message}`,
-            stash: stashEntry,
-          });
-        }
-        if (stashAction === 'pop') {
-          return NextResponse.json({
-            success: true,
-            output: 'On branch ' + gitState.branch + '\nChanges restored from stash',
-          });
-        }
-        return NextResponse.json({
-          success: true,
-          output: 'stash list: No stash entries found.',
-        });
-      }
-
-      case 'fetch': {
-        return NextResponse.json({
-          success: true,
-          output: `From git@github.com:user/massive-number.git\n * [new branch]      develop       -> origin/develop\n * [new branch]      feature/mcp-hub -> origin/feature/mcp-hub\nAlready up to date.`,
-        });
-      }
-
       case 'log': {
         const count = args?.count || args?.n || 10;
+
+        if (!project) {
+          return NextResponse.json({ commits: [], total: 0 });
+        }
+
+        const commits = await db.agentRun.findMany({
+          where: { projectId: project.id },
+          orderBy: { createdAt: 'desc' },
+          take: count,
+        });
+
         return NextResponse.json({
-          commits: commitHistory.slice(0, count),
-          total: commitHistory.length,
+          commits: commits.map((c) => ({
+            hash: c.id.slice(0, 7),
+            message: c.name + (c.description ? `: ${c.description}` : ''),
+            author: 'developer',
+            date: c.createdAt.toISOString().split('T')[0],
+            additions: c.tokens,
+            deletions: 0,
+            status: c.status,
+          })),
+          total: commits.length,
         });
       }
 
       default:
         return NextResponse.json(
-          { error: `Unsupported git command: ${command}. Supported: commit, push, pull, checkout, branch, stash, fetch, log` },
+          { error: `Unsupported git command: ${command}. Supported: commit, push, pull, log` },
           { status: 400 }
         );
     }
@@ -325,31 +315,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Generate simulated diff output
-function generateDiff(fileStatus: { file: string; status: string; additions: number; deletions: number }): string {
-  const lines: string[] = [];
-  lines.push(`diff --git a/${fileStatus.file} b/${fileStatus.file}`);
-
-  if (fileStatus.status === 'added') {
-    lines.push(`new file mode 100644`);
-  } else if (fileStatus.status === 'deleted') {
-    lines.push(`deleted file mode 100644`);
-  }
-
-  lines.push(`index a1b2c3d..e4f5g6h 100644`);
-  lines.push(`--- a/${fileStatus.file}`);
-  lines.push(`+++ b/${fileStatus.file}`);
-
-  // Generate simulated diff lines
-  for (let i = 0; i < Math.min(fileStatus.additions, 5); i++) {
-    lines.push(`+// AI-generated implementation line ${i + 1}`);
-  }
-  for (let i = 0; i < Math.min(fileStatus.deletions, 3); i++) {
-    lines.push(`-// Old implementation line ${i + 1}`);
-  }
-  lines.push(` // Context line`);
-
-  return lines.join('\n');
 }

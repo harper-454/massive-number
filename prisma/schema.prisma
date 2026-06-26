@@ -23,7 +23,15 @@ model UserSettings {
   id                String   @id @default(cuid())
   userId            String   @unique
   theme             String   @default("dark")
+  accentColor       String   @default("emerald")
+  fontFamily        String   @default("geist")
+  fontSize          Int      @default(14)
+  tabSize           Int      @default(2)
+  wordWrap          Boolean  @default(true)
+  lineNumbers       Boolean  @default(true)
+  minimap           Boolean  @default(true)
   defaultModel      String   @default("auto")
+  activePersona     String   @default("default")
   agentAutoApprove  Boolean  @default(false)
   voiceEnabled      Boolean  @default(false)
   costOptimization  Boolean  @default(true)
@@ -56,6 +64,7 @@ model Chat {
   userId    String
   model     String    @default("auto")
   mode      String    @default("chat")
+  persona   String    @default("default")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -130,6 +139,162 @@ model ToolConfig {
   args        String?
   enabled     Boolean  @default(true)
   description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// MCP Server connections - real connections managed by user
+model McpServer {
+  id          String   @id @default(cuid())
+  serverId    String   @unique
+  name        String
+  description String?
+  category    String
+  icon        String?
+  tools       String   @default("[]")
+  config      String   @default("{}")
+  connected   Boolean  @default(false)
+  health      String   @default("unknown")
+  lastConnectedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Specs - spec-to-code pipeline
+model Spec {
+  id                  String   @id @default(cuid())
+  title               String
+  description         String
+  requirements        String   @default("[]")
+  designNotes         String?
+  implementationSteps String   @default("[]")
+  testCriteria        String   @default("[]")
+  complexity          String   @default("medium")
+  affectedFiles       String   @default("[]")
+  status              String   @default("draft")
+  model               String   @default("auto")
+  projectId           String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Marketplace items - installed integrations
+model InstalledIntegration {
+  id          String   @id @default(cuid())
+  itemId      String   @unique
+  name        String
+  description String?
+  category    String?
+  author      String?
+  version     String   @default("1.0.0")
+  rating      Float    @default(0)
+  downloads   Int      @default(0)
+  price       String   @default("free")
+  verified    Boolean  @default(false)
+  config      String   @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Notifications - real user notifications
+model Notification {
+  id          String   @id @default(cuid())
+  type        String   @default("info")
+  title       String
+  description String?
+  read        Boolean  @default(false)
+  actionUrl   String?
+  createdAt   DateTime @default(now())
+}
+
+// Activity log - real user activity
+model Activity {
+  id          String   @id @default(cuid())
+  action      String
+  entity      String?
+  entityId    String?
+  description String?
+  metadata    String   @default("{}")
+  createdAt   DateTime @default(now())
+}
+
+// Memory entries - persistent AI context
+model Memory {
+  id          String   @id @default(cuid())
+  category    String   @default("preference")
+  content     String
+  source      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Codebase context - indexed files for AI
+model CodebaseContext {
+  id            String   @id @default(cuid())
+  filePath      String
+  language      String?
+  relevance     Float    @default(0)
+  lastIndexedAt DateTime @default(now())
+}
+
+// Project knowledge - key-value store
+model Knowledge {
+  id        String   @id @default(cuid())
+  topic     String   @unique
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// AI Personas - custom AI behaviors
+model Persona {
+  id          String   @id @default(cuid())
+  name        String
+  icon        String   @default("🤖")
+  description String?
+  systemPrompt String
+  focus       String?
+  isPreset    Boolean  @default(false)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// AI Rules - behavioral rules for AI
+model AiRule {
+  id          String   @id @default(cuid())
+  name        String
+  content     String
+  enabled     Boolean  @default(true)
+  isPreset    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Snippets - user code snippets
+model Snippet {
+  id          String   @id @default(cuid())
+  name        String
+  language    String
+  description String?
+  code        String
+  favorite    Boolean  @default(false)
+  isPreset    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Collaborators - real session participants
+model Collaborator {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  avatar      String?
+  status      String   @default("offline")
+  cursorFile  String?
+  cursorLine  Int?
+  color       String   @default("#10b981")
+  sessionId   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

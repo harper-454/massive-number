@@ -1,48 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
 
-// Marketplace integration items
-interface MarketplaceItem {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  rating: number;
-  downloads: number;
-  author: string;
-  price: string;
-  verified: boolean;
-}
+// Static catalog definition — this is configuration, NOT demo data
+// It defines the known integrations available in the marketplace
+const MARKETPLACE_CATALOG = [
+  { id: "gh-copilot", name: "GitHub Copilot Bridge", description: "Use Copilot suggestions within MASSIVE NUMBER", category: "ai", rating: 4.8, author: "community", price: "free", verified: true },
+  { id: "jest-runner", name: "Jest Test Runner", description: "Run Jest tests with AI-powered failure analysis", category: "testing", rating: 4.6, author: "community", price: "free", verified: true },
+  { id: "figma-sync", name: "Figma Design Sync", description: "Import Figma designs as React components", category: "design", rating: 4.3, author: "design-tools", price: "free", verified: true },
+  { id: "terraform-gen", name: "Terraform Generator", description: "Generate infrastructure-as-code from natural language", category: "devops", rating: 4.5, author: "devops-pro", price: "$9/mo", verified: false },
+  { id: "api-tester", name: "API Tester Pro", description: "AI-powered API testing and documentation", category: "testing", rating: 4.7, author: "api-tools", price: "free", verified: true },
+  { id: "db-designer", name: "Database Schema Designer", description: "Visual database schema design with AI migration generation", category: "database", rating: 4.4, author: "db-tools", price: "free", verified: true },
+  { id: "security-scanner", name: "Security Vulnerability Scanner", description: "Real-time security scanning with AI fix suggestions", category: "security", rating: 4.9, author: "security-pro", price: "$19/mo", verified: true },
+  { id: "doc-generator", name: "Documentation Generator", description: "Auto-generate API docs, READMEs, and code comments", category: "documentation", rating: 4.2, author: "docs-ai", price: "free", verified: false },
+  { id: "perf-monitor", name: "Performance Monitor", description: "Real-time performance profiling with AI optimization tips", category: "monitoring", rating: 4.1, author: "perf-tools", price: "$5/mo", verified: true },
+  { id: "i18n-ai", name: "i18n AI Translator", description: "AI-powered internationalization with context-aware translations", category: "localization", rating: 4.6, author: "localize-ai", price: "free", verified: true },
+] as const;
 
-const MARKETPLACE_ITEMS: MarketplaceItem[] = [
-  { id: "gh-copilot", name: "GitHub Copilot Bridge", description: "Use Copilot suggestions within MASSIVE NUMBER", category: "ai", rating: 4.8, downloads: 12500, author: "community", price: "free", verified: true },
-  { id: "jest-runner", name: "Jest Test Runner", description: "Run Jest tests with AI-powered failure analysis", category: "testing", rating: 4.6, downloads: 8900, author: "community", price: "free", verified: true },
-  { id: "figma-sync", name: "Figma Design Sync", description: "Import Figma designs as React components", category: "design", rating: 4.3, downloads: 5600, author: "design-tools", price: "free", verified: true },
-  { id: "terraform-gen", name: "Terraform Generator", description: "Generate infrastructure-as-code from natural language", category: "devops", rating: 4.5, downloads: 3200, author: "devops-pro", price: "$9/mo", verified: false },
-  { id: "api-tester", name: "API Tester Pro", description: "AI-powered API testing and documentation", category: "testing", rating: 4.7, downloads: 7800, author: "api-tools", price: "free", verified: true },
-  { id: "db-designer", name: "Database Schema Designer", description: "Visual database schema design with AI migration generation", category: "database", rating: 4.4, downloads: 4100, author: "db-tools", price: "free", verified: true },
-  { id: "security-scanner", name: "Security Vulnerability Scanner", description: "Real-time security scanning with AI fix suggestions", category: "security", rating: 4.9, downloads: 15200, author: "security-pro", price: "$19/mo", verified: true },
-  { id: "doc-generator", name: "Documentation Generator", description: "Auto-generate API docs, READMEs, and code comments", category: "documentation", rating: 4.2, downloads: 6700, author: "docs-ai", price: "free", verified: false },
-  { id: "perf-monitor", name: "Performance Monitor", description: "Real-time performance profiling with AI optimization tips", category: "monitoring", rating: 4.1, downloads: 2900, author: "perf-tools", price: "$5/mo", verified: true },
-  { id: "i18n-ai", name: "i18n AI Translator", description: "AI-powered internationalization with context-aware translations", category: "localization", rating: 4.6, downloads: 3800, author: "localize-ai", price: "free", verified: true },
-];
-
-// Track installed integrations
-const installedIntegrations = new Set<string>(["gh-copilot", "jest-runner"]);
-
-// GET - List marketplace integrations
+// GET - List installed integrations FROM DATABASE + available catalog
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const search = searchParams.get('search');
-    const sortBy = searchParams.get('sort'); // 'rating', 'downloads', 'name'
+    const sortBy = searchParams.get('sort'); // 'rating', 'name'
     const filter = searchParams.get('filter'); // 'installed', 'free', 'paid', 'verified'
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    let items = MARKETPLACE_ITEMS.map((item) => ({
+    // Get installed integrations from database
+    const installedItems = await db.installedIntegration.findMany();
+    const installedIds = new Set(installedItems.map((i) => i.itemId));
+
+    // Build full catalog with installed status
+    let items = MARKETPLACE_CATALOG.map((item) => ({
       ...item,
-      installed: installedIntegrations.has(item.id),
+      installed: installedIds.has(item.id),
     }));
 
     // Filter by category
@@ -75,8 +67,6 @@ export async function GET(request: NextRequest) {
     // Sort
     if (sortBy === 'rating') {
       items.sort((a, b) => b.rating - a.rating);
-    } else if (sortBy === 'downloads') {
-      items.sort((a, b) => b.downloads - a.downloads);
     } else if (sortBy === 'name') {
       items.sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -86,13 +76,21 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
     const paginatedItems = items.slice(offset, offset + limit);
 
-    // Compute metadata
-    const categories = [...new Set(MARKETPLACE_ITEMS.map((i) => i.category))];
-    const totalDownloads = MARKETPLACE_ITEMS.reduce((sum, i) => sum + i.downloads, 0);
-    const avgRating = MARKETPLACE_ITEMS.reduce((sum, i) => sum + i.rating, 0) / MARKETPLACE_ITEMS.length;
+    const categories = [...new Set(MARKETPLACE_CATALOG.map((i) => i.category))];
 
     return NextResponse.json({
       items: paginatedItems,
+      installed: installedItems.map((i) => ({
+        id: i.itemId,
+        name: i.name,
+        description: i.description,
+        category: i.category,
+        author: i.author,
+        rating: i.rating,
+        price: i.price,
+        verified: i.verified,
+        installedAt: i.createdAt,
+      })),
       pagination: {
         page,
         limit,
@@ -101,12 +99,10 @@ export async function GET(request: NextRequest) {
       },
       meta: {
         categories,
-        totalItems: MARKETPLACE_ITEMS.length,
-        totalDownloads,
-        avgRating: Math.round(avgRating * 10) / 10,
-        installedCount: installedIntegrations.size,
-        freeCount: MARKETPLACE_ITEMS.filter((i) => i.price === 'free').length,
-        paidCount: MARKETPLACE_ITEMS.filter((i) => i.price !== 'free').length,
+        totalItems: MARKETPLACE_CATALOG.length,
+        installedCount: installedItems.length,
+        freeCount: MARKETPLACE_CATALOG.filter((i) => i.price === 'free').length,
+        paidCount: MARKETPLACE_CATALOG.filter((i) => i.price !== 'free').length,
       },
     });
   } catch (error) {
@@ -122,7 +118,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, itemId } = body;
+    const { action, itemId, name, description, category, author, rating, price, verified } = body;
 
     if (!itemId) {
       return NextResponse.json(
@@ -131,81 +127,100 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const item = MARKETPLACE_ITEMS.find((i) => i.id === itemId);
-    if (!item) {
-      return NextResponse.json(
-        { error: `Marketplace item '${itemId}' not found` },
-        { status: 404 }
-      );
-    }
-
     if (action === 'install') {
-      if (installedIntegrations.has(itemId)) {
+      // Check if already installed
+      const existing = await db.installedIntegration.findUnique({
+        where: { itemId },
+      });
+
+      if (existing) {
         return NextResponse.json(
-          { error: `Item '${item.name}' is already installed` },
+          { error: `Item '${existing.name}' is already installed` },
           { status: 409 }
         );
       }
 
-      installedIntegrations.add(itemId);
+      // Find item in catalog or use provided data
+      const catalogItem = MARKETPLACE_CATALOG.find((i) => i.id === itemId);
+
+      const integration = await db.installedIntegration.create({
+        data: {
+          itemId,
+          name: name || catalogItem?.name || itemId,
+          description: description || catalogItem?.description || null,
+          category: category || catalogItem?.category || null,
+          author: author || catalogItem?.author || null,
+          rating: rating || catalogItem?.rating || 0,
+          price: price || catalogItem?.price || 'free',
+          verified: verified !== undefined ? verified : (catalogItem?.verified || false),
+        },
+      });
+
+      // Log activity
+      await db.activity.create({
+        data: {
+          action: 'marketplace_install',
+          entity: 'InstalledIntegration',
+          entityId: integration.id,
+          description: `Installed integration: ${integration.name}`,
+          metadata: JSON.stringify({ itemId, category: integration.category }),
+        },
+      });
 
       return NextResponse.json({
         success: true,
-        message: `'${item.name}' installed successfully`,
+        message: `'${integration.name}' installed successfully`,
         item: {
-          ...item,
+          id: integration.itemId,
+          name: integration.name,
+          description: integration.description,
+          category: integration.category,
+          author: integration.author,
+          rating: integration.rating,
+          price: integration.price,
+          verified: integration.verified,
           installed: true,
-          installedAt: new Date().toISOString(),
+          installedAt: integration.createdAt,
         },
-        totalInstalled: installedIntegrations.size,
       }, { status: 201 });
     }
 
     if (action === 'uninstall') {
-      if (!installedIntegrations.has(itemId)) {
+      const existing = await db.installedIntegration.findUnique({
+        where: { itemId },
+      });
+
+      if (!existing) {
         return NextResponse.json(
-          { error: `Item '${item.name}' is not installed` },
+          { error: `Item '${itemId}' is not installed` },
           { status: 404 }
         );
       }
 
-      installedIntegrations.delete(itemId);
+      await db.installedIntegration.delete({
+        where: { itemId },
+      });
+
+      // Log activity
+      await db.activity.create({
+        data: {
+          action: 'marketplace_uninstall',
+          entity: 'InstalledIntegration',
+          entityId: existing.id,
+          description: `Uninstalled integration: ${existing.name}`,
+          metadata: JSON.stringify({ itemId }),
+        },
+      });
 
       return NextResponse.json({
         success: true,
-        message: `'${item.name}' uninstalled successfully`,
-        item: {
-          ...item,
-          installed: false,
-          uninstalledAt: new Date().toISOString(),
-        },
-        totalInstalled: installedIntegrations.size,
-      });
-    }
-
-    if (action === 'details') {
-      // Return detailed info about a specific item
-      return NextResponse.json({
-        ...item,
-        installed: installedIntegrations.has(itemId),
-        details: {
-          version: '1.0.0',
-          lastUpdated: '2026-06-20',
-          size: `${Math.floor(Math.random() * 5 + 1)}.${Math.floor(Math.random() * 9)}MB`,
-          permissions: ['read:files', 'write:code'],
-          changelog: [
-            { version: '1.0.0', date: '2026-06-20', notes: 'Initial release' },
-          ],
-          reviews: [
-            { user: 'dev42', rating: 5, comment: 'Excellent integration, saves hours!', date: '2026-06-22' },
-            { user: 'code_ninja', rating: 4, comment: 'Works well, minor setup complexity', date: '2026-06-21' },
-          ],
-        },
+        message: `'${existing.name}' uninstalled successfully`,
+        itemId,
       });
     }
 
     return NextResponse.json(
-      { error: `Unknown action: ${action}. Supported: install, uninstall, details` },
+      { error: `Unknown action: ${action}. Supported: install, uninstall` },
       { status: 400 }
     );
   } catch (error) {

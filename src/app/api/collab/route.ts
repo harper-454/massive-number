@@ -1,94 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
 
-// Simulated collaborators
-interface Collaborator {
-  id: string;
-  name: string;
-  avatar: string;
-  status: 'online' | 'away' | 'offline';
-  cursor: { file: string; line: number } | null;
-  color: string;
-}
-
-interface SharedSession {
-  id: string;
-  name: string;
-  createdBy: string;
-  participants: string[];
-  activeFile: string;
-  createdAt: string;
-  expiresAt: string;
-}
-
-const collaborators: Collaborator[] = [
-  { id: "user-1", name: "Alex Chen", avatar: "AC", status: "online", cursor: { file: "chat-panel.tsx", line: 42 }, color: "#10b981" },
-  { id: "user-2", name: "Sam Rivera", avatar: "SR", status: "away", cursor: null, color: "#f59e0b" },
-  { id: "user-3", name: "Jordan Lee", avatar: "JL", status: "online", cursor: { file: "api/route.ts", line: 15 }, color: "#8b5cf6" },
-];
-
-const sharedSessions: SharedSession[] = [
-  {
-    id: "session-1",
-    name: "MCP Integration Sprint",
-    createdBy: "user-1",
-    participants: ["user-1", "user-2"],
-    activeFile: "src/app/api/mcp/route.ts",
-    createdAt: "2026-06-26T10:00:00Z",
-    expiresAt: "2026-06-26T18:00:00Z",
-  },
-  {
-    id: "session-2",
-    name: "Voice Code Review",
-    createdBy: "user-3",
-    participants: ["user-3"],
-    activeFile: "src/app/api/voice/route.ts",
-    createdAt: "2026-06-26T09:30:00Z",
-    expiresAt: "2026-06-26T12:00:00Z",
-  },
-];
-
-// Track active invites
-const activeInvites: Array<{
-  id: string;
-  sessionId: string;
-  invitedBy: string;
-  email: string;
-  role: string;
-  createdAt: string;
-}> = [];
-
-// GET - List active collaborators and shared sessions
+// GET - Return collaborators FROM DATABASE
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const include = searchParams.get('include'); // 'collaborators', 'sessions', 'invites', or null for all
+    const include = searchParams.get('include'); // 'collaborators', 'sessions', or null for all
 
     const response: Record<string, unknown> = {};
 
     if (!include || include === 'collaborators') {
+      const collaborators = await db.collaborator.findMany({
+        orderBy: { updatedAt: 'desc' },
+      });
+
       response.collaborators = collaborators.map((c) => ({
-        ...c,
-        lastActive: c.status === 'online' ? 'Just now' : c.status === 'away' ? '5 min ago' : '2 hours ago',
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        avatar: c.avatar || c.name.split(' ').map((n) => n[0]).join('').toUpperCase(),
+        status: c.status,
+        cursor: c.cursorFile ? { file: c.cursorFile, line: c.cursorLine || 0 } : null,
+        color: c.color,
+        sessionId: c.sessionId,
+        lastActive: c.updatedAt,
       }));
     }
 
     if (!include || include === 'sessions') {
-      response.sessions = sharedSessions.map((s) => ({
-        ...s,
-        participantCount: s.participants.length,
-        isActive: new Date(s.expiresAt) > new Date(),
+      // Group collaborators by sessionId
+      const collaborators = await db.collaborator.findMany();
+      const sessionMap = new Map<string, typeof collaborators>();
+
+      for (const c of collaborators) {
+        if (c.sessionId) {
+          if (!sessionMap.has(c.sessionId)) {
+            sessionMap.set(c.sessionId, []);
+          }
+          sessionMap.get(c.sessionId)!.push(c);
+        }
+      }
+
+      response.sessions = Array.from(sessionMap.entries()).map(([sessionId, participants]) => ({
+        id: sessionId,
+        name: `Session ${sessionId.slice(0, 8)}`,
+        participants: participants.map((p) => p.id),
+        participantCount: participants.length,
+        activeFile: participants[0]?.cursorFile || null,
+        isActive: true,
+        createdAt: participants[0]?.createdAt,
       }));
     }
 
-    if (!include || include === 'invites') {
-      response.invites = activeInvites;
-    }
-
+    const allCollaborators = await db.collaborator.findMany();
     response.meta = {
-      onlineCount: collaborators.filter((c) => c.status === 'online').length,
-      totalCollaborators: collaborators.length,
-      activeSessions: sharedSessions.filter((s) => new Date(s.expiresAt) > new Date()).length,
-      pendingInvites: activeInvites.length,
+      onlineCount: allCollaborators.filter((c) => c.status === 'online').length,
+      totalCollaborators: allCollaborators.length,
+      activeSessions: new Set(allCollaborators.filter((c) => c.sessionId).map((c) => c.sessionId)).size,
     };
 
     return NextResponse.json(response);
@@ -101,93 +69,89 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create a sharing link / invite collaborator
+// POST - Add collaborator or create session
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, sessionId, email, role, name, sessionName } = body;
+    const { action, name, email, sessionId } = body;
 
-    if (action === 'invite') {
-      // Invite a collaborator by email
-      if (!email) {
+    if (action === 'invite' || action === 'add') {
+      if (!name) {
         return NextResponse.json(
-          { error: 'Email is required for invite action' },
+          { error: 'Name is required for adding a collaborator' },
           { status: 400 }
         );
       }
 
-      const inviteId = `invite-${Date.now()}`;
-      const invite = {
-        id: inviteId,
-        sessionId: sessionId || 'session-1',
-        invitedBy: 'current-user',
-        email,
-        role: role || 'editor',
-        createdAt: new Date().toISOString(),
-      };
+      const collaborator = await db.collaborator.create({
+        data: {
+          name,
+          email: email || null,
+          status: 'offline',
+          color: `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`,
+          sessionId: sessionId || null,
+        },
+      });
 
-      activeInvites.push(invite);
+      // Log activity
+      await db.activity.create({
+        data: {
+          action: 'collab_invite',
+          entity: 'Collaborator',
+          entityId: collaborator.id,
+          description: `Invited collaborator: ${name}`,
+          metadata: JSON.stringify({ email, sessionId }),
+        },
+      });
 
       return NextResponse.json({
         success: true,
-        message: `Invitation sent to ${email}`,
-        invite,
-        shareLink: `https://massive-number.dev/collab/${inviteId}`,
+        message: `Collaborator "${name}" added successfully`,
+        collaborator: {
+          id: collaborator.id,
+          name: collaborator.name,
+          email: collaborator.email,
+          status: collaborator.status,
+          color: collaborator.color,
+          sessionId: collaborator.sessionId,
+        },
       }, { status: 201 });
     }
 
     if (action === 'create-session') {
-      // Create a new shared session
-      if (!sessionName) {
+      if (!sessionId) {
         return NextResponse.json(
-          { error: 'Session name is required for create-session action' },
+          { error: 'sessionId is required for create-session action' },
           { status: 400 }
         );
       }
 
-      const newSession: SharedSession = {
-        id: `session-${Date.now()}`,
-        name: sessionName,
-        createdBy: 'current-user',
-        participants: ['current-user'],
-        activeFile: 'src/app/page.tsx',
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
-      };
-
-      sharedSessions.push(newSession);
-
+      // sessionId is just stored on collaborators — create one by adding a placeholder
       return NextResponse.json({
         success: true,
-        message: `Session "${sessionName}" created`,
-        session: newSession,
+        message: `Session created`,
+        sessionId,
       }, { status: 201 });
     }
 
-    if (action === 'share-link') {
-      // Generate a sharing link for current session
-      const shareId = `share-${Date.now()}`;
-      return NextResponse.json({
-        success: true,
-        shareLink: `https://massive-number.dev/share/${shareId}`,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        permissions: role || 'view',
-      });
-    }
-
     if (action === 'update-cursor') {
-      // Update collaborator cursor position
-      const { userId, file, line } = body;
-      if (!userId || !file || !line) {
+      const { collaboratorId, file, line } = body;
+      if (!collaboratorId || !file) {
         return NextResponse.json(
-          { error: 'userId, file, and line are required for update-cursor action' },
+          { error: 'collaboratorId and file are required for update-cursor action' },
           { status: 400 }
         );
       }
-      const collaborator = collaborators.find((c) => c.id === userId);
-      if (collaborator) {
-        collaborator.cursor = { file, line };
-      }
+
+      const updated = await db.collaborator.update({
+        where: { id: collaboratorId },
+        data: {
+          cursorFile: file,
+          cursorLine: line || null,
+          updatedAt: new Date(),
+        },
+      });
+
       return NextResponse.json({
         success: true,
         cursor: { file, line },
@@ -195,7 +159,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: `Unknown action: ${action}. Supported: invite, create-session, share-link, update-cursor` },
+      { error: `Unknown action: ${action}. Supported: invite, add, create-session, update-cursor` },
       { status: 400 }
     );
   } catch (error) {
@@ -207,75 +171,53 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - Remove collaborator or session
+// DELETE - Remove collaborator
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
-    const { type, id } = body;
+    const { collaboratorId } = body;
 
-    if (!type || !id) {
+    if (!collaboratorId) {
       return NextResponse.json(
-        { error: 'type (collaborator|session|invite) and id are required' },
+        { error: 'collaboratorId is required' },
         { status: 400 }
       );
     }
 
-    if (type === 'collaborator') {
-      const idx = collaborators.findIndex((c) => c.id === id);
-      if (idx === -1) {
-        return NextResponse.json(
-          { error: `Collaborator '${id}' not found` },
-          { status: 404 }
-        );
-      }
-      const removed = collaborators.splice(idx, 1)[0];
-      return NextResponse.json({
-        success: true,
-        message: `Collaborator '${removed.name}' removed`,
-        removed,
-      });
+    const collaborator = await db.collaborator.findUnique({
+      where: { id: collaboratorId },
+    });
+
+    if (!collaborator) {
+      return NextResponse.json(
+        { error: `Collaborator '${collaboratorId}' not found` },
+        { status: 404 }
+      );
     }
 
-    if (type === 'session') {
-      const idx = sharedSessions.findIndex((s) => s.id === id);
-      if (idx === -1) {
-        return NextResponse.json(
-          { error: `Session '${id}' not found` },
-          { status: 404 }
-        );
-      }
-      const removed = sharedSessions.splice(idx, 1)[0];
-      return NextResponse.json({
-        success: true,
-        message: `Session '${removed.name}' removed`,
-        removed,
-      });
-    }
+    await db.collaborator.delete({
+      where: { id: collaboratorId },
+    });
 
-    if (type === 'invite') {
-      const idx = activeInvites.findIndex((i) => i.id === id);
-      if (idx === -1) {
-        return NextResponse.json(
-          { error: `Invite '${id}' not found` },
-          { status: 404 }
-        );
-      }
-      const removed = activeInvites.splice(idx, 1)[0];
-      return NextResponse.json({
-        success: true,
-        message: `Invite to '${removed.email}' revoked`,
-        removed,
-      });
-    }
+    // Log activity
+    await db.activity.create({
+      data: {
+        action: 'collab_remove',
+        entity: 'Collaborator',
+        entityId: collaboratorId,
+        description: `Removed collaborator: ${collaborator.name}`,
+        metadata: JSON.stringify({ name: collaborator.name }),
+      },
+    });
 
-    return NextResponse.json(
-      { error: `Unknown type: ${type}. Supported: collaborator, session, invite` },
-      { status: 400 }
-    );
+    return NextResponse.json({
+      success: true,
+      message: `Collaborator '${collaborator.name}' removed`,
+    });
   } catch (error) {
     console.error('Collab DELETE error:', error);
     return NextResponse.json(
-      { error: 'Failed to remove collaboration resource' },
+      { error: 'Failed to remove collaborator' },
       { status: 500 }
     );
   }

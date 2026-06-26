@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useEffect } from 'react';
 import {
   Settings,
   Key,
@@ -74,119 +75,44 @@ interface ProviderInfo {
   models: { id: string; name: string }[];
 }
 
-const INITIAL_PROVIDERS: ProviderInfo[] = [
-  {
-    id: 'openai',
-    name: 'OpenAI',
-    icon: <Cloud className="h-5 w-5" />,
-    color: 'text-emerald-400',
-    connected: true,
-    enabled: true,
-    apiKey: 'sk-proj-abc123...xyz',
-    models: [
-      { id: 'gpt-4o', name: 'GPT-4o' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o-mini' },
-      { id: 'o3', name: 'o3' },
-      { id: 'o3-mini', name: 'o3-mini' },
-    ],
-  },
-  {
-    id: 'anthropic',
-    name: 'Anthropic',
-    icon: <Bot className="h-5 w-5" />,
-    color: 'text-orange-400',
-    connected: true,
-    enabled: true,
-    apiKey: 'sk-ant-api03...def',
-    models: [
-      { id: 'claude-sonnet-4', name: 'Claude Sonnet 4' },
-      { id: 'claude-opus-4', name: 'Claude Opus 4' },
-      { id: 'claude-haiku-3.5', name: 'Claude Haiku 3.5' },
-    ],
-  },
-  {
-    id: 'google',
-    name: 'Google',
-    icon: <Globe className="h-5 w-5" />,
-    color: 'text-red-400',
-    connected: true,
-    enabled: true,
-    apiKey: 'AIzaSyB...ghi',
-    models: [
-      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    ],
-  },
-  {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    icon: <Zap className="h-5 w-5" />,
-    color: 'text-cyan-400',
-    connected: true,
-    enabled: true,
-    apiKey: 'dsk-jkl...mno',
-    models: [
-      { id: 'deepseek-r1', name: 'DeepSeek R1' },
-      { id: 'deepseek-v3', name: 'DeepSeek V3' },
-    ],
-  },
-  {
-    id: 'meta',
-    name: 'Meta',
-    icon: <Cpu className="h-5 w-5" />,
-    color: 'text-sky-400',
-    connected: false,
-    enabled: false,
-    apiKey: '',
-    models: [
-      { id: 'llama-4-maverick', name: 'Llama 4 Maverick' },
-      { id: 'llama-4-scout', name: 'Llama 4 Scout' },
-    ],
-  },
-  {
-    id: 'alibaba',
-    name: 'Alibaba',
-    icon: <Globe className="h-5 w-5" />,
-    color: 'text-amber-400',
-    connected: false,
-    enabled: false,
-    apiKey: '',
-    models: [
-      { id: 'qwen3-235b', name: 'Qwen3 235B' },
-      { id: 'qwen3-30b', name: 'Qwen3 30B' },
-    ],
-  },
-  {
-    id: 'mistral',
-    name: 'Mistral',
-    icon: <Zap className="h-5 w-5" />,
-    color: 'text-violet-400',
-    connected: false,
-    enabled: false,
-    apiKey: '',
-    models: [
-      { id: 'mistral-large', name: 'Mistral Large' },
-      { id: 'codestral', name: 'Codestral' },
-    ],
-  },
-];
+const INITIAL_PROVIDERS: ProviderInfo[] = [];
 
-// ── Usage Data ─────────────────────────────────────────────────────────────
+// ── Provider icon map ────────────────────────────────────────────────────────
 
-const USAGE_BY_MODEL = [
-  { model: 'GPT-4o', tokens: 18420, cost: 0.92, color: 'bg-emerald-500' },
-  { model: 'Claude Sonnet 4', tokens: 12800, cost: 0.38, color: 'bg-orange-500' },
-  { model: 'Gemini 2.5 Pro', tokens: 9200, cost: 0.18, color: 'bg-red-500' },
-  { model: 'DeepSeek R1', tokens: 4863, cost: 0.05, color: 'bg-cyan-500' },
-  { model: 'Llama 4', tokens: 2000, cost: 0.01, color: 'bg-sky-500' },
-];
+const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
+  openai: <Cloud className="h-5 w-5" />,
+  anthropic: <Bot className="h-5 w-5" />,
+  google: <Globe className="h-5 w-5" />,
+  deepseek: <Zap className="h-5 w-5" />,
+  meta: <Cpu className="h-5 w-5" />,
+  alibaba: <MessageSquare className="h-5 w-5" />,
+};
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ── Component ───────────────────────────────────────────────────────────
 
 export function SettingsPanel() {
   const { models, selectedModel, setSelectedModel, toggleModel } =
     useModelStore();
-  const [providers, setProviders] = useState<ProviderInfo[]>(INITIAL_PROVIDERS);
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+
+  useEffect(() => {
+    fetch('/api/providers')
+      .then(res => res.json())
+      .then(data => {
+        const mapped = (data.providers || []).map((p: { id: string; name: string; provider: string; apiKey: string; models: Array<{ id: string; name: string }>; enabled: boolean }) => ({
+          id: p.provider || p.id,
+          name: p.name,
+          icon: PROVIDER_ICON_MAP[p.provider?.toLowerCase()] || <Cloud className="h-5 w-5" />,
+          color: 'text-muted-foreground',
+          connected: !!p.apiKey,
+          enabled: p.enabled,
+          apiKey: p.apiKey || '',
+          models: p.models || [],
+        }));
+        setProviders(mapped);
+      })
+      .catch(() => {});
+  }, []);
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newProviderName, setNewProviderName] = useState('');

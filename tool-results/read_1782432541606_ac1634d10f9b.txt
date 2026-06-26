@@ -1,0 +1,1135 @@
+     1→'use client';
+     2→
+     3→import { useState, useCallback } from 'react';
+     4→import {
+     5→  Brain,
+     6→  Hammer,
+     7→  SearchCheck,
+     8→  RefreshCw,
+     9→  Plus,
+    10→  Trash2,
+    11→  Download,
+    12→  Upload,
+    13→  RotateCcw,
+    14→  Keyboard,
+    15→  Palette,
+    16→  FileText,
+    17→  UserCog,
+    18→  Shield,
+    19→  Code,
+    20→  TestTube,
+    21→  BookOpen,
+    22→  Check,
+    23→  ChevronRight,
+    24→  Sparkles,
+    25→  Monitor,
+    26→  Sun,
+    27→  Moon,
+    28→  TreePine,
+    29→  Type,
+    30→  Save,
+    31→  WrapText,
+    32→  Hash,
+    33→  Map,
+    34→  Copy,
+    35→  AlertTriangle,
+    36→  Settings2,
+    37→} from 'lucide-react';
+    38→import { Button } from '@/components/ui/button';
+    39→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    40→import { Badge } from '@/components/ui/badge';
+    41→import { Input } from '@/components/ui/input';
+    42→import { Textarea } from '@/components/ui/textarea';
+    43→import { Switch } from '@/components/ui/switch';
+    44→import { Separator } from '@/components/ui/separator';
+    45→import { ScrollArea } from '@/components/ui/scroll-area';
+    46→import { Slider } from '@/components/ui/slider';
+    47→import { Label } from '@/components/ui/label';
+    48→import {
+    49→  Dialog,
+    50→  DialogContent,
+    51→  DialogDescription,
+    52→  DialogFooter,
+    53→  DialogHeader,
+    54→  DialogTitle,
+    55→  DialogTrigger,
+    56→} from '@/components/ui/dialog';
+    57→import {
+    58→  AlertDialog,
+    59→  AlertDialogAction,
+    60→  AlertDialogCancel,
+    61→  AlertDialogContent,
+    62→  AlertDialogDescription,
+    63→  AlertDialogFooter,
+    64→  AlertDialogHeader,
+    65→  AlertDialogTitle,
+    66→  AlertDialogTrigger,
+    67→} from '@/components/ui/alert-dialog';
+    68→import { motion, AnimatePresence } from 'framer-motion';
+    69→
+    70→/* ───────── Types ───────── */
+    71→
+    72→interface Persona {
+    73→  id: string;
+    74→  name: string;
+    75→  icon: React.ReactNode;
+    76→  description: string;
+    77→  systemPrompt: string;
+    78→  focus: string[];
+    79→  color: string;
+    80→  preset?: boolean;
+    81→}
+    82→
+    83→interface Rule {
+    84→  id: string;
+    85→  name: string;
+    86→  content: string;
+    87→  enabled: boolean;
+    88→}
+    89→
+    90→interface Keybinding {
+    91→  action: string;
+    92→  keys: string;
+    93→  description: string;
+    94→  category: 'Navigation' | 'Chat' | 'Editor' | 'Terminal' | 'Panels';
+    95→}
+    96→
+    97→interface AppearanceSettings {
+    98→  theme: 'dark' | 'light' | 'midnight' | 'forest';
+    99→  fontFamily: 'Geist' | 'JetBrains Mono' | 'Fira Code' | 'Cascadia Code';
+   100→  fontSize: number;
+   101→  tabSize: 2 | 4 | 8;
+   102→  wordWrap: boolean;
+   103→  lineNumbers: boolean;
+   104→  minimap: boolean;
+   105→  accentColor: 'emerald' | 'amber' | 'rose' | 'cyan' | 'violet';
+   106→}
+   107→
+   108→/* ───────── Preset Data ───────── */
+   109→
+   110→const PRESET_PERSONAS: Persona[] = [
+   111→  {
+   112→    id: 'planner',
+   113→    name: 'Planner',
+   114→    icon: <Brain className="h-5 w-5" />,
+   115→    description: 'Strategic architect who breaks down requirements into clear specs before coding.',
+   116→    systemPrompt: 'You are a strategic architect. Break down requirements into clear specs before coding.',
+   117→    focus: ['specs', 'design', 'architecture'],
+   118→    color: 'text-amber-400',
+   119→    preset: true,
+   120→  },
+   121→  {
+   122→    id: 'builder',
+   123→    name: 'Builder',
+   124→    icon: <Hammer className="h-5 w-5" />,
+   125→    description: 'Rapid implementer who writes clean, efficient code following the plan.',
+   126→    systemPrompt: 'You are a rapid implementer. Write clean, efficient code following the plan.',
+   127→    focus: ['code', 'implementation', 'speed'],
+   128→    color: 'text-emerald-400',
+   129→    preset: true,
+   130→  },
+   131→  {
+   132→    id: 'reviewer',
+   133→    name: 'Reviewer',
+   134→    icon: <SearchCheck className="h-5 w-5" />,
+   135→    description: 'Strict code reviewer checking for bugs, security issues, performance, and style.',
+   136→    systemPrompt: 'You are a strict code reviewer. Check for bugs, security issues, performance problems, and style violations.',
+   137→    focus: ['review', 'security', 'quality'],
+   138→    color: 'text-rose-400',
+   139→    preset: true,
+   140→  },
+   141→  {
+   142→    id: 'iterator',
+   143→    name: 'Iterator',
+   144→    icon: <RefreshCw className="h-5 w-5" />,
+   145→    description: 'Optimization specialist who improves code for performance, readability, and maintainability.',
+   146→    systemPrompt: 'You are an optimization specialist. Improve existing code for performance, readability, and maintainability.',
+   147→    focus: ['refactor', 'optimize', 'polish'],
+   148→    color: 'text-cyan-400',
+   149→    preset: true,
+   150→  },
+   151→];
+   152→
+   153→const PRESET_RULES: Rule[] = [
+   154→  {
+   155→    id: 'rule-ts-strict',
+   156→    name: 'Use TypeScript strict mode',
+   157→    content: 'Always use TypeScript with strict type checking. No any types.',
+   158→    enabled: true,
+   159→  },
+   160→  {
+   161→    id: 'rule-conventions',
+   162→    name: 'Follow project conventions',
+   163→    content: 'Follow the existing code patterns and naming conventions in the project.',
+   164→    enabled: true,
+   165→  },
+   166→  {
+   167→    id: 'rule-security',
+   168→    name: 'Security first',
+   169→    content: 'Never introduce SQL injection, XSS, or CSRF vulnerabilities. Always validate inputs.',
+   170→    enabled: true,
+   171→  },
+   172→  {
+   173→    id: 'rule-tests',
+   174→    name: 'Write tests',
+   175→    content: 'Generate unit tests for all new functions and components.',
+   176→    enabled: false,
+   177→  },
+   178→  {
+   179→    id: 'rule-docs',
+   180→    name: 'Document everything',
+   181→    content: 'Add JSDoc comments to all exported functions and types.',
+   182→    enabled: true,
+   183→  },
+   184→];
+   185→
+   186→const KEYBINDINGS: Keybinding[] = [
+   187→  { action: 'Command Palette', keys: 'Ctrl+K', description: 'Open the command palette', category: 'Navigation' },
+   188→  { action: 'Quick panel switch', keys: '1-0', description: 'Switch between panels using number keys', category: 'Navigation' },
+   189→  { action: 'Send message', keys: 'Ctrl+Enter', description: 'Send the current chat message', category: 'Chat' },
+   190→  { action: 'Toggle terminal', keys: 'Ctrl+/', description: 'Show or hide the terminal panel', category: 'Terminal' },
+   191→  { action: 'Toggle sidebar', keys: 'Ctrl+B', description: 'Show or hide the sidebar', category: 'Panels' },
+   192→  { action: 'New project', keys: 'Ctrl+Shift+P', description: 'Create a new project', category: 'Navigation' },
+   193→  { action: 'Save file', keys: 'Ctrl+S', description: 'Save the current file', category: 'Editor' },
+   194→  { action: 'Undo', keys: 'Ctrl+Z', description: 'Undo the last action', category: 'Editor' },
+   195→  { action: 'Accept suggestion', keys: 'Tab', description: 'Accept the AI code suggestion', category: 'Editor' },
+   196→  { action: 'Close overlay', keys: 'Escape', description: 'Close any open overlay or dialog', category: 'Navigation' },
+   197→];
+   198→
+   199→const THEME_SWATCHES: Record<string, { bg: string; fg: string; accent: string; border: string }> = {
+   200→  dark: { bg: '#0a0a0a', fg: '#fafafa', accent: '#10b981', border: '#27272a' },
+   201→  light: { bg: '#fafafa', fg: '#18181b', accent: '#10b981', border: '#e4e4e7' },
+   202→  midnight: { bg: '#0c0a1a', fg: '#e2e8f0', accent: '#8b5cf6', border: '#1e1b4b' },
+   203→  forest: { bg: '#0a1a0f', fg: '#d1fae5', accent: '#34d399', border: '#14532d' },
+   204→};
+   205→
+   206→const ACCENT_COLORS: { id: AppearanceSettings['accentColor']; label: string; color: string }[] = [
+   207→  { id: 'emerald', label: 'Emerald', color: '#10b981' },
+   208→  { id: 'amber', label: 'Amber', color: '#f59e0b' },
+   209→  { id: 'rose', label: 'Rose', color: '#f43f5e' },
+   210→  { id: 'cyan', label: 'Cyan', color: '#06b6d4' },
+   211→  { id: 'violet', label: 'Violet', color: '#8b5cf6' },
+   212→];
+   213→
+   214→/* ───────── Tab Config ───────── */
+   215→
+   216→type TabId = 'personas' | 'rules' | 'keybindings' | 'appearance' | 'export';
+   217→
+   218→const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
+   219→  { id: 'personas', label: 'AI Personas', icon: <UserCog className="h-4 w-4" /> },
+   220→  { id: 'rules', label: 'AI Rules', icon: <FileText className="h-4 w-4" /> },
+   221→  { id: 'keybindings', label: 'Keybindings', icon: <Keyboard className="h-4 w-4" /> },
+   222→  { id: 'appearance', label: 'Appearance', icon: <Palette className="h-4 w-4" /> },
+   223→  { id: 'export', label: 'Export / Import', icon: <Download className="h-4 w-4" /> },
+   224→];
+   225→
+   226→/* ───────── Main Component ───────── */
+   227→
+   228→export function CustomizationHub() {
+   229→  const [activeTab, setActiveTab] = useState<TabId>('personas');
+   230→  const [activePersona, setActivePersona] = useState<string>('builder');
+   231→  const [personas, setPersonas] = useState<Persona[]>(PRESET_PERSONAS);
+   232→  const [newPersonaName, setNewPersonaName] = useState('');
+   233→  const [newPersonaPrompt, setNewPersonaPrompt] = useState('');
+   234→
+   235→  const [rules, setRules] = useState<Rule[]>(PRESET_RULES);
+   236→  const [newRuleName, setNewRuleName] = useState('');
+   237→  const [newRuleContent, setNewRuleContent] = useState('');
+   238→  const [showAddRule, setShowAddRule] = useState(false);
+   239→
+   240→  const [appearance, setAppearance] = useState<AppearanceSettings>({
+   241→    theme: 'dark',
+   242→    fontFamily: 'Geist',
+   243→    fontSize: 14,
+   244→    tabSize: 2,
+   245→    wordWrap: true,
+   246→    lineNumbers: true,
+   247→    minimap: true,
+   248→    accentColor: 'emerald',
+   249→  });
+   250→
+   251→  /* ── Persona handlers ── */
+   252→
+   253→  const handleCreatePersona = useCallback(() => {
+   254→    if (!newPersonaName.trim() || !newPersonaPrompt.trim()) return;
+   255→    const newPersona: Persona = {
+   256→      id: `custom-${Date.now()}`,
+   257→      name: newPersonaName.trim(),
+   258→      icon: <Sparkles className="h-5 w-5" />,
+   259→      description: newPersonaPrompt.trim().slice(0, 80),
+   260→      systemPrompt: newPersonaPrompt.trim(),
+   261→      focus: ['custom'],
+   262→      color: 'text-orange-400',
+   263→    };
+   264→    setPersonas((prev) => [...prev, newPersona]);
+   265→    setNewPersonaName('');
+   266→    setNewPersonaPrompt('');
+   267→  }, [newPersonaName, newPersonaPrompt]);
+   268→
+   269→  /* ── Rule handlers ── */
+   270→
+   271→  const handleAddRule = useCallback(() => {
+   272→    if (!newRuleName.trim() || !newRuleContent.trim()) return;
+   273→    const newRule: Rule = {
+   274→      id: `rule-${Date.now()}`,
+   275→      name: newRuleName.trim(),
+   276→      content: newRuleContent.trim(),
+   277→      enabled: true,
+   278→    };
+   279→    setRules((prev) => [...prev, newRule]);
+   280→    setNewRuleName('');
+   281→    setNewRuleContent('');
+   282→    setShowAddRule(false);
+   283→  }, [newRuleName, newRuleContent]);
+   284→
+   285→  const toggleRule = useCallback((id: string) => {
+   286→    setRules((prev) => prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)));
+   287→  }, []);
+   288→
+   289→  const deleteRule = useCallback((id: string) => {
+   290→    setRules((prev) => prev.filter((r) => r.id !== id));
+   291→  }, []);
+   292→
+   293→  /* ── Export / Import handlers ── */
+   294→
+   295→  const handleExport = useCallback(() => {
+   296→    const config = { activePersona, personas, rules, appearance };
+   297→    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+   298→    const url = URL.createObjectURL(blob);
+   299→    const a = document.createElement('a');
+   300→    a.href = url;
+   301→    a.download = 'massive-number-config.json';
+   302→    a.click();
+   303→    URL.revokeObjectURL(url);
+   304→  }, [activePersona, personas, rules, appearance]);
+   305→
+   306→  const handleImport = useCallback(() => {
+   307→    const input = document.createElement('input');
+   308→    input.type = 'file';
+   309→    input.accept = '.json';
+   310→    input.onchange = (e) => {
+   311→      const file = (e.target as HTMLInputElement).files?.[0];
+   312→      if (!file) return;
+   313→      const reader = new FileReader();
+   314→      reader.onload = (ev) => {
+   315→        try {
+   316→          const config = JSON.parse(ev.target?.result as string);
+   317→          if (config.activePersona) setActivePersona(config.activePersona);
+   318→          if (config.personas) setPersonas(config.personas);
+   319→          if (config.rules) setRules(config.rules);
+   320→          if (config.appearance) setAppearance((prev) => ({ ...prev, ...config.appearance }));
+   321→        } catch {
+   322→          // Invalid JSON — silently fail
+   323→        }
+   324→      };
+   325→      reader.readAsText(file);
+   326→    };
+   327→    input.click();
+   328→  }, []);
+   329→
+   330→  const handleReset = useCallback(() => {
+   331→    setPersonas(PRESET_PERSONAS);
+   332→    setRules(PRESET_RULES);
+   333→    setActivePersona('builder');
+   334→    setAppearance({
+   335→      theme: 'dark',
+   336→      fontFamily: 'Geist',
+   337→      fontSize: 14,
+   338→      tabSize: 2,
+   339→      wordWrap: true,
+   340→      lineNumbers: true,
+   341→      minimap: true,
+   342→      accentColor: 'emerald',
+   343→    });
+   344→  }, []);
+   345→
+   346→  /* ───────── Tab Content Renderers ───────── */
+   347→
+   348→  function renderPersonas() {
+   349→    return (
+   350→      <div className="space-y-4">
+   351→        <div className="flex items-center justify-between">
+   352→          <div>
+   353→            <h3 className="text-sm font-semibold">AI Personas</h3>
+   354→            <p className="text-xs text-muted-foreground mt-0.5">
+   355→              Switch between specialized AI modes. Each persona shapes the system prompt for every message.
+   356→            </p>
+   357→          </div>
+   358→          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400">
+   359→            4 Presets
+   360→          </Badge>
+   361→        </div>
+   362→
+   363→        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   364→          {personas.map((persona) => {
+   365→            const isActive = activePersona === persona.id;
+   366→            return (
+   367→              <motion.div
+   368→                key={persona.id}
+   369→                layout
+   370→                initial={{ opacity: 0, scale: 0.97 }}
+   371→                animate={{ opacity: 1, scale: 1 }}
+   372→                transition={{ duration: 0.2 }}
+   373→              >
+   374→                <Card
+   375→                  className={`relative overflow-hidden cursor-pointer transition-all ${
+   376→                    isActive
+   377→                      ? 'border-emerald-500/60 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+   378→                      : 'border-border/50 hover:border-border'
+   379→                  }`}
+   380→                  onClick={() => setActivePersona(persona.id)}
+   381→                >
+   382→                  {isActive && (
+   383→                    <motion.div
+   384→                      layoutId="persona-glow"
+   385→                      className="absolute inset-0 bg-emerald-500/5"
+   386→                      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+   387→                    />
+   388→                  )}
+   389→                  <CardContent className="p-4 relative">
+   390→                    <div className="flex items-start gap-3">
+   391→                      <div
+   392→                        className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${
+   393→                          isActive
+   394→                            ? 'bg-emerald-500/15 text-emerald-400'
+   395→                            : 'bg-muted/60 text-muted-foreground'
+   396→                        }`}
+   397→                      >
+   398→                        {persona.icon}
+   399→                      </div>
+   400→                      <div className="flex-1 min-w-0">
+   401→                        <div className="flex items-center gap-2">
+   402→                          <span className="font-semibold text-sm">{persona.name}</span>
+   403→                          {isActive && (
+   404→                            <Badge className="text-[9px] h-4 px-1.5 bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30">
+   405→                              Active
+   406→                            </Badge>
+   407→                          )}
+   408→                        </div>
+   409→                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+   410→                          {persona.description}
+   411→                        </p>
+   412→                        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+   413→                          {persona.focus.map((f) => (
+   414→                            <Badge
+   415→                              key={f}
+   416→                              variant="secondary"
+   417→                              className="text-[9px] h-4 px-1.5 capitalize"
+   418→                            >
+   419→                              {f}
+   420→                            </Badge>
+   421→                          ))}
+   422→                        </div>
+   423→                      </div>
+   424→                    </div>
+   425→
+   426→                    {!isActive && (
+   427→                      <Button
+   428→                        size="sm"
+   429→                        variant="outline"
+   430→                        className="mt-3 w-full text-xs h-7"
+   431→                        onClick={(e) => {
+   432→                          e.stopPropagation();
+   433→                          setActivePersona(persona.id);
+   434→                        }}
+   435→                      >
+   436→                        Set Active
+   437→                      </Button>
+   438→                    )}
+   439→
+   440→                    {isActive && (
+   441→                      <div className="mt-3 p-2 rounded-md bg-emerald-500/5 border border-emerald-500/10">
+   442→                        <p className="text-[10px] text-muted-foreground font-mono leading-relaxed">
+   443→                          &quot;{persona.systemPrompt}&quot;
+   444→                        </p>
+   445→                      </div>
+   446→                    )}
+   447→                  </CardContent>
+   448→                </Card>
+   449→              </motion.div>
+   450→            );
+   451→          })}
+   452→        </div>
+   453→
+   454→        <Separator />
+   455→
+   456→        {/* Custom Persona Creator */}
+   457→        <div className="space-y-3">
+   458→          <div className="flex items-center gap-2">
+   459→            <Sparkles className="h-4 w-4 text-orange-400" />
+   460→            <h4 className="text-sm font-semibold">Create Custom Persona</h4>
+   461→          </div>
+   462→          <div className="space-y-2">
+   463→            <Input
+   464→              placeholder="Persona name..."
+   465→              value={newPersonaName}
+   466→              onChange={(e) => setNewPersonaName(e.target.value)}
+   467→              className="text-sm h-9"
+   468→            />
+   469→            <Textarea
+   470→              placeholder="System prompt — this shapes how the AI behaves when this persona is active..."
+   471→              value={newPersonaPrompt}
+   472→              onChange={(e) => setNewPersonaPrompt(e.target.value)}
+   473→              className="text-sm min-h-[80px] resize-none"
+   474→            />
+   475→            <Button
+   476→              size="sm"
+   477→              onClick={handleCreatePersona}
+   478→              disabled={!newPersonaName.trim() || !newPersonaPrompt.trim()}
+   479→              className="h-8 gap-1.5"
+   480→            >
+   481→              <Plus className="h-3.5 w-3.5" />
+   482→              Create Persona
+   483→            </Button>
+   484→          </div>
+   485→        </div>
+   486→      </div>
+   487→    );
+   488→  }
+   489→
+   490→  function renderRules() {
+   491→    const enabledCount = rules.filter((r) => r.enabled).length;
+   492→    return (
+   493→      <div className="space-y-4">
+   494→        <div className="flex items-center justify-between">
+   495→          <div>
+   496→            <h3 className="text-sm font-semibold">AI Rules</h3>
+   497→            <p className="text-xs text-muted-foreground mt-0.5">
+   498→              Custom rules that shape AI behavior — like .cursorrules for every interaction.
+   499→            </p>
+   500→          </div>
+   501→          <div className="flex items-center gap-2">
+   502→            <Badge variant="outline" className="text-[10px]">
+   503→              {enabledCount}/{rules.length} active
+   504→            </Badge>
+   505→            <Button
+   506→              size="sm"
+   507→              variant="outline"
+   508→              className="h-7 gap-1.5 text-xs"
+   509→              onClick={() => setShowAddRule(true)}
+   510→            >
+   511→              <Plus className="h-3 w-3" />
+   512→              Add Rule
+   513→            </Button>
+   514→          </div>
+   515→        </div>
+   516→
+   517→        <AnimatePresence>
+   518→          {showAddRule && (
+   519→            <motion.div
+   520→              initial={{ opacity: 0, height: 0 }}
+   521→              animate={{ opacity: 1, height: 'auto' }}
+   522→              exit={{ opacity: 0, height: 0 }}
+   523→              transition={{ duration: 0.2 }}
+   524→            >
+   525→              <Card className="border-emerald-500/30 bg-emerald-500/5">
+   526→                <CardContent className="p-4 space-y-2">
+   527→                  <Input
+   528→                    placeholder="Rule name..."
+   529→                    value={newRuleName}
+   530→                    onChange={(e) => setNewRuleName(e.target.value)}
+   531→                    className="text-sm h-8"
+   532→                    autoFocus
+   533→                  />
+   534→                  <Textarea
+   535→                    placeholder="Rule content — what the AI should always follow..."
+   536→                    value={newRuleContent}
+   537→                    onChange={(e) => setNewRuleContent(e.target.value)}
+   538→                    className="text-sm min-h-[60px] resize-none"
+   539→                  />
+   540→                  <div className="flex items-center gap-2">
+   541→                    <Button
+   542→                      size="sm"
+   543→                      className="h-7 gap-1.5 text-xs"
+   544→                      onClick={handleAddRule}
+   545→                      disabled={!newRuleName.trim() || !newRuleContent.trim()}
+   546→                    >
+   547→                      <Check className="h-3 w-3" />
+   548→                      Add
+   549→                    </Button>
+   550→                    <Button
+   551→                      size="sm"
+   552→                      variant="ghost"
+   553→                      className="h-7 text-xs"
+   554→                      onClick={() => {
+   555→                        setShowAddRule(false);
+   556→                        setNewRuleName('');
+   557→                        setNewRuleContent('');
+   558→                      }}
+   559→                    >
+   560→                      Cancel
+   561→                    </Button>
+   562→                  </div>
+   563→                </CardContent>
+   564→              </Card>
+   565→            </motion.div>
+   566→          )}
+   567→        </AnimatePresence>
+   568→
+   569→        <div className="space-y-2">
+   570→          {rules.map((rule, idx) => {
+   571→            const ruleIcons: React.ReactNode[] = [
+   572→              <Code key="code" className="h-3.5 w-3.5" />,
+   573→              <BookOpen key="book" className="h-3.5 w-3.5" />,
+   574→              <Shield key="shield" className="h-3.5 w-3.5" />,
+   575→              <TestTube key="test" className="h-3.5 w-3.5" />,
+   576→              <FileText key="file" className="h-3.5 w-3.5" />,
+   577→            ];
+   578→            return (
+   579→              <motion.div
+   580→                key={rule.id}
+   581→                initial={{ opacity: 0, x: -10 }}
+   582→                animate={{ opacity: 1, x: 0 }}
+   583→                transition={{ duration: 0.2, delay: idx * 0.03 }}
+   584→              >
+   585→                <Card
+   586→                  className={`transition-all ${
+   587→                    rule.enabled ? 'border-border/60' : 'border-border/30 opacity-60'
+   588→                  }`}
+   589→                >
+   590→                  <CardContent className="p-3">
+   591→                    <div className="flex items-start gap-3">
+   592→                      <div
+   593→                        className={`h-8 w-8 rounded-md flex items-center justify-center shrink-0 ${
+   594→                          rule.enabled
+   595→                            ? 'bg-emerald-500/10 text-emerald-400'
+   596→                            : 'bg-muted/40 text-muted-foreground'
+   597→                        }`}
+   598→                      >
+   599→                        {ruleIcons[idx % ruleIcons.length]}
+   600→                      </div>
+   601→                      <div className="flex-1 min-w-0">
+   602→                        <div className="flex items-center justify-between">
+   603→                          <span
+   604→                            className={`text-sm font-medium ${
+   605→                              rule.enabled ? 'text-foreground' : 'text-muted-foreground'
+   606→                            }`}
+   607→                          >
+   608→                            {rule.name}
+   609→                          </span>
+   610→                          <div className="flex items-center gap-2">
+   611→                            <Switch
+   612→                              checked={rule.enabled}
+   613→                              onCheckedChange={() => toggleRule(rule.id)}
+   614→                              className="scale-75"
+   615→                            />
+   616→                            <Button
+   617→                              size="icon"
+   618→                              variant="ghost"
+   619→                              className="h-6 w-6 text-muted-foreground hover:text-red-400"
+   620→                              onClick={() => deleteRule(rule.id)}
+   621→                            >
+   622→                              <Trash2 className="h-3 w-3" />
+   623→                            </Button>
+   624→                          </div>
+   625→                        </div>
+   626→                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+   627→                          {rule.content}
+   628→                        </p>
+   629→                      </div>
+   630→                    </div>
+   631→                  </CardContent>
+   632→                </Card>
+   633→              </motion.div>
+   634→            );
+   635→          })}
+   636→        </div>
+   637→      </div>
+   638→    );
+   639→  }
+   640→
+   641→  function renderKeybindings() {
+   642→    const categories: Keybinding['category'][] = [
+   643→      'Navigation',
+   644→      'Chat',
+   645→      'Editor',
+   646→      'Terminal',
+   647→      'Panels',
+   648→    ];
+   649→    const categoryIcons: Record<string, React.ReactNode> = {
+   650→      Navigation: <ChevronRight className="h-3.5 w-3.5 text-amber-400" />,
+   651→      Chat: <Monitor className="h-3.5 w-3.5 text-emerald-400" />,
+   652→      Editor: <Code className="h-3.5 w-3.5 text-cyan-400" />,
+   653→      Terminal: <Keyboard className="h-3.5 w-3.5 text-orange-400" />,
+   654→      Panels: <Settings2 className="h-3.5 w-3.5 text-rose-400" />,
+   655→    };
+   656→
+   657→    return (
+   658→      <div className="space-y-4">
+   659→        <div>
+   660→          <h3 className="text-sm font-semibold">Keybindings</h3>
+   661→          <p className="text-xs text-muted-foreground mt-0.5">
+   662→            Keyboard shortcuts for efficient navigation and control.
+   663→          </p>
+   664→        </div>
+   665→
+   666→        {categories.map((category) => {
+   667→          const bindings = KEYBINDINGS.filter((k) => k.category === category);
+   668→          if (bindings.length === 0) return null;
+   669→          return (
+   670→            <div key={category} className="space-y-2">
+   671→              <div className="flex items-center gap-2">
+   672→                {categoryIcons[category]}
+   673→                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+   674→                  {category}
+   675→                </span>
+   676→              </div>
+   677→              <div className="space-y-1">
+   678→                {bindings.map((binding) => (
+   679→                  <div
+   680→                    key={binding.action}
+   681→                    className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 transition-colors"
+   682→                  >
+   683→                    <div>
+   684→                      <span className="text-sm font-medium">{binding.action}</span>
+   685→                      <p className="text-[10px] text-muted-foreground">{binding.description}</p>
+   686→                    </div>
+   687→                    <div className="flex items-center gap-1">
+   688→                      {binding.keys.split('+').map((key, i) => (
+   689→                        <span key={i} className="flex items-center gap-1">
+   690→                          {i > 0 && <span className="text-[10px] text-muted-foreground">+</span>}
+   691→                          <kbd className="inline-flex h-6 min-w-[24px] items-center justify-center rounded border border-border bg-muted/60 px-1.5 text-[10px] font-mono text-foreground">
+   692→                            {key}
+   693→                          </kbd>
+   694→                        </span>
+   695→                      ))}
+   696→                    </div>
+   697→                  </div>
+   698→                ))}
+   699→              </div>
+   700→            </div>
+   701→          );
+   702→        })}
+   703→      </div>
+   704→    );
+   705→  }
+   706→
+   707→  function renderAppearance() {
+   708→    const themes: { id: AppearanceSettings['theme']; label: string; icon: React.ReactNode }[] = [
+   709→      { id: 'dark', label: 'Dark', icon: <Moon className="h-3.5 w-3.5" /> },
+   710→      { id: 'light', label: 'Light', icon: <Sun className="h-3.5 w-3.5" /> },
+   711→      { id: 'midnight', label: 'Midnight', icon: <Sparkles className="h-3.5 w-3.5" /> },
+   712→      { id: 'forest', label: 'Forest', icon: <TreePine className="h-3.5 w-3.5" /> },
+   713→    ];
+   714→
+   715→    const fonts: AppearanceSettings['fontFamily'][] = [
+   716→      'Geist',
+   717→      'JetBrains Mono',
+   718→      'Fira Code',
+   719→      'Cascadia Code',
+   720→    ];
+   721→
+   722→    return (
+   723→      <div className="space-y-5">
+   724→        <div>
+   725→          <h3 className="text-sm font-semibold">Appearance</h3>
+   726→          <p className="text-xs text-muted-foreground mt-0.5">
+   727→            Customize the look and feel of your workspace.
+   728→          </p>
+   729→        </div>
+   730→
+   731→        {/* Theme Selector */}
+   732→        <div className="space-y-2">
+   733→          <Label className="text-xs font-medium">Theme</Label>
+   734→          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+   735→            {themes.map((theme) => {
+   736→              const swatch = THEME_SWATCHES[theme.id];
+   737→              const isActive = appearance.theme === theme.id;
+   738→              return (
+   739→                <button
+   740→                  key={theme.id}
+   741→                  onClick={() => setAppearance((prev) => ({ ...prev, theme: theme.id }))}
+   742→                  className={`relative flex flex-col items-center gap-2 p-3 rounded-lg border transition-all ${
+   743→                    isActive
+   744→                      ? 'border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/20'
+   745→                      : 'border-border/50 hover:border-border bg-card/30'
+   746→                  }`}
+   747→                >
+   748→                  {/* Mini swatch */}
+   749→                  <div
+   750→                    className="h-10 w-full rounded-md overflow-hidden flex gap-0.5"
+   751→                    style={{ border: `1px solid ${swatch.border}` }}
+   752→                  >
+   753→                    <div className="flex-1" style={{ backgroundColor: swatch.bg }} />
+   754→                    <div className="w-2" style={{ backgroundColor: swatch.accent }} />
+   755→                    <div className="flex-1" style={{ backgroundColor: swatch.fg, opacity: 0.15 }} />
+   756→                  </div>
+   757→                  <div className="flex items-center gap-1.5">
+   758→                    {theme.icon}
+   759→                    <span className="text-xs font-medium">{theme.label}</span>
+   760→                  </div>
+   761→                  {isActive && (
+   762→                    <div className="absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-emerald-500 flex items-center justify-center">
+   763→                      <Check className="h-2.5 w-2.5 text-white" />
+   764→                    </div>
+   765→                  )}
+   766→                </button>
+   767→              );
+   768→            })}
+   769→          </div>
+   770→        </div>
+   771→
+   772→        {/* Font Family */}
+   773→        <div className="space-y-2">
+   774→          <Label className="text-xs font-medium">Font Family</Label>
+   775→          <div className="grid grid-cols-2 gap-2">
+   776→            {fonts.map((font) => {
+   777→              const isActive = appearance.fontFamily === font;
+   778→              return (
+   779→                <button
+   780→                  key={font}
+   781→                  onClick={() => setAppearance((prev) => ({ ...prev, fontFamily: font }))}
+   782→                  className={`flex items-center gap-2 p-2.5 rounded-lg border transition-all text-left ${
+   783→                    isActive
+   784→                      ? 'border-emerald-500/60 bg-emerald-500/5'
+   785→                      : 'border-border/50 hover:border-border bg-card/30'
+   786→                  }`}
+   787→                >
+   788→                  <Type className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+   789→                  <div className="flex-1 min-w-0">
+   790→                    <span
+   791→                      className={`text-xs font-medium block truncate ${isActive ? 'text-emerald-400' : ''}`}
+   792→                      style={{ fontFamily: font }}
+   793→                    >
+   794→                      {font}
+   795→                    </span>
+   796→                  </div>
+   797→                  {isActive && <Check className="h-3 w-3 text-emerald-400 shrink-0" />}
+   798→                </button>
+   799→              );
+   800→            })}
+   801→          </div>
+   802→        </div>
+   803→
+   804→        {/* Font Size */}
+   805→        <div className="space-y-2">
+   806→          <div className="flex items-center justify-between">
+   807→            <Label className="text-xs font-medium">Font Size</Label>
+   808→            <span className="text-xs text-muted-foreground font-mono">{appearance.fontSize}px</span>
+   809→          </div>
+   810→          <Slider
+   811→            value={[appearance.fontSize]}
+   812→            onValueChange={([val]) => setAppearance((prev) => ({ ...prev, fontSize: val }))}
+   813→            min={12}
+   814→            max={20}
+   815→            step={1}
+   816→            className="w-full"
+   817→          />
+   818→          <div className="flex justify-between text-[9px] text-muted-foreground">
+   819→            <span>12px</span>
+   820→            <span>20px</span>
+   821→          </div>
+   822→        </div>
+   823→
+   824→        {/* Editor Settings */}
+   825→        <div className="space-y-3">
+   826→          <Label className="text-xs font-medium">Editor Settings</Label>
+   827→
+   828→          <div className="grid grid-cols-3 gap-2">
+   829→            {([2, 4, 8] as const).map((size) => (
+   830→              <button
+   831→                key={size}
+   832→                onClick={() => setAppearance((prev) => ({ ...prev, tabSize: size }))}
+   833→                className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-xs font-medium transition-all ${
+   834→                  appearance.tabSize === size
+   835→                    ? 'border-emerald-500/60 bg-emerald-500/5 text-emerald-400'
+   836→                    : 'border-border/50 hover:border-border text-muted-foreground'
+   837→                }`}
+   838→              >
+   839→                <Hash className="h-3 w-3" />
+   840→                Tab: {size}
+   841→              </button>
+   842→            ))}
+   843→          </div>
+   844→
+   845→          <div className="space-y-2">
+   846→            {([
+   847→              { key: 'wordWrap' as const, label: 'Word Wrap', icon: <WrapText className="h-3.5 w-3.5" /> },
+   848→              { key: 'lineNumbers' as const, label: 'Line Numbers', icon: <Hash className="h-3.5 w-3.5" /> },
+   849→              { key: 'minimap' as const, label: 'Minimap', icon: <Map className="h-3.5 w-3.5" /> },
+   850→            ]).map((setting) => (
+   851→              <div
+   852→                key={setting.key}
+   853→                className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/20"
+   854→              >
+   855→                <div className="flex items-center gap-2">
+   856→                  <span className="text-muted-foreground">{setting.icon}</span>
+   857→                  <span className="text-xs font-medium">{setting.label}</span>
+   858→                </div>
+   859→                <Switch
+   860→                  checked={appearance[setting.key]}
+   861→                  onCheckedChange={(val) =>
+   862→                    setAppearance((prev) => ({ ...prev, [setting.key]: val }))
+   863→                  }
+   864→                  className="scale-75"
+   865→                />
+   866→              </div>
+   867→            ))}
+   868→          </div>
+   869→        </div>
+   870→
+   871→        {/* Accent Color */}
+   872→        <div className="space-y-2">
+   873→          <Label className="text-xs font-medium">Accent Color</Label>
+   874→          <div className="flex items-center gap-2">
+   875→            {ACCENT_COLORS.map((accent) => {
+   876→              const isActive = appearance.accentColor === accent.id;
+   877→              return (
+   878→                <button
+   879→                  key={accent.id}
+   880→                  onClick={() =>
+   881→                    setAppearance((prev) => ({ ...prev, accentColor: accent.id }))
+   882→                  }
+   883→                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+   884→                    isActive
+   885→                      ? 'border-transparent shadow-lg'
+   886→                      : 'border-border/50 hover:border-border'
+   887→                  }`}
+   888→                  style={
+   889→                    isActive
+   890→                      ? { backgroundColor: accent.color + '20', color: accent.color, borderColor: accent.color + '60' }
+   891→                      : {}
+   892→                  }
+   893→                >
+   894→                  <span
+   895→                    className="h-3 w-3 rounded-full shrink-0"
+   896→                    style={{ backgroundColor: accent.color }}
+   897→                  />
+   898→                  <span>{accent.label}</span>
+   899→                  {isActive && <Check className="h-3 w-3" />}
+   900→                </button>
+   901→              );
+   902→            })}
+   903→          </div>
+   904→        </div>
+   905→
+   906→        {/* Preview */}
+   907→        <div className="space-y-2">
+   908→          <Label className="text-xs font-medium">Preview</Label>
+   909→          <Card className="border-border/50">
+   910→            <CardContent className="p-4 space-y-2">
+   911→              <div className="flex items-center gap-2">
+   912→                <Save className="h-3.5 w-3.5 text-emerald-400" />
+   913→                <span
+   914→                  className="text-sm font-medium"
+   915→                  style={{
+   916→                    fontFamily: appearance.fontFamily,
+   917→                    fontSize: `${appearance.fontSize}px`,
+   918→                  }}
+   919→                >
+   920→                  function massiveNumber()
+   921→                </span>
+   922→              </div>
+   923→              <div
+   924→                className="font-mono text-xs leading-relaxed rounded-md p-3 bg-muted/30 border border-border/30"
+   925→                style={{
+   926→                  fontFamily: appearance.fontFamily,
+   927→                  fontSize: `${appearance.fontSize - 2}px`,
+   928→                  tabSize: appearance.tabSize,
+   929→                  whiteSpace: appearance.wordWrap ? 'pre-wrap' : 'pre',
+   930→                }}
+   931→              >
+   932→                <div className="flex">
+   933→                  {appearance.lineNumbers && (
+   934→                    <span className="text-muted-foreground/40 select-none mr-4 text-right w-6">
+   935→                      1{'\n'}2{'\n'}3
+   936→                    </span>
+   937→                  )}
+   938→                  <span>
+   939→                    <span className="text-rose-400">const</span>{' '}
+   940→                    <span className="text-cyan-300">config</span>{' '}
+   941→                    <span className="text-rose-400">=</span> {'{'}
+   942→                    {'\n'}
+   943→                    {'  '}
+   944→                    <span className="text-emerald-400">theme</span>:{' '}
+   945→                    <span className="text-amber-300">&apos;{appearance.theme}&apos;</span>,
+   946→                    {'\n'}
+   947→                    {'}'}
+   948→                  </span>
+   949→                </div>
+   950→              </div>
+   951→            </CardContent>
+   952→          </Card>
+   953→        </div>
+   954→      </div>
+   955→    );
+   956→  }
+   957→
+   958→  function renderExportImport() {
+   959→    const configSummary = {
+   960→      persona: personas.find((p) => p.id === activePersona)?.name || 'Unknown',
+   961→      rulesActive: rules.filter((r) => r.enabled).length,
+   962→      rulesTotal: rules.length,
+   963→      theme: appearance.theme,
+   964→      font: appearance.fontFamily,
+   965→      accent: appearance.accentColor,
+   966→    };
+   967→
+   968→    return (
+   969→      <div className="space-y-5">
+   970→        <div>
+   971→          <h3 className="text-sm font-semibold">Export / Import Settings</h3>
+   972→          <p className="text-xs text-muted-foreground mt-0.5">
+   973→            Backup, restore, or reset your configuration.
+   974→          </p>
+   975→        </div>
+   976→
+   977→        {/* Config Summary */}
+   978→        <Card className="border-border/50">
+   979→          <CardHeader className="pb-2 pt-4 px-4">
+   980→            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+   981→              Current Configuration
+   982→            </CardTitle>
+   983→          </CardHeader>
+   984→          <CardContent className="px-4 pb-4">
+   985→            <div className="grid grid-cols-2 gap-3">
+   986→              {[
+   987→                { label: 'Active Persona', value: configSummary.persona },
+   988→                { label: 'Rules', value: `${configSummary.rulesActive}/${configSummary.rulesTotal}` },
+   989→                { label: 'Theme', value: configSummary.theme },
+   990→                { label: 'Font', value: configSummary.font },
+   991→                { label: 'Accent', value: configSummary.accent },
+   992→                { label: 'Font Size', value: `${appearance.fontSize}px` },
+   993→              ].map((item) => (
+   994→                <div key={item.label} className="space-y-0.5">
+   995→                  <span className="text-[10px] text-muted-foreground">{item.label}</span>
+   996→                  <span className="text-sm font-medium block capitalize">{item.value}</span>
+   997→                </div>
+   998→              ))}
+   999→            </div>
+  1000→          </CardContent>
+  1001→        </Card>
+  1002→
+  1003→        {/* Actions */}
+  1004→        <div className="space-y-2">
+  1005→          <Button
+  1006→            className="w-full h-10 gap-2"
+  1007→            onClick={handleExport}
+  1008→          >
+  1009→            <Download className="h-4 w-4" />
+  1010→            Export Settings
+  1011→          </Button>
+  1012→
+  1013→          <Button
+  1014→            variant="outline"
+  1015→            className="w-full h-10 gap-2"
+  1016→            onClick={handleImport}
+  1017→          >
+  1018→            <Upload className="h-4 w-4" />
+  1019→            Import Settings
+  1020→          </Button>
+  1021→
+  1022→          <AlertDialog>
+  1023→            <AlertDialogTrigger asChild>
+  1024→              <Button
+  1025→                variant="outline"
+  1026→                className="w-full h-10 gap-2 text-red-400 border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+  1027→              >
+  1028→                <RotateCcw className="h-4 w-4" />
+  1029→                Reset to Defaults
+  1030→              </Button>
+  1031→            </AlertDialogTrigger>
+  1032→            <AlertDialogContent>
+  1033→              <AlertDialogHeader>
+  1034→                <AlertDialogTitle className="flex items-center gap-2">
+  1035→                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+  1036→                  Reset All Settings?
+  1037→                </AlertDialogTitle>
+  1038→                <AlertDialogDescription>
+  1039→                  This will revert all personas, rules, appearance settings, and keybindings
+  1040→                  back to their defaults. This action cannot be undone.
+  1041→                </AlertDialogDescription>
+  1042→              </AlertDialogHeader>
+  1043→              <AlertDialogFooter>
+  1044→                <AlertDialogCancel>Cancel</AlertDialogCancel>
+  1045→                <AlertDialogAction
+  1046→                  onClick={handleReset}
+  1047→                  className="bg-red-500 hover:bg-red-600 text-white"
+  1048→                >
+  1049→                  Reset Everything
+  1050→                </AlertDialogAction>
+  1051→              </AlertDialogFooter>
+  1052→            </AlertDialogContent>
+  1053→          </AlertDialog>
+  1054→        </div>
+  1055→
+  1056→        {/* JSON Preview */}
+  1057→        <div className="space-y-2">
+  1058→          <Label className="text-xs font-medium">Configuration JSON</Label>
+  1059→          <div className="rounded-lg border border-border/30 bg-muted/20 p-3 max-h-48 overflow-y-auto">
+  1060→            <pre className="text-[10px] font-mono text-muted-foreground leading-relaxed">
+  1061→              {JSON.stringify(
+  1062→                { activePersona, personas: personas.length, rules: rules.length, appearance },
+  1063→                null,
+  1064→                2
+  1065→              )}
+  1066→            </pre>
+  1067→          </div>
+  1068→        </div>
+  1069→      </div>
+  1070→    );
+  1071→  }
+  1072→
+  1073→  /* ───────── Render ───────── */
+  1074→
+  1075→  const tabContent: Record<TabId, () => React.ReactNode> = {
+  1076→    personas: renderPersonas,
+  1077→    rules: renderRules,
+  1078→    keybindings: renderKeybindings,
+  1079→    appearance: renderAppearance,
+  1080→    export: renderExportImport,
+  1081→  };
+  1082→
+  1083→  return (
+  1084→    <div className="flex h-full">
+  1085→      {/* Tab sidebar */}
+  1086→      <div className="w-44 border-r border-border/40 bg-card/20 shrink-0 flex flex-col py-2">
+  1087→        <div className="px-3 pb-2">
+  1088→          <h2 className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
+  1089→            Customize
+  1090→          </h2>
+  1091→        </div>
+  1092→        <nav className="flex flex-col gap-0.5 px-2">
+  1093→          {TABS.map((tab) => {
+  1094→            const isActive = activeTab === tab.id;
+  1095→            return (
+  1096→              <button
+  1097→                key={tab.id}
+  1098→                onClick={() => setActiveTab(tab.id)}
+  1099→                className={`flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-all ${
+  1100→                  isActive
+  1101→                    ? 'bg-emerald-500/10 text-emerald-400 font-medium'
+  1102→                    : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+  1103→                }`}
+  1104→              >
+  1105→                {tab.icon}
+  1106→                <span>{tab.label}</span>
+  1107→                {isActive && (
+  1108→                  <ChevronRight className="h-3 w-3 ml-auto text-emerald-400" />
+  1109→                )}
+  1110→              </button>
+  1111→            );
+  1112→          })}
+  1113→        </nav>
+  1114→      </div>
+  1115→
+  1116→      {/* Tab content */}
+  1117→      <ScrollArea className="flex-1">
+  1118→        <div className="p-5 max-w-2xl">
+  1119→          <AnimatePresence mode="wait">
+  1120→            <motion.div
+  1121→              key={activeTab}
+  1122→              initial={{ opacity: 0, x: 8 }}
+  1123→              animate={{ opacity: 1, x: 0 }}
+  1124→              exit={{ opacity: 0, x: -8 }}
+  1125→              transition={{ duration: 0.15 }}
+  1126→            >
+  1127→              {tabContent[activeTab]()}
+  1128→            </motion.div>
+  1129→          </AnimatePresence>
+  1130→        </div>
+  1131→      </ScrollArea>
+  1132→    </div>
+  1133→  );
+  1134→}
+  1135→

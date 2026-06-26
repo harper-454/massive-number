@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   GitBranch,
   GitCommit,
@@ -61,81 +61,6 @@ interface Commit {
 
 // ── Data ────────────────────────────────────────────────────────────────
 
-const BRANCHES = ['main', 'develop', 'feature/mcp-hub', 'fix/streaming', 'feature/spec-panel', 'release/v2.0'];
-
-const CHANGED_FILES: ChangedFile[] = [
-  {
-    name: 'page.tsx',
-    path: 'src/app/page.tsx',
-    status: 'modified',
-    additions: 12,
-    deletions: 3,
-    diff: [
-      { type: 'context', content: 'import { ChatPanel } from "@/components/nexus/chat-panel";', lineOld: 1, lineNew: 1 },
-      { type: 'remove', content: 'const oldLayout = true;', lineOld: 2 },
-      { type: 'add', content: 'const newLayout = false;', lineNew: 2 },
-      { type: 'add', content: 'import { MCPHub } from "@/components/nexus/mcp-hub";', lineNew: 3 },
-      { type: 'context', content: '', lineOld: 3, lineNew: 4 },
-      { type: 'context', content: 'export default function Home() {', lineOld: 4, lineNew: 5 },
-      { type: 'remove', content: '  return <OldComponent />;', lineOld: 5 },
-      { type: 'add', content: '  return (', lineNew: 6 },
-      { type: 'add', content: '    <div className="flex h-screen">', lineNew: 7 },
-      { type: 'add', content: '      <MCPHub />', lineNew: 8 },
-      { type: 'add', content: '    </div>', lineNew: 9 },
-      { type: 'add', content: '  );', lineNew: 10 },
-      { type: 'context', content: '}', lineOld: 6, lineNew: 11 },
-    ],
-  },
-  {
-    name: 'mcp-hub.tsx',
-    path: 'src/components/nexus/mcp-hub.tsx',
-    status: 'added',
-    additions: 245,
-    deletions: 0,
-    diff: [
-      { type: 'add', content: "'use client';", lineNew: 1 },
-      { type: 'add', content: '', lineNew: 2 },
-      { type: 'add', content: 'import { useState, useMemo } from "react";', lineNew: 3 },
-      { type: 'add', content: 'import { Plug, Search, Zap } from "lucide-react";', lineNew: 4 },
-      { type: 'add', content: '// MCP Hub component implementation...', lineNew: 5 },
-    ],
-  },
-  {
-    name: 'api.ts',
-    path: 'src/lib/api.ts',
-    status: 'modified',
-    additions: 8,
-    deletions: 2,
-    diff: [
-      { type: 'context', content: 'const API_BASE = "/api";', lineOld: 1, lineNew: 1 },
-      { type: 'remove', content: 'export const timeout = 5000;', lineOld: 2 },
-      { type: 'add', content: 'export const timeout = 10000;', lineNew: 2 },
-      { type: 'add', content: 'export const retryCount = 3;', lineNew: 3 },
-    ],
-  },
-  {
-    name: 'utils.ts',
-    path: 'src/lib/utils.ts',
-    status: 'deleted',
-    additions: 0,
-    deletions: 15,
-    diff: [
-      { type: 'remove', content: 'export function deprecatedUtil() {', lineOld: 1 },
-      { type: 'remove', content: '  // This function is no longer needed', lineOld: 2 },
-      { type: 'remove', content: '  return null;', lineOld: 3 },
-      { type: 'remove', content: '}', lineOld: 4 },
-    ],
-  },
-];
-
-const RECENT_COMMITS: Commit[] = [
-  { hash: 'a3f7c2d', message: 'feat: add MCP integration hub with 12 server types', date: '2 hours ago', additions: 245, deletions: 3 },
-  { hash: 'b8e1f4a', message: 'fix: resolve chat streaming connection issue', date: '5 hours ago', additions: 12, deletions: 8 },
-  { hash: 'c9d2e5b', message: 'feat: implement agent pipeline with visual steps', date: '1 day ago', additions: 189, deletions: 45 },
-  { hash: 'd1a3f6c', message: 'refactor: optimize model selector component', date: '2 days ago', additions: 34, deletions: 52 },
-  { hash: 'e4b5g7d', message: 'chore: update dependencies and config', date: '3 days ago', additions: 8, deletions: 8 },
-];
-
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<FileStatus, { label: string; color: string; bg: string }> = {
@@ -152,22 +77,60 @@ export function GitPanel() {
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [committed, setCommitted] = useState(false);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [changedFiles, setChangedFiles] = useState<ChangedFile[]>([]);
+  const [recentCommits, setRecentCommits] = useState<Commit[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalAdditions = CHANGED_FILES.reduce((s, f) => s + f.additions, 0);
-  const totalDeletions = CHANGED_FILES.reduce((s, f) => s + f.deletions, 0);
+  useEffect(() => {
+    fetch('/api/git')
+      .then(res => res.json())
+      .then(data => {
+        setBranches(data.branches || []);
+        setCurrentBranch(data.branch || 'main');
+        setChangedFiles((data.status || []).map((f: { file: string; status: string; additions: number; deletions: number }) => ({
+          name: f.file.split('/').pop() || f.file,
+          path: f.file,
+          status: f.status as FileStatus,
+          additions: f.additions,
+          deletions: f.deletions,
+          diff: [],
+        })));
+        setRecentCommits((data.recentCommits || []).map((c: { hash: string; message: string; date: string; additions: number; deletions: number }) => ({
+          hash: c.hash,
+          message: c.message,
+          date: c.date,
+          additions: c.additions,
+          deletions: c.deletions,
+        })));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const totalAdditions = changedFiles.reduce((s, f) => s + f.additions, 0);
+  const totalDeletions = changedFiles.reduce((s, f) => s + f.deletions, 0);
 
   const handleCommit = () => {
     if (!commitMessage.trim()) return;
     setIsCommitting(true);
-    setTimeout(() => {
-      setIsCommitting(false);
-      setCommitted(true);
-      setCommitMessage('');
-      setTimeout(() => setCommitted(false), 3000);
-    }, 1500);
+    fetch('/api/git', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: 'commit', args: { message: commitMessage } }),
+    })
+      .then(res => res.json())
+      .then(() => {
+        setIsCommitting(false);
+        setCommitted(true);
+        setCommitMessage('');
+        setChangedFiles([]);
+        setTimeout(() => setCommitted(false), 3000);
+      })
+      .catch(() => setIsCommitting(false));
   };
 
-  const activeDiff = CHANGED_FILES.find((f) => f.path === selectedFile);
+  const activeDiff = changedFiles.find((f) => f.path === selectedFile);
 
   return (
     <div className="flex flex-col h-full">
@@ -197,7 +160,7 @@ export function GitPanel() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {BRANCHES.map((b) => (
+              {branches.map((b) => (
                 <SelectItem key={b} value={b} className="text-[10px]">
                   {b}
                 </SelectItem>
@@ -214,7 +177,7 @@ export function GitPanel() {
         <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
           <span className="flex items-center gap-1">
             <File className="h-2.5 w-2.5" />
-            {CHANGED_FILES.length} files
+            {changedFiles.length} files
           </span>
           <span className="flex items-center gap-1 text-emerald-400">
             <Plus className="h-2.5 w-2.5" />
@@ -241,7 +204,13 @@ export function GitPanel() {
           </div>
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-2 space-y-0.5">
-              {CHANGED_FILES.map((file) => {
+              {changedFiles.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <GitBranch className="h-6 w-6 mx-auto mb-2 opacity-30" />
+                  <p className="text-[10px]">No changes to commit</p>
+                </div>
+              ) : null}
+              {changedFiles.map((file) => {
                 const statusCfg = STATUS_CONFIG[file.status];
                 const isSelected = selectedFile === file.path;
 
@@ -377,7 +346,12 @@ export function GitPanel() {
           </span>
         </div>
         <div className="px-3 pb-2 space-y-1">
-          {RECENT_COMMITS.map((commit) => (
+          {recentCommits.length === 0 ? (
+            <div className="py-4 text-center text-muted-foreground">
+              <p className="text-[10px]">No git activity yet</p>
+            </div>
+          ) : null}
+          {recentCommits.map((commit) => (
             <div
               key={commit.hash}
               className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted/30 transition-colors"

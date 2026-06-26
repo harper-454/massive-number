@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Bell,
   CheckCircle2,
@@ -29,6 +29,7 @@ import {
   Crown,
   Palette,
   Zap,
+  Activity,
   ChevronDown,
   ChevronRight,
   Filter,
@@ -81,146 +82,26 @@ interface QuickAction {
 }
 
 // ── Data ────────────────────────────────────────────────────────────────
+// Quick actions are config, not data — KEEP
 
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  {
-    id: 'notif-1',
-    type: 'info',
-    title: 'New model available',
-    description: 'Qwen3 235B is now available for use in chat and agent modes.',
-    timestamp: new Date(Date.now() - 2 * 60 * 1000),
-    read: false,
-  },
-  {
-    id: 'notif-2',
-    type: 'success',
-    title: 'MCP Server connected',
-    description: 'GitHub MCP server connected successfully. You can now use GitHub tools.',
-    timestamp: new Date(Date.now() - 5 * 60 * 1000),
-    read: false,
-  },
-  {
-    id: 'notif-3',
-    type: 'warning',
-    title: 'Token usage alert',
-    description: 'Token usage is at 80% of your daily limit. Consider optimizing your prompts.',
-    timestamp: new Date(Date.now() - 15 * 60 * 1000),
-    read: false,
-  },
-  {
-    id: 'notif-4',
-    type: 'error',
-    title: 'API connection failed',
-    description: 'Failed to connect to Anthropic API — check your API key in Settings → Providers.',
-    timestamp: new Date(Date.now() - 30 * 60 * 1000),
-    read: false,
-  },
-  {
-    id: 'notif-5',
-    type: 'info',
-    title: 'Platform update',
-    description: 'MASSIVE NUMBER v2.1 is live with improved agent execution and MCP support.',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    read: true,
-  },
-  {
-    id: 'notif-6',
-    type: 'success',
-    title: 'Agent completed',
-    description: 'Agent "Build auth system" completed successfully with 47 files generated.',
-    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
-    read: true,
-  },
-  {
-    id: 'notif-7',
-    type: 'info',
-    title: 'New integration available',
-    description: 'Slack MCP server is now available in the marketplace.',
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-    read: true,
-  },
-  {
-    id: 'notif-8',
-    type: 'warning',
-    title: 'Storage usage',
-    description: 'Project storage is at 75%. Consider archiving old projects.',
-    timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-    read: true,
-  },
-  {
-    id: 'notif-9',
-    type: 'success',
-    title: 'Deployment successful',
-    description: 'Your project was deployed to production successfully.',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    read: true,
-  },
-];
-
-const TIMELINE_ITEMS: TimelineItem[] = [
-  {
-    id: 'tl-1',
-    icon: MessageSquare,
-    iconColor: 'text-emerald-400',
-    action: 'Sent message in chat #1',
-    timestamp: new Date(Date.now() - 2 * 60 * 1000),
-  },
-  {
-    id: 'tl-2',
-    icon: Bot,
-    iconColor: 'text-amber-400',
-    action: "Launched agent 'Build auth system'",
-    timestamp: new Date(Date.now() - 5 * 60 * 1000),
-    entityLink: '#agents',
-  },
-  {
-    id: 'tl-3',
-    icon: Plug,
-    iconColor: 'text-teal-400',
-    action: 'Connected GitHub MCP server',
-    timestamp: new Date(Date.now() - 10 * 60 * 1000),
-    entityLink: '#mcp',
-  },
-  {
-    id: 'tl-4',
-    icon: FileText,
-    iconColor: 'text-orange-400',
-    action: "Generated spec 'Real-time Chat'",
-    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-    entityLink: '#spec',
-  },
-  {
-    id: 'tl-5',
-    icon: GitBranch,
-    iconColor: 'text-emerald-400',
-    action: 'Pushed 3 commits to main',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    entityLink: '#git',
-  },
-  {
-    id: 'tl-6',
-    icon: Bot,
-    iconColor: 'text-amber-400',
-    action: "Agent completed 'Build auth system'",
-    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
-    entityLink: '#agents',
-  },
-  {
-    id: 'tl-7',
-    icon: Package,
-    iconColor: 'text-orange-400',
-    action: 'Installed Security Scanner from marketplace',
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-    entityLink: '#marketplace',
-  },
-  {
-    id: 'tl-8',
-    icon: User,
-    iconColor: 'text-teal-400',
-    action: 'Shared session with alex@example.com',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-  },
-];
+// Timeline icon map
+const TIMELINE_ICON_MAP: Record<string, React.ElementType> = {
+  messagesquare: MessageSquare,
+  bot: Bot,
+  plug: Plug,
+  filetext: FileText,
+  gitbranch: GitBranch,
+  package: Package,
+  user: User,
+  collab_invite: User,
+  snippet_create: Code,
+  mcp_connect: Plug,
+  spec_generate: FileText,
+  agent_launch: Bot,
+  chat_message: MessageSquare,
+  marketplace_install: Package,
+  settings_update: Settings,
+};
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'qa-1', label: 'New Chat', icon: MessageSquare, navigateTo: 'chat', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25' },
@@ -266,11 +147,39 @@ function isWithinDays(date: Date, days: number): boolean {
 // ── Component ───────────────────────────────────────────────────────────
 
 export function NotificationsPanel() {
-  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notifFilter, setNotifFilter] = useState<NotificationFilter>('all');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [activeSection, setActiveSection] = useState<'notifications' | 'timeline' | 'actions'>('notifications');
   const [expandedTimeline, setExpandedTimeline] = useState<Set<string>>(new Set());
+  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/notifications').then(r => r.json()),
+      fetch('/api/activity').then(r => r.json()),
+    ])
+      .then(([notifData, activityData]) => {
+        setNotifications((notifData.notifications || []).map((n: { id: string; type: string; title: string; description: string; createdAt: string; read: boolean; actionUrl?: string }) => ({
+          id: n.id,
+          type: n.type as NotificationType,
+          title: n.title,
+          description: n.description,
+          timestamp: new Date(n.createdAt),
+          read: n.read,
+        })));
+        setTimelineItems((activityData.activities || []).map((a: { id: string; action: string; entity?: string; entityId?: string; description?: string; metadata?: string; createdAt: string }) => ({
+          id: a.id,
+          icon: TIMELINE_ICON_MAP[a.action?.toLowerCase()] || Activity,
+          iconColor: 'text-muted-foreground',
+          action: a.description || a.action,
+          timestamp: new Date(a.createdAt),
+        })));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   // Filtered notifications
   const filteredNotifications = useMemo(() => {
@@ -298,16 +207,16 @@ export function NotificationsPanel() {
   // Filtered timeline
   const filteredTimeline = useMemo(() => {
     if (dateFilter === 'today') {
-      return TIMELINE_ITEMS.filter((t) => isToday(t.timestamp));
+      return timelineItems.filter((t) => isToday(t.timestamp));
     }
     if (dateFilter === '7days') {
-      return TIMELINE_ITEMS.filter((t) => isWithinDays(t.timestamp, 7));
+      return timelineItems.filter((t) => isWithinDays(t.timestamp, 7));
     }
     if (dateFilter === '30days') {
-      return TIMELINE_ITEMS.filter((t) => isWithinDays(t.timestamp, 30));
+      return timelineItems.filter((t) => isWithinDays(t.timestamp, 30));
     }
-    return TIMELINE_ITEMS;
-  }, [dateFilter]);
+    return timelineItems;
+  }, [dateFilter, timelineItems]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

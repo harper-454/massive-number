@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Brain,
   Hammer,
@@ -107,81 +107,9 @@ interface AppearanceSettings {
 
 /* ───────── Preset Data ───────── */
 
-const PRESET_PERSONAS: Persona[] = [
-  {
-    id: 'planner',
-    name: 'Planner',
-    icon: <Brain className="h-5 w-5" />,
-    description: 'Strategic architect who breaks down requirements into clear specs before coding.',
-    systemPrompt: 'You are a strategic architect. Break down requirements into clear specs before coding.',
-    focus: ['specs', 'design', 'architecture'],
-    color: 'text-amber-400',
-    preset: true,
-  },
-  {
-    id: 'builder',
-    name: 'Builder',
-    icon: <Hammer className="h-5 w-5" />,
-    description: 'Rapid implementer who writes clean, efficient code following the plan.',
-    systemPrompt: 'You are a rapid implementer. Write clean, efficient code following the plan.',
-    focus: ['code', 'implementation', 'speed'],
-    color: 'text-emerald-400',
-    preset: true,
-  },
-  {
-    id: 'reviewer',
-    name: 'Reviewer',
-    icon: <SearchCheck className="h-5 w-5" />,
-    description: 'Strict code reviewer checking for bugs, security issues, performance, and style.',
-    systemPrompt: 'You are a strict code reviewer. Check for bugs, security issues, performance problems, and style violations.',
-    focus: ['review', 'security', 'quality'],
-    color: 'text-rose-400',
-    preset: true,
-  },
-  {
-    id: 'iterator',
-    name: 'Iterator',
-    icon: <RefreshCw className="h-5 w-5" />,
-    description: 'Optimization specialist who improves code for performance, readability, and maintainability.',
-    systemPrompt: 'You are an optimization specialist. Improve existing code for performance, readability, and maintainability.',
-    focus: ['refactor', 'optimize', 'polish'],
-    color: 'text-cyan-400',
-    preset: true,
-  },
-];
+const PRESET_PERSONAS: Persona[] = [];
 
-const PRESET_RULES: Rule[] = [
-  {
-    id: 'rule-ts-strict',
-    name: 'Use TypeScript strict mode',
-    content: 'Always use TypeScript with strict type checking. No any types.',
-    enabled: true,
-  },
-  {
-    id: 'rule-conventions',
-    name: 'Follow project conventions',
-    content: 'Follow the existing code patterns and naming conventions in the project.',
-    enabled: true,
-  },
-  {
-    id: 'rule-security',
-    name: 'Security first',
-    content: 'Never introduce SQL injection, XSS, or CSRF vulnerabilities. Always validate inputs.',
-    enabled: true,
-  },
-  {
-    id: 'rule-tests',
-    name: 'Write tests',
-    content: 'Generate unit tests for all new functions and components.',
-    enabled: false,
-  },
-  {
-    id: 'rule-docs',
-    name: 'Document everything',
-    content: 'Add JSDoc comments to all exported functions and types.',
-    enabled: true,
-  },
-];
+const PRESET_RULES: Rule[] = [];
 
 const KEYBINDINGS: Keybinding[] = [
   { action: 'Command Palette', keys: 'Ctrl+K', description: 'Open the command palette', category: 'Navigation' },
@@ -227,15 +155,44 @@ const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
 
 export function CustomizationHub() {
   const [activeTab, setActiveTab] = useState<TabId>('personas');
-  const [activePersona, setActivePersona] = useState<string>('builder');
-  const [personas, setPersonas] = useState<Persona[]>(PRESET_PERSONAS);
+  const [activePersona, setActivePersona] = useState<string>('');
+  const [personas, setPersonas] = useState<Persona[]>([]);
   const [newPersonaName, setNewPersonaName] = useState('');
   const [newPersonaPrompt, setNewPersonaPrompt] = useState('');
 
-  const [rules, setRules] = useState<Rule[]>(PRESET_RULES);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleContent, setNewRuleContent] = useState('');
   const [showAddRule, setShowAddRule] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/personas').then(r => r.json()),
+      fetch('/api/rules').then(r => r.json()),
+    ])
+      .then(([personasData, rulesData]) => {
+        setPersonas((personasData.personas || []).map((p: { id: string; name: string; icon: string; description: string; systemPrompt: string; focus: string[]; color: string; preset?: boolean }) => ({
+          id: p.id,
+          name: p.name,
+          icon: <Sparkles className="h-5 w-5" />,
+          description: p.description,
+          systemPrompt: p.systemPrompt,
+          focus: p.focus || ['custom'],
+          color: p.color || 'text-orange-400',
+          preset: p.preset,
+        })));
+        setRules((rulesData.rules || []).map((r: { id: string; name: string; content: string; enabled: boolean }) => ({
+          id: r.id,
+          name: r.name,
+          content: r.content,
+          enabled: r.enabled,
+        })));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const [appearance, setAppearance] = useState<AppearanceSettings>({
     theme: 'dark',
@@ -264,6 +221,11 @@ export function CustomizationHub() {
     setPersonas((prev) => [...prev, newPersona]);
     setNewPersonaName('');
     setNewPersonaPrompt('');
+    fetch('/api/personas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newPersona.name, description: newPersona.description, systemPrompt: newPersona.systemPrompt, focus: newPersona.focus, color: newPersona.color }),
+    }).catch(() => {});
   }, [newPersonaName, newPersonaPrompt]);
 
   /* ── Rule handlers ── */
@@ -277,6 +239,11 @@ export function CustomizationHub() {
       enabled: true,
     };
     setRules((prev) => [...prev, newRule]);
+    fetch('/api/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newRule.name, content: newRule.content, enabled: true }),
+    }).catch(() => {});
     setNewRuleName('');
     setNewRuleContent('');
     setShowAddRule(false);

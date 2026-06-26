@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   File,
   Folder,
@@ -35,51 +35,7 @@ export interface FileNode {
 }
 
 // ── Sample file tree ────────────────────────────────────────────────────────
-
-const SAMPLE_TREE: FileNode = {
-  name: 'my-project',
-  type: 'folder',
-  children: [
-    {
-      name: 'src',
-      type: 'folder',
-      children: [
-        {
-          name: 'app',
-          type: 'folder',
-          children: [
-            { name: 'page.tsx', type: 'file' },
-            { name: 'layout.tsx', type: 'file' },
-          ],
-        },
-        {
-          name: 'components',
-          type: 'folder',
-          children: [
-            { name: 'header.tsx', type: 'file' },
-            { name: 'sidebar.tsx', type: 'file' },
-          ],
-        },
-        {
-          name: 'lib',
-          type: 'folder',
-          children: [
-            { name: 'utils.ts', type: 'file' },
-            { name: 'db.ts', type: 'file' },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'prisma',
-      type: 'folder',
-      children: [{ name: 'schema.prisma', type: 'file' }],
-    },
-    { name: 'package.json', type: 'file' },
-    { name: 'tsconfig.json', type: 'file' },
-    { name: 'README.md', type: 'file' },
-  ],
-};
+// Tree comes from API now
 
 // ── File icon by extension ──────────────────────────────────────────────────
 
@@ -301,11 +257,34 @@ interface FileExplorerProps {
 }
 
 export default function FileExplorer({ onFileSelect }: FileExplorerProps) {
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
-    new Set(['my-project', 'my-project/src', 'my-project/src/app', 'my-project/src/components', 'my-project/src/lib', 'my-project/prisma'])
-  );
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [fileTree, setFileTree] = useState<FileNode | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/files?projectId=default')
+      .then(res => res.json())
+      .then(data => {
+        if (data.files && data.files.length > 0) {
+          // Build a simple tree from flat file list
+          const root: FileNode = { name: 'my-project', type: 'folder', children: [] };
+          const fileNodes: Record<string, FileNode> = {};
+          (data.files as Array<{ name: string; path: string; isDir: boolean; parentId: string | null }>).forEach((f) => {
+            fileNodes[f.path] = { name: f.name, type: f.isDir ? 'folder' : 'file', children: f.isDir ? [] : undefined };
+          });
+          // Simple flat listing under root
+          const folders = (data.files as Array<{ name: string; path: string; isDir: boolean }>).filter(f => f.isDir);
+          const files = (data.files as Array<{ name: string; path: string; isDir: boolean }>).filter(f => !f.isDir);
+          root.children = [...folders.map(f => fileNodes[f.path]), ...files.map(f => fileNodes[f.path])];
+          setFileTree(root);
+          setExpandedFolders(new Set(['my-project']));
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const toggleFolder = useCallback((path: string) => {
     setExpandedFolders((prev) => {
@@ -328,8 +307,9 @@ export default function FileExplorer({ onFileSelect }: FileExplorerProps) {
   );
 
   const filteredTree = useMemo(() => {
-    return filterTreeNode(SAMPLE_TREE, '', searchQuery);
-  }, [searchQuery]);
+    if (!fileTree) return null;
+    return filterTreeNode(fileTree, '', searchQuery);
+  }, [searchQuery, fileTree]);
 
   return (
     <div className="flex flex-col h-full w-full bg-[#0a0a0a] rounded-lg border border-[#262626] overflow-hidden">
@@ -378,14 +358,7 @@ export default function FileExplorer({ onFileSelect }: FileExplorerProps) {
               depth={0}
               expandedFolders={
                 searchQuery
-                  ? new Set([
-                      'my-project',
-                      'my-project/src',
-                      'my-project/src/app',
-                      'my-project/src/components',
-                      'my-project/src/lib',
-                      'my-project/prisma',
-                    ])
+                  ? new Set(['my-project'])
                   : expandedFolders
               }
               onToggleFolder={toggleFolder}
@@ -395,7 +368,7 @@ export default function FileExplorer({ onFileSelect }: FileExplorerProps) {
             />
           ) : (
             <div className="text-xs text-zinc-600 text-center py-4">
-              No files found
+              {loading ? 'Loading...' : 'No project loaded. Create a project to see files.'}
             </div>
           )}
         </div>

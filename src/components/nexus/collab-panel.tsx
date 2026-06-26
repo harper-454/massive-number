@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Users,
   Share2,
@@ -57,40 +57,48 @@ interface ChatMessage {
 
 // ── Data ────────────────────────────────────────────────────────────────
 
-const COLLABORATORS: Collaborator[] = [
-  { id: 'me', name: 'You', initials: 'YU', color: 'bg-emerald-500', status: 'online', currentFile: 'mcp-hub.tsx', cursorLine: 42 },
-  { id: 'alex', name: 'Alex Chen', initials: 'AC', color: 'bg-amber-500', status: 'online', currentFile: 'chat-panel.tsx', cursorLine: 87 },
-  { id: 'sam', name: 'Sam Rivera', initials: 'SR', color: 'bg-teal-500', status: 'online', currentFile: 'git-panel.tsx', cursorLine: 15 },
-  { id: 'jordan', name: 'Jordan Kim', initials: 'JK', color: 'bg-orange-500', status: 'away' },
-  { id: 'taylor', name: 'Taylor Wu', initials: 'TW', color: 'bg-rose-500', status: 'online', currentFile: 'spec-panel.tsx', cursorLine: 33 },
-  { id: 'morgan', name: 'Morgan Lee', initials: 'ML', color: 'bg-violet-500', status: 'offline' },
-];
-
-const INITIAL_ACTIVITIES: ActivityItem[] = [
-  { id: '1', userId: 'alex', action: 'edited', target: 'chat-panel.tsx line 87', time: '2m ago' },
-  { id: '2', userId: 'sam', action: 'pushed to', target: 'feature/mcp-hub', time: '5m ago' },
-  { id: '3', userId: 'taylor', action: 'created spec', target: 'Auth Module Redesign', time: '8m ago' },
-  { id: '4', userId: 'alex', action: 'resolved merge conflict in', target: 'api.ts', time: '15m ago' },
-  { id: '5', userId: 'jordan', action: 'commented on', target: 'PR #47', time: '20m ago' },
-  { id: '6', userId: 'sam', action: 'deployed to', target: 'staging', time: '30m ago' },
-];
-
-const INITIAL_CHAT: ChatMessage[] = [
-  { id: '1', userId: 'alex', message: 'Hey, I just pushed the chat streaming fix to the feature branch', time: '10:32 AM', isSelf: false },
-  { id: '2', userId: 'sam', message: 'Nice! The MCP hub is looking great. Should we integrate the git panel next?', time: '10:35 AM', isSelf: false },
-  { id: '3', userId: 'me', message: 'Yes, I\'m working on it now. The diff viewer is almost done.', time: '10:38 AM', isSelf: true },
-  { id: '4', userId: 'taylor', message: 'I just created a spec for the auth module redesign. Check it out!', time: '10:41 AM', isSelf: false },
-];
-
 // ── Component ───────────────────────────────────────────────────────────
 
 export function CollabPanel() {
-  const [shareLink] = useState('https://massive-number.dev/s/xK9mP2nQ');
+  const [shareLink, setShareLink] = useState('');
   const [copied, setCopied] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [activeTab, setActiveTab] = useState<'activity' | 'chat'>('activity');
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/collab').then(r => r.json()),
+      fetch('/api/activity').then(r => r.json()),
+    ])
+      .then(([collabData, activityData]) => {
+        setCollaborators((collabData.collaborators || []).map((c: { id: string; name: string; avatar: string; status: 'online' | 'away' | 'offline'; cursor: { file: string; line: number } | null; color: string }) => ({
+          id: c.id,
+          name: c.name,
+          initials: c.avatar,
+          color: `bg-${c.color?.replace('#', '') || 'emerald-500'}`,
+          status: c.status,
+          currentFile: c.cursor?.file,
+          cursorLine: c.cursor?.line,
+        })));
+        setActivities((activityData.activities || []).map((a: { id: string; action: string; target: string; timestamp: string }) => ({
+          id: a.id,
+          userId: '',
+          action: a.action,
+          target: a.target,
+          time: new Date(a.timestamp).toLocaleTimeString(),
+        })));
+        if (collabData.meta?.onlineCount !== undefined) {
+          // Use meta data if needed
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,6 +108,19 @@ export function CollabPanel() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleShareSession = useCallback(() => {
+    fetch('/api/collab', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'share-link' }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.shareLink) setShareLink(data.shareLink);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSendChat = () => {
     if (!chatInput.trim()) return;
@@ -114,10 +135,10 @@ export function CollabPanel() {
     setChatInput('');
   };
 
-  const onlineCount = COLLABORATORS.filter((c) => c.status === 'online').length;
-  const activeEditors = COLLABORATORS.filter((c) => c.status === 'online' && c.currentFile);
+  const onlineCount = collaborators.filter((c) => c.status === 'online').length;
+  const activeEditors = collaborators.filter((c) => c.status === 'online' && c.currentFile);
 
-  const getCollaborator = (id: string) => COLLABORATORS.find((c) => c.id === id);
+  const getCollaborator = (id: string) => collaborators.find((c) => c.id === id);
 
   const STATUS_DOT: Record<CollaboratorStatus, string> = {
     online: 'bg-emerald-400',
@@ -179,7 +200,13 @@ export function CollabPanel() {
       </div>
       <div className="shrink-0 px-3 pb-2">
         <div className="space-y-1">
-          {COLLABORATORS.filter((c) => c.status !== 'offline').map((collab) => (
+          {collaborators.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <Users className="h-6 w-6 mx-auto mb-2 opacity-30" />
+              <p className="text-[10px]">No collaborators. Share your session to invite others.</p>
+            </div>
+          ) : null}
+          {collaborators.filter((c) => c.status !== 'offline').map((collab) => (
             <div
               key={collab.id}
               className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted/30 transition-colors"
@@ -285,7 +312,12 @@ export function CollabPanel() {
         {activeTab === 'activity' ? (
           <ScrollArea className="h-full">
             <div className="p-3 space-y-2">
-              {INITIAL_ACTIVITIES.map((item, i) => {
+              {activities.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <p className="text-[10px]">No activity yet</p>
+                </div>
+              ) : null}
+              {activities.map((item, i) => {
                 const user = getCollaborator(item.userId);
                 return (
                   <motion.div

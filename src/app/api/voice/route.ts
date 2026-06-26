@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
 
-// Available TTS voices
+// Available TTS voices — static config, not demo data
 const TTS_VOICES = [
   { id: 'alloy', name: 'Alloy', description: 'Neutral and balanced', language: 'en-US' },
   { id: 'echo', name: 'Echo', description: 'Warm and conversational', language: 'en-US' },
@@ -18,17 +18,14 @@ export async function POST(request: NextRequest) {
     const { action } = body;
 
     if (action === 'tts' || !action) {
-      // Text-to-Speech
       return await handleTTS(body);
     }
 
     if (action === 'transcribe') {
-      // Speech-to-Text (ASR)
       return await handleTranscribe(body);
     }
 
     if (action === 'voices') {
-      // List available voices
       return NextResponse.json({
         voices: TTS_VOICES,
         default: 'alloy',
@@ -71,7 +68,6 @@ async function handleTTS(body: {
     );
   }
 
-  // Validate voice selection
   const selectedVoice = TTS_VOICES.find((v) => v.id === voice) || TTS_VOICES[0];
 
   try {
@@ -82,7 +78,6 @@ async function handleTTS(body: {
       speed,
     });
 
-    // If we got actual audio data back
     if (audioBuffer) {
       const audioData = typeof audioBuffer === 'string'
         ? audioBuffer
@@ -104,28 +99,14 @@ async function handleTTS(body: {
       });
     }
   } catch (ttsError) {
-    console.error('TTS SDK error, using fallback:', ttsError);
+    console.error('TTS SDK error:', ttsError);
   }
 
-  // Fallback: return simulated TTS response with realistic metadata
-  const duration = estimateDuration(text, speed);
-  const estimatedSize = Math.floor(duration * 24000 * 2); // 24kHz, 16-bit mono
-
-  return NextResponse.json({
-    success: true,
-    audio: null,
-    metadata: {
-      voice: selectedVoice.id,
-      voiceName: selectedVoice.name,
-      text,
-      duration,
-      format,
-      sampleRate: 24000,
-      channels: 1,
-      size: estimatedSize,
-    },
-    message: 'TTS processed. Audio metadata generated. In production, this returns base64-encoded audio data.',
-  });
+  // If SDK fails, return error — no fake audio data
+  return NextResponse.json(
+    { error: 'TTS service unavailable. Please try again later.' },
+    { status: 503 }
+  );
 }
 
 // Handle Speech-to-Text (Transcription)
@@ -172,31 +153,18 @@ async function handleTranscribe(body: {
       }
     }
   } catch (asrError) {
-    console.error('ASR SDK error, using fallback:', asrError);
+    console.error('ASR SDK error:', asrError);
   }
 
-  // Fallback: return simulated transcription
-  const simulatedTranscript = 'This is a simulated transcription. In production, the audio would be processed by the ASR service and return the actual spoken content.';
-
-  return NextResponse.json({
-    success: true,
-    transcript: simulatedTranscript,
-    language,
-    confidence: 0.92,
-    duration: estimateAudioDuration(audioData),
-    words: simulatedTranscript.split(' ').map((word, index) => ({
-      word,
-      start: index * 0.35,
-      end: (index + 1) * 0.35,
-      confidence: 0.88 + Math.random() * 0.12,
-    })),
-    message: 'ASR processed with fallback. In production, this returns actual transcription from audio data.',
-  });
+  // If SDK fails, return error — no fake transcription
+  return NextResponse.json(
+    { error: 'ASR service unavailable. Please try again later.' },
+    { status: 503 }
+  );
 }
 
 // Estimate speech duration in seconds
 function estimateDuration(text: string, speed: number): number {
-  // Average speaking rate: ~150 words per minute at speed 1.0
   const wordCount = text.split(/\s+/).length;
   const wordsPerMinute = 150 * speed;
   return Math.round((wordCount / wordsPerMinute) * 60 * 100) / 100;
@@ -204,8 +172,6 @@ function estimateDuration(text: string, speed: number): number {
 
 // Estimate audio duration from base64 data size
 function estimateAudioDuration(base64Audio: string): number {
-  // Rough estimate: base64 is ~4/3 the size of binary
-  // 24kHz 16-bit mono = 48000 bytes per second
   const binarySize = (base64Audio.length * 3) / 4;
   return Math.round((binarySize / 48000) * 100) / 100;
 }

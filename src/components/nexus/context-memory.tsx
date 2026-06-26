@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Brain,
   Database,
@@ -134,119 +134,6 @@ const CATEGORY_CONFIG: Record<MemoryCategory, { label: string; color: string; bg
 
 /* ───────── Sample Data ───────── */
 
-const SAMPLE_MEMORIES: MemoryEntry[] = [
-  {
-    id: 'mem-1',
-    category: 'codebase',
-    content: 'Project uses Next.js 16 with App Router and TypeScript strict mode',
-    source: 'Chat #12 — Project Setup',
-    date: '2026-06-24',
-  },
-  {
-    id: 'mem-2',
-    category: 'preference',
-    content: 'User prefers functional components over class components',
-    source: 'Chat #8 — Component Architecture',
-    date: '2026-06-23',
-  },
-  {
-    id: 'mem-3',
-    category: 'decision',
-    content: 'Using Prisma ORM with SQLite for data layer',
-    source: 'Chat #5 — Database Design',
-    date: '2026-06-22',
-  },
-  {
-    id: 'mem-4',
-    category: 'error',
-    content: 'Next.js 16 requires dynamic route params to be awaited',
-    source: 'Chat #15 — Bug Fix',
-    date: '2026-06-24',
-  },
-  {
-    id: 'mem-5',
-    category: 'style',
-    content: 'Use Tailwind CSS utility classes, avoid inline styles',
-    source: 'Chat #3 — Styling Guide',
-    date: '2026-06-21',
-  },
-];
-
-const SAMPLE_INDEXED_FILES: IndexedFile[] = [
-  { path: 'src/app/page.tsx', language: 'TypeScript', lastIndexed: '2026-06-24T14:30', relevance: 95 },
-  { path: 'prisma/schema.prisma', language: 'Prisma', lastIndexed: '2026-06-24T13:15', relevance: 88 },
-  { path: 'src/stores/chat-store.ts', language: 'TypeScript', lastIndexed: '2026-06-24T12:00', relevance: 82 },
-  { path: 'src/components/nexus/chat-panel.tsx', language: 'TSX', lastIndexed: '2026-06-24T11:45', relevance: 79 },
-  { path: 'src/lib/db.ts', language: 'TypeScript', lastIndexed: '2026-06-23T16:20', relevance: 71 },
-  { path: 'src/stores/model-store.ts', language: 'TypeScript', lastIndexed: '2026-06-23T15:00', relevance: 68 },
-];
-
-const SAMPLE_KNOWLEDGE: KnowledgeEntry[] = [
-  {
-    id: 'know-1',
-    topic: 'architecture',
-    content: 'Full-stack Next.js 16 app with Prisma ORM, Zustand state management, and socket.io for real-time features',
-  },
-  {
-    id: 'know-2',
-    topic: 'api-pattern',
-    content: 'All API routes follow REST conventions with proper error handling and TypeScript types',
-  },
-  {
-    id: 'know-3',
-    topic: 'styling',
-    content: 'Tailwind CSS 4 with shadcn/ui components. Emerald/teal accent system. Dark theme by default.',
-  },
-  {
-    id: 'know-4',
-    topic: 'deployment',
-    content: 'Bun runtime for both Next.js and mini-services. SQLite for persistence. Caddy gateway for port routing.',
-  },
-];
-
-const SAMPLE_SESSIONS: SessionEntry[] = [
-  {
-    id: 'session-1',
-    date: '2026-06-24 14:30',
-    duration: '1h 23m',
-    messages: 47,
-    models: ['gpt-4o', 'claude-sonnet'],
-    tokens: 24500,
-    cost: 1.23,
-    summary: 'Built the customization hub and context memory panels. Integrated with existing store architecture.',
-  },
-  {
-    id: 'session-2',
-    date: '2026-06-24 10:15',
-    duration: '45m',
-    messages: 22,
-    models: ['gpt-4o'],
-    tokens: 12800,
-    cost: 0.64,
-    summary: 'Debugged WebSocket connection issues. Added polling fallback for gateway routing.',
-  },
-  {
-    id: 'session-3',
-    date: '2026-06-23 16:00',
-    duration: '2h 10m',
-    messages: 68,
-    models: ['claude-sonnet', 'deepseek-r1'],
-    tokens: 41200,
-    cost: 2.08,
-    summary: 'Implemented the agent execution pipeline with 6-step workflow and real-time streaming.',
-  },
-  {
-    id: 'session-4',
-    date: '2026-06-23 11:30',
-    duration: '30m',
-    messages: 15,
-    models: ['gpt-4o'],
-    tokens: 7200,
-    cost: 0.36,
-    summary: 'Set up Prisma schema and initial database migration. Created 8 API routes.',
-  },
-];
-
 /* ───────── Section Config ───────── */
 
 type SectionId = 'memory' | 'codebase' | 'knowledge' | 'sessions';
@@ -262,10 +149,48 @@ const SECTIONS: { id: SectionId; label: string; icon: React.ReactNode; descripti
 
 export function ContextMemory() {
   const [activeSection, setActiveSection] = useState<SectionId>('memory');
-  const [memories, setMemories] = useState<MemoryEntry[]>(SAMPLE_MEMORIES);
-  const [indexedFiles, setIndexedFiles] = useState<IndexedFile[]>(SAMPLE_INDEXED_FILES);
-  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>(SAMPLE_KNOWLEDGE);
-  const [sessions] = useState<SessionEntry[]>(SAMPLE_SESSIONS);
+  const [memories, setMemories] = useState<MemoryEntry[]>([]);
+  const [indexedFiles, setIndexedFiles] = useState<IndexedFile[]>([]);
+  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
+  const [sessions, setSessions] = useState<SessionEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/memory').then(r => r.json()),
+      fetch('/api/context').then(r => r.json()),
+      fetch('/api/context?type=knowledge').then(r => r.json()),
+      fetch('/api/chat?limit=10').then(r => r.json()),
+    ])
+      .then(([memData, ctxData, knowData, chatData]) => {
+        setMemories((memData.memories || []).map((m: { id: string; category: string; content: string; source: string; date: string }) => ({
+          id: m.id, category: m.category as MemoryCategory, content: m.content, source: m.source, date: m.date,
+        })));
+        setIndexedFiles((ctxData.files || []).map((f: { path: string; language: string; lastIndexed: string; relevance: number }) => ({
+          path: f.path, language: f.language, lastIndexed: f.lastIndexed, relevance: f.relevance,
+        })));
+        setKnowledge((knowData.knowledge || []).map((k: { id: string; topic: string; content: string }) => ({
+          id: k.id, topic: k.topic, content: k.content,
+        })));
+        setSessions((chatData.chats || []).map((c: { id: string; updatedAt: string; messages: Array<{ role: string; content: string; tokens?: number; cost?: number; model?: string; duration?: number }> }) => {
+          const msgs = c.messages || [];
+          const totalTokens = msgs.reduce((s: number, m: { tokens?: number }) => s + (m.tokens || 0), 0);
+          const totalCost = msgs.reduce((s: number, m: { cost?: number }) => s + (m.cost || 0), 0);
+          const models = [...new Set(msgs.map((m: { model?: string }) => m.model).filter(Boolean))] as string[];
+          return {
+            id: c.id,
+            date: new Date(c.updatedAt).toLocaleString(),
+            duration: '',
+            messages: msgs.length,
+            models,
+            tokens: totalTokens,
+            cost: totalCost,
+          };
+        }));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   // Add memory dialog
   const [showAddMemory, setShowAddMemory] = useState(false);

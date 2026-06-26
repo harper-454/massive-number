@@ -1,0 +1,1366 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo } from 'react';
+     4→import {
+     5→  LayoutTemplate,
+     6→  Star,
+     7→  Copy,
+     8→  Check,
+     9→  ChevronDown,
+    10→  ChevronRight,
+    11→  Plus,
+    12→  Code,
+    13→  Bot,
+    14→  Server,
+    15→  ShoppingCart,
+    16→  BarChart3,
+    17→  Cpu,
+    18→  Building2,
+    19→  Smartphone,
+    20→  Trash2,
+    21→  Edit3,
+    22→  Save,
+    23→  X,
+    24→  Search,
+    25→  Sparkles,
+    26→  FileCode,
+    27→  Braces,
+    28→  Palette,
+    29→  Wifi,
+    30→  Shield,
+    31→  ArrowLeftRight,
+    32→  Database,
+    33→  MessageSquare,
+    34→  Zap,
+    35→  BookOpen,
+    36→} from 'lucide-react';
+    37→import { Card, CardContent } from '@/components/ui/card';
+    38→import { Badge } from '@/components/ui/badge';
+    39→import { Button } from '@/components/ui/button';
+    40→import { Input } from '@/components/ui/input';
+    41→import { Textarea } from '@/components/ui/textarea';
+    42→import { ScrollArea } from '@/components/ui/scroll-area';
+    43→import { Separator } from '@/components/ui/separator';
+    44→import {
+    45→  Select,
+    46→  SelectContent,
+    47→  SelectItem,
+    48→  SelectTrigger,
+    49→  SelectValue,
+    50→} from '@/components/ui/select';
+    51→import { motion, AnimatePresence } from 'framer-motion';
+    52→
+    53→// ── Types ───────────────────────────────────────────────────────────────
+    54→
+    55→interface ProjectTemplate {
+    56→  id: string;
+    57→  name: string;
+    58→  description: string;
+    59→  techStack: string[];
+    60→  rating: number;
+    61→  gradient: string;
+    62→  icon: React.ElementType;
+    63→}
+    64→
+    65→interface CodeSnippet {
+    66→  id: string;
+    67→  name: string;
+    68→  language: string;
+    69→  description: string;
+    70→  code: string;
+    71→  favorited: boolean;
+    72→}
+    73→
+    74→interface CustomSnippet {
+    75→  id: string;
+    76→  name: string;
+    77→  language: string;
+    78→  description: string;
+    79→  code: string;
+    80→  createdAt: Date;
+    81→}
+    82→
+    83→// ── Data ────────────────────────────────────────────────────────────────
+    84→
+    85→const PROJECT_TEMPLATES: ProjectTemplate[] = [
+    86→  {
+    87→    id: 'tpl-1',
+    88→    name: 'Next.js Full-Stack App',
+    89→    description: 'Complete full-stack starter with auth, API routes, and database.',
+    90→    techStack: ['Next.js', 'TypeScript', 'Prisma', 'Tailwind'],
+    91→    rating: 4.9,
+    92→    gradient: 'from-emerald-500 to-teal-600',
+    93→    icon: LayoutTemplate,
+    94→  },
+    95→  {
+    96→    id: 'tpl-2',
+    97→    name: 'AI Chat Application',
+    98→    description: 'Real-time chat with multi-model support, streaming responses, and conversation memory.',
+    99→    techStack: ['Next.js', 'Socket.io', 'z-ai-sdk', 'Zustand'],
+   100→    rating: 4.8,
+   101→    gradient: 'from-amber-500 to-orange-600',
+   102→    icon: Bot,
+   103→  },
+   104→  {
+   105→    id: 'tpl-3',
+   106→    name: 'REST API Server',
+   107→    description: 'Production-ready REST API with validation, auth middleware, and OpenAPI docs.',
+   108→    techStack: ['Next.js API', 'Zod', 'Prisma'],
+   109→    rating: 4.7,
+   110→    gradient: 'from-teal-500 to-emerald-600',
+   111→    icon: Server,
+   112→  },
+   113→  {
+   114→    id: 'tpl-4',
+   115→    name: 'E-Commerce Store',
+   116→    description: 'Full e-commerce with product catalog, cart, checkout, and Stripe payments.',
+   117→    techStack: ['Next.js', 'Stripe', 'Prisma', 'Tailwind'],
+   118→    rating: 4.6,
+   119→    gradient: 'from-orange-500 to-amber-600',
+   120→    icon: ShoppingCart,
+   121→  },
+   122→  {
+   123→    id: 'tpl-5',
+   124→    name: 'Dashboard Analytics',
+   125→    description: 'Data visualization dashboard with charts, filters, and real-time updates.',
+   126→    techStack: ['Next.js', 'Recharts', 'Prisma', 'Tailwind'],
+   127→    rating: 4.5,
+   128→    gradient: 'from-amber-400 to-orange-500',
+   129→    icon: BarChart3,
+   130→  },
+   131→  {
+   132→    id: 'tpl-6',
+   133→    name: 'AI Agent Framework',
+   134→    description: 'Build custom AI agents with tool calling, MCP integration, and step-by-step execution.',
+   135→    techStack: ['Next.js', 'z-ai-sdk', 'Socket.io'],
+   136→    rating: 4.8,
+   137→    gradient: 'from-emerald-400 to-teal-500',
+   138→    icon: Cpu,
+   139→  },
+   140→  {
+   141→    id: 'tpl-7',
+   142→    name: 'SaaS Starter',
+   143→    description: 'Multi-tenant SaaS with billing, teams, roles, and usage tracking.',
+   144→    techStack: ['Next.js', 'NextAuth', 'Prisma', 'Stripe'],
+   145→    rating: 4.7,
+   146→    gradient: 'from-teal-400 to-emerald-500',
+   147→    icon: Building2,
+   148→  },
+   149→  {
+   150→    id: 'tpl-8',
+   151→    name: 'Mobile-First PWA',
+   152→    description: 'Progressive web app with offline support, push notifications, and responsive design.',
+   153→    techStack: ['Next.js', 'Service Worker', 'Tailwind'],
+   154→    rating: 4.4,
+   155→    gradient: 'from-orange-400 to-amber-500',
+   156→    icon: Smartphone,
+   157→  },
+   158→];
+   159→
+   160→const CODE_SNIPPETS: CodeSnippet[] = [
+   161→  {
+   162→    id: 'snip-1',
+   163→    name: 'React Hook with API',
+   164→    language: 'TypeScript',
+   165→    description: 'Custom hook for data fetching with loading/error states',
+   166→    code: `import { useState, useEffect } from 'react';
+   167→
+   168→interface UseApiResult<T> {
+   169→  data: T | null;
+   170→  loading: boolean;
+   171→  error: string | null;
+   172→  refetch: () => void;
+   173→}
+   174→
+   175→export function useApi<T>(url: string): UseApiResult<T> {
+   176→  const [data, setData] = useState<T | null>(null);
+   177→  const [loading, setLoading] = useState(true);
+   178→  const [error, setError] = useState<string | null>(null);
+   179→
+   180→  const fetchData = async () => {
+   181→    setLoading(true);
+   182→    setError(null);
+   183→    try {
+   184→      const res = await fetch(url);
+   185→      if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+   186→      const json = await res.json();
+   187→      setData(json);
+   188→    } catch (err) {
+   189→      setError(err instanceof Error ? err.message : 'Unknown error');
+   190→    } finally {
+   191→      setLoading(false);
+   192→    }
+   193→  };
+   194→
+   195→  useEffect(() => { fetchData(); }, [url]);
+   196→  return { data, loading, error, refetch: fetchData };
+   197→}`,
+   198→    favorited: false,
+   199→  },
+   200→  {
+   201→    id: 'snip-2',
+   202→    name: 'Prisma Model Template',
+   203→    language: 'TypeScript',
+   204→    description: 'Standard Prisma model with timestamps and soft delete',
+   205→    code: `model BaseModel {
+   206→  id        String   @id @default(cuid())
+   207→  createdAt DateTime @default(now())
+   208→  updatedAt DateTime @updatedAt
+   209→  deletedAt DateTime? @map("deleted_at")
+   210→
+   211→  @@map("base_models")
+   212→}
+   213→
+   214→model User {
+   215→  id        String   @id @default(cuid())
+   216→  email     String   @unique
+   217→  name      String?
+   218→  avatar    String?
+   219→  role      Role     @default(USER)
+   220→  active    Boolean  @default(true)
+   221→  createdAt DateTime @default(now())
+   222→  updatedAt DateTime @updatedAt
+   223→  deletedAt DateTime?
+   224→
+   225→  posts     Post[]
+   226→  profile   Profile?
+   227→
+   228→  @@index([email])
+   229→  @@map("users")
+   230→}
+   231→
+   232→enum Role {
+   233→  USER
+   234→  ADMIN
+   235→  SUPER_ADMIN
+   236→}`,
+   237→    favorited: true,
+   238→  },
+   239→  {
+   240→    id: 'snip-3',
+   241→    name: 'API Route Handler',
+   242→    language: 'TypeScript',
+   243→    description: 'Next.js API route with validation and error handling',
+   244→    code: `import { NextRequest, NextResponse } from 'next/server';
+   245→import { z } from 'zod';
+   246→
+   247→const schema = z.object({
+   248→  name: z.string().min(1).max(100),
+   249→  email: z.string().email(),
+   250→  role: z.enum(['user', 'admin']).default('user'),
+   251→});
+   252→
+   253→export async function POST(request: NextRequest) {
+   254→  try {
+   255→    const body = await request.json();
+   256→    const validated = schema.parse(body);
+   257→
+   258→    // Your business logic here
+   259→    const result = await createResource(validated);
+   260→
+   261→    return NextResponse.json(
+   262→      { success: true, data: result },
+   263→      { status: 201 }
+   264→    );
+   265→  } catch (error) {
+   266→    if (error instanceof z.ZodError) {
+   267→      return NextResponse.json(
+   268→        { success: false, errors: error.flatten() },
+   269→        { status: 400 }
+   270→      );
+   271→    }
+   272→    console.error('API Error:', error);
+   273→    return NextResponse.json(
+   274→      { success: false, error: 'Internal server error' },
+   275→      { status: 500 }
+   276→    );
+   277→  }
+   278→}`,
+   279→    favorited: false,
+   280→  },
+   281→  {
+   282→    id: 'snip-4',
+   283→    name: 'Zustand Store',
+   284→    language: 'TypeScript',
+   285→    description: 'Zustand store template with TypeScript types',
+   286→    code: `import { create } from 'zustand';
+   287→import { devtools, persist } from 'zustand/middleware';
+   288→
+   289→interface Item {
+   290→  id: string;
+   291→  name: string;
+   292→  completed: boolean;
+   293→}
+   294→
+   295→interface StoreState {
+   296→  items: Item[];
+   297→  filter: 'all' | 'active' | 'completed';
+   298→  // Actions
+   299→  addItem: (name: string) => void;
+   300→  removeItem: (id: string) => void;
+   301→  toggleItem: (id: string) => void;
+   302→  setFilter: (filter: StoreState['filter']) => void;
+   303→}
+   304→
+   305→export const useStore = create<StoreState>()(
+   306→  devtools(
+   307→    persist(
+   308→      (set) => ({
+   309→        items: [],
+   310→        filter: 'all',
+   311→
+   312→        addItem: (name) => set((state) => ({
+   313→          items: [...state.items, {
+   314→            id: crypto.randomUUID(),
+   315→            name,
+   316→            completed: false,
+   317→          }],
+   318→        })),
+   319→
+   320→        removeItem: (id) => set((state) => ({
+   321→          items: state.items.filter((i) => i.id !== id),
+   322→        })),
+   323→
+   324→        toggleItem: (id) => set((state) => ({
+   325→          items: state.items.map((i) =>
+   326→            i.id === id ? { ...i, completed: !i.completed } : i
+   327→          ),
+   328→        })),
+   329→
+   330→        setFilter: (filter) => set({ filter }),
+   331→      }),
+   332→      { name: 'app-store' }
+   333→    )
+   334→  )
+   335→);`,
+   336→    favorited: false,
+   337→  },
+   338→  {
+   339→    id: 'snip-5',
+   340→    name: 'Glass Morphism Card',
+   341→    language: 'CSS',
+   342→    description: 'Frosted glass effect card with backdrop blur',
+   343→    code: `.glass-card {
+   344→  background: rgba(255, 255, 255, 0.05);
+   345→  backdrop-filter: blur(16px) saturate(180%);
+   346→  -webkit-backdrop-filter: blur(16px) saturate(180%);
+   347→  border: 1px solid rgba(255, 255, 255, 0.1);
+   348→  border-radius: 16px;
+   349→  box-shadow:
+   350→    0 8px 32px rgba(0, 0, 0, 0.2),
+   351→    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+   352→  transition: all 0.3s ease;
+   353→}
+   354→
+   355→.glass-card:hover {
+   356→  background: rgba(255, 255, 255, 0.08);
+   357→  border-color: rgba(255, 255, 255, 0.15);
+   358→  box-shadow:
+   359→    0 12px 40px rgba(0, 0, 0, 0.3),
+   360→    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+   361→  transform: translateY(-2px);
+   362→}
+   363→
+   364→/* Usage with Tailwind */
+   365→/* bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-lg */`,
+   366→    favorited: true,
+   367→  },
+   368→  {
+   369→    id: 'snip-6',
+   370→    name: 'WebSocket Hook',
+   371→    language: 'TypeScript',
+   372→    description: 'Custom hook for socket.io with auto-reconnect',
+   373→    code: `import { useEffect, useRef, useState, useCallback } from 'react';
+   374→import { io, Socket } from 'socket.io-client';
+   375→
+   376→interface UseSocketOptions {
+   377→  url: string;
+   378→  port?: number;
+   379→  autoConnect?: boolean;
+   380→  reconnection?: boolean;
+   381→  reconnectionAttempts?: number;
+   382→  reconnectionDelay?: number;
+   383→}
+   384→
+   385→interface UseSocketReturn {
+   386→  socket: Socket | null;
+   387→  connected: boolean;
+   388→  emit: (event: string, ...args: unknown[]) => void;
+   389→  on: (event: string, callback: (...args: unknown[]) => void) => void;
+   390→  off: (event: string, callback?: (...args: unknown[]) => void) => void;
+   391→}
+   392→
+   393→export function useSocket(options: UseSocketOptions): UseSocketReturn {
+   394→  const {
+   395→    url,
+   396→    port,
+   397→    autoConnect = true,
+   398→    reconnection = true,
+   399→    reconnectionAttempts = 5,
+   400→    reconnectionDelay = 1000,
+   401→  } = options;
+   402→
+   403→  const socketRef = useRef<Socket | null>(null);
+   404→  const [connected, setConnected] = useState(false);
+   405→
+   406→  useEffect(() => {
+   407→    const socketUrl = port
+   408→      ? \`\${url}?XTransformPort=\${port}\`
+   409→      : url;
+   410→
+   411→    const socket = io(socketUrl, {
+   412→      autoConnect,
+   413→      reconnection,
+   414→      reconnectionAttempts,
+   415→      reconnectionDelay,
+   416→      transports: ['websocket', 'polling'],
+   417→    });
+   418→
+   419→    socket.on('connect', () => setConnected(true));
+   420→    socket.on('disconnect', () => setConnected(false));
+   421→
+   422→    socketRef.current = socket;
+   423→
+   424→    return () => {
+   425→      socket.disconnect();
+   426→    };
+   427→  }, [url, port, autoConnect, reconnection, reconnectionAttempts, reconnectionDelay]);
+   428→
+   429→  const emit = useCallback((event: string, ...args: unknown[]) => {
+   430→    socketRef.current?.emit(event, ...args);
+   431→  }, []);
+   432→
+   433→  const on = useCallback((event: string, callback: (...args: unknown[]) => void) => {
+   434→    socketRef.current?.on(event, callback);
+   435→  }, []);
+   436→
+   437→  const off = useCallback((event: string, callback?: (...args: unknown[]) => void) => {
+   438→    socketRef.current?.off(event, callback);
+   439→  }, []);
+   440→
+   441→  return { socket: socketRef.current, connected, emit, on, off };
+   442→}`,
+   443→    favorited: false,
+   444→  },
+   445→  {
+   446→    id: 'snip-7',
+   447→    name: 'Auth Middleware',
+   448→    language: 'TypeScript',
+   449→    description: 'NextAuth session check middleware for API routes',
+   450→    code: `import { NextRequest, NextResponse } from 'next/server';
+   451→import { getServerSession } from 'next-auth';
+   452→
+   453→interface AuthenticatedRequest extends NextRequest {
+   454→  user?: {
+   455→    id: string;
+   456→    email: string;
+   457→    role: string;
+   458→  };
+   459→}
+   460→
+   461→export function withAuth(
+   462→  handler: (req: AuthenticatedRequest) => Promise<NextResponse>,
+   463→  options?: { requiredRole?: string[] }
+   464→) {
+   465→  return async (req: NextRequest) => {
+   466→    try {
+   467→      const session = await getServerSession();
+   468→
+   469→      if (!session?.user) {
+   470→        return NextResponse.json(
+   471→          { success: false, error: 'Authentication required' },
+   472→          { status: 401 }
+   473→        );
+   474→      }
+   475→
+   476→      // Role check
+   477→      if (options?.requiredRole?.length) {
+   478→        const userRole = (session.user as Record<string, unknown>).role as string;
+   479→        if (!options.requiredRole.includes(userRole)) {
+   480→          return NextResponse.json(
+   481→            { success: false, error: 'Insufficient permissions' },
+   482→            { status: 403 }
+   483→          );
+   484→        }
+   485→      }
+   486→
+   487→      // Attach user to request
+   488→      (req as AuthenticatedRequest).user = {
+   489→        id: (session.user as Record<string, unknown>).id as string,
+   490→        email: session.user.email ?? '',
+   491→        role: (session.user as Record<string, unknown>).role as string,
+   492→      };
+   493→
+   494→      return handler(req as AuthenticatedRequest);
+   495→    } catch (error) {
+   496→      console.error('Auth middleware error:', error);
+   497→      return NextResponse.json(
+   498→        { success: false, error: 'Internal server error' },
+   499→        { status: 500 }
+   500→      );
+   501→    }
+   502→  };
+   503→}`,
+   504→    favorited: false,
+   505→  },
+   506→  {
+   507→    id: 'snip-8',
+   508→    name: 'Pagination Component',
+   509→    language: 'TypeScript',
+   510→    description: 'Reusable pagination with page numbers and navigation',
+   511→    code: `import { Button } from '@/components/ui/button';
+   512→import { ChevronLeft, ChevronRight } from 'lucide-react';
+   513→
+   514→interface PaginationProps {
+   515→  currentPage: number;
+   516→  totalPages: number;
+   517→  onPageChange: (page: number) => void;
+   518→  siblingCount?: number;
+   519→}
+   520→
+   521→export function Pagination({
+   522→  currentPage,
+   523→  totalPages,
+   524→  onPageChange,
+   525→  siblingCount = 1,
+   526→}: PaginationProps) {
+   527→  const range = (start: number, end: number) =>
+   528→    Array.from({ length: end - start + 1 }, (_, i) => start + i);
+   529→
+   530→  const getPageNumbers = () => {
+   531→    const totalPageNumbers = siblingCount * 2 + 5;
+   532→
+   533→    if (totalPageNumbers >= totalPages) {
+   534→      return range(1, totalPages);
+   535→    }
+   536→
+   537→    const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
+   538→    const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
+   539→
+   540→    const showLeftDots = leftSiblingIndex > 2;
+   541→    const showRightDots = rightSiblingIndex < totalPages - 2;
+   542→
+   543→    if (!showLeftDots && showRightDots) {
+   544→      const leftItemCount = 3 + 2 * siblingCount;
+   545→      return [...range(1, leftItemCount), '...', totalPages];
+   546→    }
+   547→
+   548→    if (showLeftDots && !showRightDots) {
+   549→      const rightItemCount = 3 + 2 * siblingCount;
+   550→      return [1, '...', ...range(totalPages - rightItemCount + 1, totalPages)];
+   551→    }
+   552→
+   553→    return [1, '...', ...range(leftSiblingIndex, rightSiblingIndex), '...', totalPages];
+   554→  };
+   555→
+   556→  return (
+   557→    <div className="flex items-center gap-1">
+   558→      <Button
+   559→        variant="outline"
+   560→        size="icon"
+   561→        className="h-8 w-8"
+   562→        onClick={() => onPageChange(currentPage - 1)}
+   563→        disabled={currentPage <= 1}
+   564→      >
+   565→        <ChevronLeft className="h-4 w-4" />
+   566→      </Button>
+   567→      {getPageNumbers().map((page, idx) =>
+   568→        page === '...' ? (
+   569→          <span key={\`dot-\${idx}\`} className="px-2 text-muted-foreground">...</span>
+   570→        ) : (
+   571→          <Button
+   572→            key={page}
+   573→            variant={currentPage === page ? 'default' : 'outline'}
+   574→            size="icon"
+   575→            className="h-8 w-8"
+   576→            onClick={() => onPageChange(page as number)}
+   577→          >
+   578→            {page}
+   579→          </Button>
+   580→        )
+   581→      )}
+   582→      <Button
+   583→        variant="outline"
+   584→        size="icon"
+   585→        className="h-8 w-8"
+   586→        onClick={() => onPageChange(currentPage + 1)}
+   587→        disabled={currentPage >= totalPages}
+   588→      >
+   589→        <ChevronRight className="h-4 w-4" />
+   590→      </Button>
+   591→    </div>
+   592→  );
+   593→}`,
+   594→    favorited: false,
+   595→  },
+   596→  {
+   597→    id: 'snip-9',
+   598→    name: 'Database Migration',
+   599→    language: 'SQL',
+   600→    description: 'Prisma migration template with indexes and relations',
+   601→    code: `-- CreateEnum
+   602→ALTER TYPE "Role" ADD VALUE 'MODERATOR';
+   603→
+   604→-- CreateTable
+   605→CREATE TABLE "posts" (
+   606→    "id" TEXT NOT NULL,
+   607→    "title" TEXT NOT NULL,
+   608→    "slug" TEXT NOT NULL,
+   609→    "content" TEXT NOT NULL,
+   610→    "published" BOOLEAN NOT NULL DEFAULT false,
+   611→    "author_id" TEXT NOT NULL,
+   612→    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   613→    "updated_at" TIMESTAMP(3) NOT NULL,
+   614→    "deleted_at" TIMESTAMP(3),
+   615→
+   616→    CONSTRAINT "posts_pkey" PRIMARY KEY ("id")
+   617→);
+   618→
+   619→-- CreateTable
+   620→CREATE TABLE "comments" (
+   621→    "id" TEXT NOT NULL,
+   622→    "content" TEXT NOT NULL,
+   623→    "post_id" TEXT NOT NULL,
+   624→    "author_id" TEXT NOT NULL,
+   625→    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   626→    "updated_at" TIMESTAMP(3) NOT NULL,
+   627→
+   628→    CONSTRAINT "comments_pkey" PRIMARY KEY ("id")
+   629→);
+   630→
+   631→-- CreateIndex
+   632→CREATE UNIQUE INDEX "posts_slug_key" ON "posts"("slug");
+   633→CREATE INDEX "posts_author_id_idx" ON "posts"("author_id");
+   634→CREATE INDEX "posts_published_idx" ON "posts"("published");
+   635→CREATE INDEX "comments_post_id_idx" ON "comments"("post_id");
+   636→
+   637→-- AddForeignKey
+   638→ALTER TABLE "posts" ADD CONSTRAINT "posts_author_id_fkey"
+   639→  FOREIGN KEY ("author_id") REFERENCES "users"("id")
+   640→  ON DELETE CASCADE ON UPDATE CASCADE;
+   641→
+   642→ALTER TABLE "comments" ADD CONSTRAINT "comments_post_id_fkey"
+   643→  FOREIGN KEY ("post_id") REFERENCES "posts"("id")
+   644→  ON DELETE CASCADE ON UPDATE CASCADE;
+   645→
+   646→ALTER TABLE "comments" ADD CONSTRAINT "comments_author_id_fkey"
+   647→  FOREIGN KEY ("author_id") REFERENCES "users"("id")
+   648→  ON DELETE CASCADE ON UPDATE CASCADE;`,
+   649→    favorited: false,
+   650→  },
+   651→  {
+   652→    id: 'snip-10',
+   653→    name: 'AI Chat Component',
+   654→    language: 'TypeScript',
+   655→    description: 'Streaming chat component with multi-model support',
+   656→    code: `import { useState, useRef, useEffect } from 'react';
+   657→
+   658→interface Message {
+   659→  id: string;
+   660→  role: 'user' | 'assistant';
+   661→  content: string;
+   662→  model?: string;
+   663→  isStreaming?: boolean;
+   664→}
+   665→
+   666→interface ChatComponentProps {
+   667→  apiEndpoint?: string;
+   668→  model?: string;
+   669→  onModelChange?: (model: string) => void;
+   670→}
+   671→
+   672→export function useChatStream({ apiEndpoint = '/api/chat', model = 'gpt-4' }: ChatComponentProps) {
+   673→  const [messages, setMessages] = useState<Message[]>([]);
+   674→  const [isStreaming, setIsStreaming] = useState(false);
+   675→  const abortRef = useRef<AbortController | null>(null);
+   676→
+   677→  const sendMessage = async (content: string) => {
+   678→    const userMsg: Message = {
+   679→      id: \`msg-\${Date.now()}-user\`,
+   680→      role: 'user',
+   681→      content,
+   682→    };
+   683→
+   684→    const assistantMsgId = \`msg-\${Date.now()}-ai\`;
+   685→    const assistantMsg: Message = {
+   686→      id: assistantMsgId,
+   687→      role: 'assistant',
+   688→      content: '',
+   689→      model,
+   690→      isStreaming: true,
+   691→    };
+   692→
+   693→    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+   694→    setIsStreaming(true);
+   695→
+   696→    const controller = new AbortController();
+   697→    abortRef.current = controller;
+   698→
+   699→    try {
+   700→      const res = await fetch(apiEndpoint, {
+   701→        method: 'POST',
+   702→        headers: { 'Content-Type': 'application/json' },
+   703→        body: JSON.stringify({ messages: [...messages, userMsg], model }),
+   704→        signal: controller.signal,
+   705→      });
+   706→
+   707→      const reader = res.body?.getReader();
+   708→      const decoder = new TextDecoder();
+   709→      let accumulated = '';
+   710→
+   711→      while (reader) {
+   712→        const { done, value } = await reader.read();
+   713→        if (done) break;
+   714→
+   715→        accumulated += decoder.decode(value, { stream: true });
+   716→        setMessages((prev) =>
+   717→          prev.map((m) =>
+   718→            m.id === assistantMsgId
+   719→              ? { ...m, content: accumulated }
+   720→              : m
+   721→          )
+   722→        );
+   723→      }
+   724→
+   725→      setMessages((prev) =>
+   726→        prev.map((m) =>
+   727→          m.id === assistantMsgId
+   728→            ? { ...m, isStreaming: false }
+   729→            : m
+   730→        )
+   731→      );
+   732→    } catch (error) {
+   733→      if (!controller.signal.aborted) {
+   734→        setMessages((prev) =>
+   735→          prev.map((m) =>
+   736→            m.id === assistantMsgId
+   737→              ? { ...m, content: 'Error: Failed to get response', isStreaming: false }
+   738→              : m
+   739→          )
+   740→        );
+   741→      }
+   742→    } finally {
+   743→      setIsStreaming(false);
+   744→    }
+   745→  };
+   746→
+   747→  const stopStreaming = () => {
+   748→    abortRef.current?.abort();
+   749→    setIsStreaming(false);
+   750→  };
+   751→
+   752→  return { messages, isStreaming, sendMessage, stopStreaming };
+   753→}`,
+   754→    favorited: true,
+   755→  },
+   756→];
+   757→
+   758→const LANGUAGE_COLORS: Record<string, string> = {
+   759→  TypeScript: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+   760→  CSS: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+   761→  SQL: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
+   762→};
+   763→
+   764→const LANGUAGE_ICONS: Record<string, React.ElementType> = {
+   765→  TypeScript: Braces,
+   766→  CSS: Palette,
+   767→  SQL: Database,
+   768→};
+   769→
+   770→// ── Component ───────────────────────────────────────────────────────────
+   771→
+   772→export function TemplatesPanel() {
+   773→  const [activeSection, setActiveSection] = useState<'templates' | 'snippets' | 'custom'>('templates');
+   774→  const [search, setSearch] = useState('');
+   775→  const [expandedSnippet, setExpandedSnippet] = useState<string | null>(null);
+   776→  const [snippetFavorites, setSnippetFavorites] = useState<Record<string, boolean>>(() => {
+   777→    const initial: Record<string, boolean> = {};
+   778→    CODE_SNIPPETS.forEach((s) => { initial[s.id] = s.favorited; });
+   779→    return initial;
+   780→  });
+   781→  const [copiedId, setCopiedId] = useState<string | null>(null);
+   782→  const [customSnippets, setCustomSnippets] = useState<CustomSnippet[]>([]);
+   783→  const [showCreateForm, setShowCreateForm] = useState(false);
+   784→  const [editingId, setEditingId] = useState<string | null>(null);
+   785→  const [formData, setFormData] = useState({ name: '', language: 'TypeScript', description: '', code: '' });
+   786→
+   787→  // Filter templates
+   788→  const filteredTemplates = useMemo(() => {
+   789→    if (!search) return PROJECT_TEMPLATES;
+   790→    const q = search.toLowerCase();
+   791→    return PROJECT_TEMPLATES.filter(
+   792→      (t) =>
+   793→        t.name.toLowerCase().includes(q) ||
+   794→        t.description.toLowerCase().includes(q) ||
+   795→        t.techStack.some((s) => s.toLowerCase().includes(q))
+   796→    );
+   797→  }, [search]);
+   798→
+   799→  // Filter snippets
+   800→  const filteredSnippets = useMemo(() => {
+   801→    if (!search) return CODE_SNIPPETS;
+   802→    const q = search.toLowerCase();
+   803→    return CODE_SNIPPETS.filter(
+   804→      (s) =>
+   805→        s.name.toLowerCase().includes(q) ||
+   806→        s.description.toLowerCase().includes(q) ||
+   807→        s.language.toLowerCase().includes(q)
+   808→    );
+   809→  }, [search]);
+   810→
+   811→  const handleCopy = async (code: string, id: string) => {
+   812→    await navigator.clipboard.writeText(code);
+   813→    setCopiedId(id);
+   814→    setTimeout(() => setCopiedId(null), 2000);
+   815→  };
+   816→
+   817→  const toggleFavorite = (id: string) => {
+   818→    setSnippetFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
+   819→  };
+   820→
+   821→  const handleCreateSnippet = () => {
+   822→    if (!formData.name.trim() || !formData.code.trim()) return;
+   823→    const snippet: CustomSnippet = {
+   824→      id: `custom-${Date.now()}`,
+   825→      name: formData.name.trim(),
+   826→      language: formData.language,
+   827→      description: formData.description.trim(),
+   828→      code: formData.code,
+   829→      createdAt: new Date(),
+   830→    };
+   831→    setCustomSnippets((prev) => [snippet, ...prev]);
+   832→    setFormData({ name: '', language: 'TypeScript', description: '', code: '' });
+   833→    setShowCreateForm(false);
+   834→  };
+   835→
+   836→  const handleUpdateSnippet = () => {
+   837→    if (!editingId || !formData.name.trim() || !formData.code.trim()) return;
+   838→    setCustomSnippets((prev) =>
+   839→      prev.map((s) =>
+   840→        s.id === editingId
+   841→          ? { ...s, name: formData.name.trim(), language: formData.language, description: formData.description.trim(), code: formData.code }
+   842→          : s
+   843→      )
+   844→    );
+   845→    setEditingId(null);
+   846→    setFormData({ name: '', language: 'TypeScript', description: '', code: '' });
+   847→  };
+   848→
+   849→  const handleDeleteSnippet = (id: string) => {
+   850→    setCustomSnippets((prev) => prev.filter((s) => s.id !== id));
+   851→    if (editingId === id) {
+   852→      setEditingId(null);
+   853→      setFormData({ name: '', language: 'TypeScript', description: '', code: '' });
+   854→    }
+   855→  };
+   856→
+   857→  const handleEditSnippet = (snippet: CustomSnippet) => {
+   858→    setEditingId(snippet.id);
+   859→    setFormData({ name: snippet.name, language: snippet.language, description: snippet.description, code: snippet.code });
+   860→    setShowCreateForm(false);
+   861→  };
+   862→
+   863→  const renderStars = (rating: number) => {
+   864→    const full = Math.floor(rating);
+   865→    const half = rating % 1 >= 0.5;
+   866→    return (
+   867→      <div className="flex items-center gap-0.5">
+   868→        {Array.from({ length: 5 }).map((_, i) => (
+   869→          <Star
+   870→            key={i}
+   871→            className={`h-2.5 w-2.5 ${
+   872→              i < full
+   873→                ? 'text-amber-400 fill-amber-400'
+   874→                : i === full && half
+   875→                  ? 'text-amber-400 fill-amber-400/50'
+   876→                  : 'text-muted-foreground/30'
+   877→            }`}
+   878→          />
+   879→        ))}
+   880→        <span className="text-[9px] text-muted-foreground ml-0.5">{rating}</span>
+   881→      </div>
+   882→    );
+   883→  };
+   884→
+   885→  const SECTIONS = [
+   886→    { id: 'templates' as const, label: 'Templates', icon: LayoutTemplate },
+   887→    { id: 'snippets' as const, label: 'Snippets', icon: Code },
+   888→    { id: 'custom' as const, label: 'Custom', icon: Plus },
+   889→  ];
+   890→
+   891→  return (
+   892→    <div className="flex flex-col h-full">
+   893→      {/* Header */}
+   894→      <div className="shrink-0 px-4 pt-4 pb-2">
+   895→        <div className="flex items-center justify-between mb-3">
+   896→          <div className="flex items-center gap-2">
+   897→            <div className="h-7 w-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+   898→              <LayoutTemplate className="h-4 w-4 text-emerald-400" />
+   899→            </div>
+   900→            <div>
+   901→              <h2 className="text-sm font-semibold">Templates & Snippets</h2>
+   902→              <p className="text-[10px] text-muted-foreground">Starter projects & reusable code</p>
+   903→            </div>
+   904→          </div>
+   905→          <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-400 gap-1">
+   906→            <FileCode className="h-2.5 w-2.5" />
+   907→            {PROJECT_TEMPLATES.length + CODE_SNIPPETS.length + customSnippets.length} items
+   908→          </Badge>
+   909→        </div>
+   910→
+   911→        {/* Search */}
+   912→        <div className="relative mb-3">
+   913→          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+   914→          <Input
+   915→            value={search}
+   916→            onChange={(e) => setSearch(e.target.value)}
+   917→            placeholder="Search templates & snippets..."
+   918→            className="pl-8 h-8 text-xs bg-card/50"
+   919→          />
+   920→        </div>
+   921→
+   922→        {/* Section tabs */}
+   923→        <div className="flex gap-1">
+   924→          {SECTIONS.map((section) => {
+   925→            const Icon = section.icon;
+   926→            return (
+   927→              <button
+   928→                key={section.id}
+   929→                onClick={() => setActiveSection(section.id)}
+   930→                className={`px-3 py-1.5 rounded-md text-[10px] font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+   931→                  activeSection === section.id
+   932→                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+   933→                    : 'bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent'
+   934→                }`}
+   935→              >
+   936→                <Icon className="h-3 w-3" />
+   937→                {section.label}
+   938→              </button>
+   939→            );
+   940→          })}
+   941→        </div>
+   942→      </div>
+   943→
+   944→      <Separator className="shrink-0" />
+   945→
+   946→      {/* Content */}
+   947→      <ScrollArea className="flex-1 min-h-0">
+   948→        <div className="p-4 space-y-4">
+   949→          {/* Section 1: Project Templates */}
+   950→          {activeSection === 'templates' && (
+   951→            <div>
+   952→              <div className="flex items-center gap-1.5 mb-3">
+   953→                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+   954→                <span className="text-[10px] font-semibold uppercase tracking-wider">Project Templates</span>
+   955→                <span className="text-[9px] text-muted-foreground">({filteredTemplates.length})</span>
+   956→              </div>
+   957→              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   958→                {filteredTemplates.map((template, idx) => {
+   959→                  const Icon = template.icon;
+   960→                  return (
+   961→                    <motion.div
+   962→                      key={template.id}
+   963→                      initial={{ opacity: 0, y: 8 }}
+   964→                      animate={{ opacity: 1, y: 0 }}
+   965→                      transition={{ delay: idx * 0.04 }}
+   966→                      className="group rounded-lg border border-border/50 bg-card/50 overflow-hidden hover:border-border transition-all"
+   967→                    >
+   968→                      {/* Gradient header */}
+   969→                      <div className={`h-20 bg-gradient-to-br ${template.gradient} relative overflow-hidden`}>
+   970→                        <div className="absolute inset-0 bg-black/10" />
+   971→                        <div className="absolute inset-0 flex items-center justify-center">
+   972→                          <Icon className="h-10 w-10 text-white/30" />
+   973→                        </div>
+   974→                        {/* Rating overlay */}
+   975→                        <div className="absolute top-2 right-2">
+   976→                          <Badge className="text-[7px] h-4 px-1.5 bg-black/30 text-white border-0 backdrop-blur-sm gap-0.5">
+   977→                            <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+   978→                            {template.rating}
+   979→                          </Badge>
+   980→                        </div>
+   981→                      </div>
+   982→
+   983→                      {/* Content */}
+   984→                      <div className="p-3">
+   985→                        <h3 className="text-xs font-semibold mb-1 group-hover:text-foreground transition-colors">
+   986→                          {template.name}
+   987→                        </h3>
+   988→                        <p className="text-[9px] text-muted-foreground line-clamp-2 mb-2">
+   989→                          {template.description}
+   990→                        </p>
+   991→                        {/* Tech stack badges */}
+   992→                        <div className="flex flex-wrap gap-1 mb-2.5">
+   993→                          {template.techStack.map((tech) => (
+   994→                            <Badge
+   995→                              key={tech}
+   996→                              variant="outline"
+   997→                              className="text-[7px] h-4 px-1.5 bg-muted/50"
+   998→                            >
+   999→                              {tech}
+  1000→                            </Badge>
+  1001→                          ))}
+  1002→                        </div>
+  1003→                        <Button
+  1004→                          size="sm"
+  1005→                          className="w-full h-7 text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white"
+  1006→                        >
+  1007→                          <Zap className="h-3 w-3 mr-1" />
+  1008→                          Use Template
+  1009→                        </Button>
+  1010→                      </div>
+  1011→                    </motion.div>
+  1012→                  );
+  1013→                })}
+  1014→              </div>
+  1015→              {filteredTemplates.length === 0 && (
+  1016→                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+  1017→                  <Search className="h-8 w-8 mb-2 opacity-40" />
+  1018→                  <p className="text-xs">No templates match your search</p>
+  1019→                </div>
+  1020→              )}
+  1021→            </div>
+  1022→          )}
+  1023→
+  1024→          {/* Section 2: Code Snippets */}
+  1025→          {activeSection === 'snippets' && (
+  1026→            <div>
+  1027→              <div className="flex items-center gap-1.5 mb-3">
+  1028→                <Code className="h-3.5 w-3.5 text-emerald-400" />
+  1029→                <span className="text-[10px] font-semibold uppercase tracking-wider">Code Snippets</span>
+  1030→                <span className="text-[9px] text-muted-foreground">({filteredSnippets.length})</span>
+  1031→              </div>
+  1032→              <div className="space-y-2">
+  1033→                {filteredSnippets.map((snippet, idx) => {
+  1034→                  const isExpanded = expandedSnippet === snippet.id;
+  1035→                  const isFavorited = snippetFavorites[snippet.id] ?? false;
+  1036→                  const isCopied = copiedId === snippet.id;
+  1037→                  const LangIcon = LANGUAGE_ICONS[snippet.language] || Braces;
+  1038→                  const langColor = LANGUAGE_COLORS[snippet.language] || LANGUAGE_COLORS.TypeScript;
+  1039→
+  1040→                  return (
+  1041→                    <motion.div
+  1042→                      key={snippet.id}
+  1043→                      initial={{ opacity: 0, y: 6 }}
+  1044→                      animate={{ opacity: 1, y: 0 }}
+  1045→                      transition={{ delay: idx * 0.03 }}
+  1046→                      className="rounded-lg border border-border/50 bg-card/50 overflow-hidden hover:border-border/80 transition-all"
+  1047→                    >
+  1048→                      {/* Header row */}
+  1049→                      <div
+  1050→                        className="flex items-center gap-2 p-3 cursor-pointer"
+  1051→                        onClick={() => setExpandedSnippet(isExpanded ? null : snippet.id)}
+  1052→                      >
+  1053→                        <Badge className={`text-[7px] h-4 px-1.5 border gap-1 ${langColor}`} variant="outline">
+  1054→                          <LangIcon className="h-2.5 w-2.5" />
+  1055→                          {snippet.language}
+  1056→                        </Badge>
+  1057→                        <div className="flex-1 min-w-0">
+  1058→                          <div className="flex items-center gap-1.5">
+  1059→                            <span className="text-[10px] font-semibold truncate">{snippet.name}</span>
+  1060→                          </div>
+  1061→                          <p className="text-[9px] text-muted-foreground truncate">{snippet.description}</p>
+  1062→                        </div>
+  1063→                        <button
+  1064→                          onClick={(e) => { e.stopPropagation(); toggleFavorite(snippet.id); }}
+  1065→                          className="shrink-0 p-1 rounded hover:bg-muted/50 transition-colors"
+  1066→                          aria-label={isFavorited ? 'Unfavorite' : 'Favorite'}
+  1067→                        >
+  1068→                          <Star
+  1069→                            className={`h-3.5 w-3.5 transition-colors ${
+  1070→                              isFavorited
+  1071→                                ? 'text-amber-400 fill-amber-400'
+  1072→                                : 'text-muted-foreground/40 hover:text-muted-foreground'
+  1073→                            }`}
+  1074→                          />
+  1075→                        </button>
+  1076→                        {isExpanded ? (
+  1077→                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+  1078→                        ) : (
+  1079→                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+  1080→                        )}
+  1081→                      </div>
+  1082→
+  1083→                      {/* Expanded code */}
+  1084→                      <AnimatePresence>
+  1085→                        {isExpanded && (
+  1086→                          <motion.div
+  1087→                            initial={{ height: 0, opacity: 0 }}
+  1088→                            animate={{ height: 'auto', opacity: 1 }}
+  1089→                            exit={{ height: 0, opacity: 0 }}
+  1090→                            transition={{ duration: 0.2 }}
+  1091→                            className="overflow-hidden"
+  1092→                          >
+  1093→                            <div className="px-3 pb-3">
+  1094→                              <div className="relative rounded-md bg-[#1e1e1e] border border-border/30 overflow-hidden">
+  1095→                                <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b border-border/20">
+  1096→                                  <span className="text-[9px] font-mono text-muted-foreground">{snippet.language}</span>
+  1097→                                  <div className="flex items-center gap-1">
+  1098→                                    <button
+  1099→                                      onClick={() => handleCopy(snippet.code, snippet.id)}
+  1100→                                      className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors text-[9px]"
+  1101→                                    >
+  1102→                                      {isCopied ? (
+  1103→                                        <Check className="h-3 w-3 text-emerald-400" />
+  1104→                                      ) : (
+  1105→                                        <Copy className="h-3 w-3" />
+  1106→                                      )}
+  1107→                                      {isCopied ? 'Copied' : 'Copy'}
+  1108→                                    </button>
+  1109→                                  </div>
+  1110→                                </div>
+  1111→                                <pre className="p-3 text-[9px] leading-relaxed font-mono text-zinc-300 overflow-x-auto max-h-64 overflow-y-auto scrollbar-thin">
+  1112→                                  <code>{snippet.code}</code>
+  1113→                                </pre>
+  1114→                              </div>
+  1115→                              {/* Action buttons */}
+  1116→                              <div className="flex items-center gap-2 mt-2">
+  1117→                                <Button
+  1118→                                  size="sm"
+  1119→                                  variant="outline"
+  1120→                                  className="h-6 px-2.5 text-[9px] gap-1"
+  1121→                                  onClick={() => handleCopy(snippet.code, snippet.id)}
+  1122→                                >
+  1123→                                  {isCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+  1124→                                  {isCopied ? 'Copied!' : 'Copy Code'}
+  1125→                                </Button>
+  1126→                                <Button
+  1127→                                  size="sm"
+  1128→                                  className="h-6 px-2.5 text-[9px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+  1129→                                >
+  1130→                                  <Code className="h-3 w-3" />
+  1131→                                  Use in Editor
+  1132→                                </Button>
+  1133→                              </div>
+  1134→                            </div>
+  1135→                          </motion.div>
+  1136→                        )}
+  1137→                      </AnimatePresence>
+  1138→                    </motion.div>
+  1139→                  );
+  1140→                })}
+  1141→              </div>
+  1142→              {filteredSnippets.length === 0 && (
+  1143→                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+  1144→                  <Search className="h-8 w-8 mb-2 opacity-40" />
+  1145→                  <p className="text-xs">No snippets match your search</p>
+  1146→                </div>
+  1147→              )}
+  1148→            </div>
+  1149→          )}
+  1150→
+  1151→          {/* Section 3: Custom Snippets */}
+  1152→          {activeSection === 'custom' && (
+  1153→            <div>
+  1154→              <div className="flex items-center justify-between mb-3">
+  1155→                <div className="flex items-center gap-1.5">
+  1156→                  <BookOpen className="h-3.5 w-3.5 text-teal-400" />
+  1157→                  <span className="text-[10px] font-semibold uppercase tracking-wider">Custom Snippets</span>
+  1158→                  <span className="text-[9px] text-muted-foreground">({customSnippets.length})</span>
+  1159→                </div>
+  1160→                <Button
+  1161→                  size="sm"
+  1162→                  className="h-6 px-2.5 text-[9px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+  1163→                  onClick={() => { setShowCreateForm(!showCreateForm); setEditingId(null); setFormData({ name: '', language: 'TypeScript', description: '', code: '' }); }}
+  1164→                >
+  1165→                  <Plus className="h-3 w-3" />
+  1166→                  Create Snippet
+  1167→                </Button>
+  1168→              </div>
+  1169→
+  1170→              {/* Create / Edit Form */}
+  1171→              <AnimatePresence>
+  1172→                {(showCreateForm || editingId) && (
+  1173→                  <motion.div
+  1174→                    initial={{ opacity: 0, height: 0 }}
+  1175→                    animate={{ opacity: 1, height: 'auto' }}
+  1176→                    exit={{ opacity: 0, height: 0 }}
+  1177→                    transition={{ duration: 0.2 }}
+  1178→                    className="mb-4 overflow-hidden"
+  1179→                  >
+  1180→                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2.5">
+  1181→                      <div className="flex items-center justify-between">
+  1182→                        <span className="text-[10px] font-semibold text-emerald-400">
+  1183→                          {editingId ? 'Edit Snippet' : 'Create New Snippet'}
+  1184→                        </span>
+  1185→                        <button
+  1186→                          onClick={() => { setShowCreateForm(false); setEditingId(null); setFormData({ name: '', language: 'TypeScript', description: '', code: '' }); }}
+  1187→                          className="p-1 rounded hover:bg-muted/50 text-muted-foreground transition-colors"
+  1188→                        >
+  1189→                          <X className="h-3 w-3" />
+  1190→                        </button>
+  1191→                      </div>
+  1192→                      <Input
+  1193→                        value={formData.name}
+  1194→                        onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+  1195→                        placeholder="Snippet name..."
+  1196→                        className="h-7 text-[10px] bg-card/50"
+  1197→                      />
+  1198→                      <div className="flex gap-2">
+  1199→                        <Select value={formData.language} onValueChange={(v) => setFormData((p) => ({ ...p, language: v }))}>
+  1200→                          <SelectTrigger className="h-7 text-[10px] bg-card/50 w-36">
+  1201→                            <SelectValue />
+  1202→                          </SelectTrigger>
+  1203→                          <SelectContent>
+  1204→                            <SelectItem value="TypeScript">TypeScript</SelectItem>
+  1205→                            <SelectItem value="CSS">CSS</SelectItem>
+  1206→                            <SelectItem value="SQL">SQL</SelectItem>
+  1207→                          </SelectContent>
+  1208→                        </Select>
+  1209→                      </div>
+  1210→                      <Input
+  1211→                        value={formData.description}
+  1212→                        onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
+  1213→                        placeholder="Description..."
+  1214→                        className="h-7 text-[10px] bg-card/50"
+  1215→                      />
+  1216→                      <Textarea
+  1217→                        value={formData.code}
+  1218→                        onChange={(e) => setFormData((p) => ({ ...p, code: e.target.value }))}
+  1219→                        placeholder="Paste or write your code here..."
+  1220→                        className="min-h-[120px] text-[9px] font-mono bg-[#1e1e1e] border-border/30 resize-y"
+  1221→                        rows={6}
+  1222→                      />
+  1223→                      <div className="flex items-center gap-2">
+  1224→                        <Button
+  1225→                          size="sm"
+  1226→                          className="h-6 px-3 text-[9px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+  1227→                          onClick={editingId ? handleUpdateSnippet : handleCreateSnippet}
+  1228→                          disabled={!formData.name.trim() || !formData.code.trim()}
+  1229→                        >
+  1230→                          <Save className="h-3 w-3" />
+  1231→                          {editingId ? 'Update' : 'Save Snippet'}
+  1232→                        </Button>
+  1233→                        <Button
+  1234→                          size="sm"
+  1235→                          variant="ghost"
+  1236→                          className="h-6 px-3 text-[9px] text-muted-foreground"
+  1237→                          onClick={() => { setShowCreateForm(false); setEditingId(null); setFormData({ name: '', language: 'TypeScript', description: '', code: '' }); }}
+  1238→                        >
+  1239→                          Cancel
+  1240→                        </Button>
+  1241→                      </div>
+  1242→                    </div>
+  1243→                  </motion.div>
+  1244→                )}
+  1245→              </AnimatePresence>
+  1246→
+  1247→              {/* Custom snippets list */}
+  1248→              {customSnippets.length === 0 && !showCreateForm && !editingId ? (
+  1249→                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+  1250→                  <FileCode className="h-10 w-10 mb-3 opacity-30" />
+  1251→                  <p className="text-xs font-medium mb-1">No custom snippets yet</p>
+  1252→                  <p className="text-[10px] text-muted-foreground/60 mb-3">Create your first reusable code snippet</p>
+  1253→                  <Button
+  1254→                    size="sm"
+  1255→                    className="h-7 px-3 text-[9px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+  1256→                    onClick={() => setShowCreateForm(true)}
+  1257→                  >
+  1258→                    <Plus className="h-3 w-3" />
+  1259→                    Create Snippet
+  1260→                  </Button>
+  1261→                </div>
+  1262→              ) : (
+  1263→                <div className="space-y-2">
+  1264→                  {customSnippets.map((snippet, idx) => {
+  1265→                    const LangIcon = LANGUAGE_ICONS[snippet.language] || Braces;
+  1266→                    const langColor = LANGUAGE_COLORS[snippet.language] || LANGUAGE_COLORS.TypeScript;
+  1267→                    const isCopied = copiedId === snippet.id;
+  1268→
+  1269→                    return (
+  1270→                      <motion.div
+  1271→                        key={snippet.id}
+  1272→                        initial={{ opacity: 0, y: 6 }}
+  1273→                        animate={{ opacity: 1, y: 0 }}
+  1274→                        transition={{ delay: idx * 0.03 }}
+  1275→                        className="rounded-lg border border-border/50 bg-card/50 p-3 hover:border-border/80 transition-all"
+  1276→                      >
+  1277→                        <div className="flex items-start gap-2">
+  1278→                          <div className="flex-1 min-w-0">
+  1279→                            <div className="flex items-center gap-1.5 mb-1">
+  1280→                              <Badge className={`text-[7px] h-4 px-1.5 border gap-1 ${langColor}`} variant="outline">
+  1281→                                <LangIcon className="h-2.5 w-2.5" />
+  1282→                                {snippet.language}
+  1283→                              </Badge>
+  1284→                              <span className="text-[10px] font-semibold truncate">{snippet.name}</span>
+  1285→                            </div>
+  1286→                            {snippet.description && (
+  1287→                              <p className="text-[9px] text-muted-foreground line-clamp-1">{snippet.description}</p>
+  1288→                            )}
+  1289→                            <div className="mt-1.5 rounded bg-[#1e1e1e] border border-border/30 p-2 max-h-24 overflow-hidden relative">
+  1290→                              <pre className="text-[8px] font-mono text-zinc-400 overflow-hidden">
+  1291→                                <code>{snippet.code.slice(0, 200)}{snippet.code.length > 200 ? '...' : ''}</code>
+  1292→                              </pre>
+  1293→                            </div>
+  1294→                          </div>
+  1295→                          <div className="flex flex-col gap-1 shrink-0">
+  1296→                            <button
+  1297→                              onClick={() => handleCopy(snippet.code, snippet.id)}
+  1298→                              className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+  1299→                              aria-label="Copy snippet"
+  1300→                            >
+  1301→                              {isCopied ? (
+  1302→                                <Check className="h-3 w-3 text-emerald-400" />
+  1303→                              ) : (
+  1304→                                <Copy className="h-3 w-3" />
+  1305→                              )}
+  1306→                            </button>
+  1307→                            <button
+  1308→                              onClick={() => handleEditSnippet(snippet)}
+  1309→                              className="p-1.5 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+  1310→                              aria-label="Edit snippet"
+  1311→                            >
+  1312→                              <Edit3 className="h-3 w-3" />
+  1313→                            </button>
+  1314→                            <button
+  1315→                              onClick={() => handleDeleteSnippet(snippet.id)}
+  1316→                              className="p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+  1317→                              aria-label="Delete snippet"
+  1318→                            >
+  1319→                              <Trash2 className="h-3 w-3" />
+  1320→                            </button>
+  1321→                          </div>
+  1322→                        </div>
+  1323→                        <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/20">
+  1324→                          <span className="text-[8px] text-muted-foreground">
+  1325→                            {snippet.createdAt.toLocaleDateString()}
+  1326→                          </span>
+  1327→                          <Button
+  1328→                            size="sm"
+  1329→                            className="h-5 px-2 text-[8px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+  1330→                          >
+  1331→                            <Code className="h-2.5 w-2.5" />
+  1332→                            Use in Editor
+  1333→                          </Button>
+  1334→                        </div>
+  1335→                      </motion.div>
+  1336→                    );
+  1337→                  })}
+  1338→                </div>
+  1339→              )}
+  1340→            </div>
+  1341→          )}
+  1342→        </div>
+  1343→      </ScrollArea>
+  1344→
+  1345→      {/* Footer stats */}
+  1346→      <Separator className="shrink-0" />
+  1347→      <div className="shrink-0 px-4 py-2 flex items-center justify-between text-[10px] text-muted-foreground bg-card/30">
+  1348→        <div className="flex items-center gap-4">
+  1349→          <span className="flex items-center gap-1">
+  1350→            <LayoutTemplate className="h-2.5 w-2.5" />
+  1351→            {PROJECT_TEMPLATES.length} templates
+  1352→          </span>
+  1353→          <span className="flex items-center gap-1">
+  1354→            <Code className="h-2.5 w-2.5" />
+  1355→            {CODE_SNIPPETS.length} snippets
+  1356→          </span>
+  1357→        </div>
+  1358→        <span className="flex items-center gap-1">
+  1359→          <Star className="h-2.5 w-2.5 text-amber-400" />
+  1360→          {Object.values(snippetFavorites).filter(Boolean).length} favorited
+  1361→        </span>
+  1362→      </div>
+  1363→    </div>
+  1364→  );
+  1365→}
+  1366→

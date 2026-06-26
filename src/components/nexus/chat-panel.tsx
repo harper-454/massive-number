@@ -66,43 +66,13 @@ interface Persona {
   description: string;
 }
 
-const PERSONAS: Persona[] = [
-  {
-    id: 'default',
-    name: 'Default',
-    icon: <Bot className="h-3 w-3" />,
-    prefix: '',
-    description: 'General-purpose AI assistant',
-  },
-  {
-    id: 'planner',
-    name: 'Planner',
-    icon: <Sparkles className="h-3 w-3" />,
-    prefix: 'You are a strategic planner. Break down complex tasks into clear, actionable steps. Focus on architecture decisions, project structure, and implementation roadmaps. Always think about edge cases and dependencies.',
-    description: 'Strategic planning & architecture',
-  },
-  {
-    id: 'builder',
-    name: 'Builder',
-    icon: <Code className="h-3 w-3" />,
-    prefix: 'You are a code builder. Focus on writing clean, efficient, production-ready code. Prioritize working implementations over perfect designs. Include error handling, type safety, and follow best practices.',
-    description: 'Production-ready code implementation',
-  },
-  {
-    id: 'reviewer',
-    name: 'Reviewer',
-    icon: <Check className="h-3 w-3" />,
-    prefix: 'You are a code reviewer. Analyze code for bugs, performance issues, security vulnerabilities, and maintainability. Suggest specific improvements with explanations. Be thorough but constructive.',
-    description: 'Code review & quality analysis',
-  },
-  {
-    id: 'iterator',
-    name: 'Iterator',
-    icon: <RefreshCw className="h-3 w-3" />,
-    prefix: 'You are an iteration specialist. Take existing code and improve it incrementally. Focus on refactoring, optimization, and enhancing functionality step by step. Preserve existing behavior while improving code quality.',
-    description: 'Incremental improvement & refactoring',
-  },
-];
+const DEFAULT_PERSONA: Persona = {
+  id: 'default',
+  name: 'Default',
+  icon: <Bot className="h-3 w-3" />,
+  prefix: '',
+  description: 'General-purpose AI assistant',
+};
 
 /* ───────── Code block with copy ───────── */
 
@@ -412,7 +382,24 @@ export function ChatPanel() {
   const [webGrounding, setWebGrounding] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [activePersona, setActivePersona] = useState<string>('default');
+  const [personas, setPersonas] = useState<Persona[]>([DEFAULT_PERSONA]);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/personas')
+      .then(res => res.json())
+      .then(data => {
+        const fetched = (data.personas || []).map((p: { id: string; name: string; description: string; systemPrompt: string }) => ({
+          id: p.id,
+          name: p.name,
+          icon: <Bot className="h-3 w-3" />,
+          prefix: p.systemPrompt || '',
+          description: p.description || '',
+        }));
+        setPersonas([DEFAULT_PERSONA, ...fetched]);
+      })
+      .catch(() => {});
+  }, []);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamingMsgIdRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -424,7 +411,7 @@ export function ChatPanel() {
 
   const activeChat = chats.find((c) => c.id === activeChatId);
   const tokenCount = estimateTokens(input);
-  const currentPersona = PERSONAS.find((p) => p.id === activePersona) || PERSONAS[0];
+  const currentPersona = personas.find((p) => p.id === activePersona) || DEFAULT_PERSONA;
 
   // Auto-scroll
   useEffect(() => {
@@ -751,7 +738,7 @@ export function ChatPanel() {
                   <p className="text-[10px] font-medium text-muted-foreground px-2 py-1 uppercase tracking-wider">
                     AI Persona
                   </p>
-                  {PERSONAS.map((persona) => (
+                  {personas.map((persona) => (
                     <button
                       key={persona.id}
                       onClick={() => setActivePersona(persona.id)}

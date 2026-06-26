@@ -775,3 +775,90 @@ Work Log:
 - mn-final-templates.png
 - mn-final-competitive.png
 - mn-final-mcp.png
+
+---
+Task ID: 40
+Agent: Frontend Data Stripping Engineer
+Task: Strip ALL demo/mock/simulated data from UI components — production-ready data from APIs only
+
+Work Log:
+- Created 7 new API routes to replace hardcoded data:
+  - `/api/personas/route.ts` — GET/POST/PUT/DELETE for AI personas
+  - `/api/rules/route.ts` — GET/POST/PUT/DELETE for AI rules
+  - `/api/memory/route.ts` — GET/POST/DELETE for conversation memory
+  - `/api/context/route.ts` — GET/POST/DELETE for codebase context and project knowledge
+  - `/api/snippets/route.ts` — GET/POST/PUT/DELETE for code snippets
+  - `/api/notifications/route.ts` — GET/POST/PUT/DELETE for notifications
+  - `/api/activity/route.ts` — GET/POST for activity timeline
+
+- Modified 14 components to remove hardcoded data and add API fetches:
+  1. **mcp-hub.tsx** — Removed hardcoded SERVERS array (12 servers). Added useEffect to fetch from `/api/mcp`. Added ICON_MAP for API icon name mapping. Added empty state for no servers.
+  2. **git-panel.tsx** — Removed hardcoded BRANCHES, CHANGED_FILES, RECENT_COMMITS. Added useEffect to fetch from `/api/git`. Commit action now calls API. Empty states for no changes/no activity.
+  3. **collab-panel.tsx** — Removed hardcoded COLLABORATORS, INITIAL_ACTIVITIES, INITIAL_CHAT. Added useEffect to fetch from `/api/collab` and `/api/activity`. Share session button calls API. Empty state for no collaborators.
+  4. **spec-panel.tsx** — Removed hardcoded SAMPLE_SPECS. Added useEffect to fetch from `/api/specs`. Generate spec calls API instead of setTimeout. Status changes sync to API via PUT.
+  5. **marketplace-panel.tsx** — Removed hardcoded PLUGINS array (14 items). Added useEffect to fetch from `/api/marketplace`. Install/uninstall calls API. Featured flag computed from rating/downloads.
+  6. **customization-hub.tsx** — Removed hardcoded PRESET_PERSONAS (4) and PRESET_RULES (5). Added useEffect to fetch from `/api/personas` and `/api/rules`. Create persona/rule calls API. Keybindings and Appearance config kept as constants.
+  7. **context-memory.tsx** — Removed hardcoded SAMPLE_MEMORIES (5), SAMPLE_INDEXED_FILES (6), SAMPLE_KNOWLEDGE (4), SAMPLE_SESSIONS (4). Added useEffect to fetch from `/api/memory`, `/api/context`, `/api/context?type=knowledge`, and `/api/chat`.
+  8. **templates-panel.tsx** — Removed hardcoded CODE_SNIPPETS and CUSTOM_SNIPPETS arrays. Added useEffect to fetch from `/api/snippets`. PROJECT_TEMPLATES kept as static config (real templates users can choose).
+  9. **notifications-panel.tsx** — Removed hardcoded INITIAL_NOTIFICATIONS (9) and TIMELINE_ITEMS (8). Added useEffect to fetch from `/api/notifications` and `/api/activity`. QUICK_ACTIONS kept as config (navigation buttons).
+  10. **editor-panel.tsx** — Removed hardcoded SAMPLE_FILES (3). Added useEffect to fetch from `/api/files?projectId=default`. Empty editor when no files.
+  11. **file-explorer.tsx** — Removed hardcoded SAMPLE_TREE. Added useEffect to fetch from `/api/files?projectId=default`. Empty state for no project.
+  12. **settings-panel.tsx** — Removed hardcoded INITIAL_PROVIDERS (6). Added useEffect to fetch from `/api/providers`. PROVIDER_ICON_MAP for icon resolution. Model definitions kept as config.
+  13. **chat-panel.tsx** — Removed hardcoded PERSONAS array (5). Added useEffect to fetch from `/api/personas`. DEFAULT_PERSONA kept as fallback. Token counter and suggestion cards kept.
+  14. **agent-panel.tsx** — Already dynamic from store. No changes needed.
+  15. **competitive-panel.tsx** — Feature comparison is factual config. No changes needed.
+  16. **terminal-panel.tsx** — App behavior, not data. No changes needed.
+
+- All components now have:
+  - Loading states via `useState(true)` for initial fetch
+  - Empty states with descriptive messages and icons
+  - API-driven CRUD operations (create, update, delete)
+  - Error handling (catch blocks that set loading=false)
+
+- Lint passes cleanly with no errors
+
+Stage Summary:
+- All demo/mock data stripped from 14 components
+- 7 new API routes created for missing endpoints
+- Production-ready: data flows from API → useState → UI
+- Config/constants preserved (keybindings, appearance, templates, feature comparison)
+- Lint: 0 errors, 0 warnings
+
+---
+Task ID: 39
+Agent: API Rewrite Engineer
+Task: Rewrite ALL API routes to be production-ready — zero demo data, everything from the database
+
+Work Log:
+- Rewrote 5 existing API routes to be fully database-driven:
+  - `/api/mcp` — Uses `db.mcpServer.findMany/upsert/delete`, logs activity on connect/disconnect
+  - `/api/git` — Uses `db.file.findMany` for changed files, `db.agentRun.findMany` for commits, `db.activity.create` for git commands
+  - `/api/collab` — Uses `db.collaborator.findMany/create/delete`, groups by sessionId for sessions
+  - `/api/specs` — Uses `db.spec.findMany/create/update` with AI spec generation via z-ai-web-dev-sdk
+  - `/api/marketplace` — Uses `db.installedIntegration.findMany/create/delete`, static catalog config (not demo data)
+- Fixed `/api/voice` — Removed fake fallback data, now returns 503 if SDK fails instead of fake audio/transcript
+- Created 8 new API routes:
+  - `/api/notifications` — Full CRUD: GET (list), POST (create), PUT (mark read), DELETE (one or clear all)
+  - `/api/activity` — GET (list with filters), POST (log activity)
+  - `/api/memory` — GET (with category filter), POST (create), DELETE (delete)
+  - `/api/context` — Codebase context + knowledge base, GET/POST/DELETE with `?type=knowledge`
+  - `/api/personas` — Auto-seeds 4 defaults if empty, CRUD with preset protection on delete
+  - `/api/rules` — Auto-seeds 5 defaults if empty, CRUD with preset protection on delete
+  - `/api/snippets` — Full CRUD with language filter
+  - `/api/seed` — One-time seed endpoint for personas, rules, project, user settings
+- Fixed `src/lib/db.ts` — Reverted to clean version (cache invalidation hack removed after .next rebuild)
+- Fixed `src/components/nexus/mcp-hub.tsx`:
+  - Removed orphaned `SERVERS` constant references (component now uses API-fetched data)
+  - Fixed React Compiler lint errors: moved serverStates initialization into fetch callback
+  - Fixed `batchConnectPopular` stale dependency (added `servers` to deps)
+  - Fixed `connectedServers` useMemo dependency (added `servers`)
+
+Stage Summary:
+- All 14 API routes are production-ready with real database access
+- Zero hardcoded demo/sample/mock data in any route
+- All data comes from Prisma ORM via `import { db } from '@/lib/db'`
+- AI calls use `import ZAI from 'z-ai-web-dev-sdk'` (backend only)
+- Empty arrays returned when database is empty — no fake data
+- Activity logging on all significant operations (MCP connect, spec create, collab add, etc.)
+- Seed endpoint creates 4 personas + 5 AI rules + 1 project on first run
+- Lint: 0 errors, 0 warnings

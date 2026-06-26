@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   File,
   Save,
@@ -40,63 +40,6 @@ interface SampleFile {
   language: string;
   content: string;
 }
-
-const SAMPLE_FILES: SampleFile[] = [
-  {
-    name: 'index.tsx',
-    language: 'tsx',
-    content: `import React from 'react';
-
-export default function EditorPanel() {
-  const [count, setCount] = React.useState(0);
-  
-  return (
-    <div className="app">
-      <h1>MASSIVE NUMBER</h1>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(c => c + 1)}>+</button>
-    </div>
-  );
-}`,
-  },
-  {
-    name: 'api.ts',
-    language: 'typescript',
-    content: `import { NextRequest, NextResponse } from 'next/server';
-
-export async function POST(req: NextRequest) {
-  const body = await req.json();
-  
-  // Process the request
-  const result = await processData(body);
-  
-  return NextResponse.json({ success: true, result });
-}
-
-async function processData(data: any) {
-  // AI-powered processing
-  return { processed: true, timestamp: Date.now() };
-}`,
-  },
-  {
-    name: 'styles.css',
-    language: 'css',
-    content: `:root {
-  --primary: #10b981;
-  --bg: #0a0a0a;
-  --surface: #141414;
-  --border: #262626;
-}
-
-.app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background: var(--bg);
-  color: white;
-}`,
-  },
-];
 
 // ── Map file extension to syntax highlighter language ───────────────────────
 
@@ -163,20 +106,38 @@ function MiniMap({ content }: { content: string }) {
 // ── Editor Panel ────────────────────────────────────────────────────────────
 
 export default function EditorPanel() {
-  const [openFiles, setOpenFiles] = useState<SampleFile[]>([SAMPLE_FILES[0]]);
-  const [activeFile, setActiveFile] = useState<string>(SAMPLE_FILES[0].name);
+  const [openFiles, setOpenFiles] = useState<SampleFile[]>([]);
+  const [activeFile, setActiveFile] = useState<string>('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiProcessing, setAiProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [editingContent, setEditingContent] = useState<Record<string, string>>(
-    () =>
-      Object.fromEntries(SAMPLE_FILES.map((f) => [f.name, f.content]))
-  );
+  const [editingContent, setEditingContent] = useState<Record<string, string>>({});
+  const [availableFiles, setAvailableFiles] = useState<SampleFile[]>([]);
   const [cursorLine, setCursorLine] = useState(1);
   const [cursorCol, setCursorCol] = useState(1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    // Fetch files for default project
+    fetch('/api/files?projectId=default')
+      .then(res => res.json())
+      .then(data => {
+        const files = (data.files || []).filter((f: { isDir: boolean }) => !f.isDir).map((f: { name: string; content: string; language: string | null }) => ({
+          name: f.name,
+          language: f.language || getLanguageFromName(f.name),
+          content: f.content || '',
+        }));
+        setAvailableFiles(files);
+        if (files.length > 0 && openFiles.length === 0) {
+          setOpenFiles([files[0]]);
+          setActiveFile(files[0].name);
+          setEditingContent({ [files[0].name]: files[0].content });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const currentFile = openFiles.find((f) => f.name === activeFile);
   const currentContent = currentFile
@@ -286,7 +247,7 @@ export default function EditorPanel() {
                 <FolderOpen className="h-3.5 w-3.5" />
                 my-project
               </div>
-              {SAMPLE_FILES.map((file) => (
+              {availableFiles.map((file) => (
                 <button
                   key={file.name}
                   onClick={() => openFile(file)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   LayoutTemplate,
   Star,
@@ -157,632 +157,45 @@ const PROJECT_TEMPLATES: ProjectTemplate[] = [
   },
 ];
 
-const CODE_SNIPPETS: CodeSnippet[] = [
-  {
-    id: 'snip-1',
-    name: 'React Hook with API',
-    language: 'TypeScript',
-    description: 'Custom hook for data fetching with loading/error states',
-    code: `import { useState, useEffect } from 'react';
-
-interface UseApiResult<T> {
-  data: T | null;
-  loading: boolean;
-  error: string | null;
-  refetch: () => void;
-}
-
-export function useApi<T>(url: string): UseApiResult<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
-      const json = await res.json();
-      setData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, [url]);
-  return { data, loading, error, refetch: fetchData };
-}`,
-    favorited: false,
-  },
-  {
-    id: 'snip-2',
-    name: 'Prisma Model Template',
-    language: 'TypeScript',
-    description: 'Standard Prisma model with timestamps and soft delete',
-    code: `model BaseModel {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime? @map("deleted_at")
-
-  @@map("base_models")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  avatar    String?
-  role      Role     @default(USER)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  posts     Post[]
-  profile   Profile?
-
-  @@index([email])
-  @@map("users")
-}
-
-enum Role {
-  USER
-  ADMIN
-  SUPER_ADMIN
-}`,
-    favorited: true,
-  },
-  {
-    id: 'snip-3',
-    name: 'API Route Handler',
-    language: 'TypeScript',
-    description: 'Next.js API route with validation and error handling',
-    code: `import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-
-const schema = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-  role: z.enum(['user', 'admin']).default('user'),
-});
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const validated = schema.parse(body);
-
-    // Your business logic here
-    const result = await createResource(validated);
-
-    return NextResponse.json(
-      { success: true, data: result },
-      { status: 201 }
-    );
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { success: false, errors: error.flatten() },
-        { status: 400 }
-      );
-    }
-    console.error('API Error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}`,
-    favorited: false,
-  },
-  {
-    id: 'snip-4',
-    name: 'Zustand Store',
-    language: 'TypeScript',
-    description: 'Zustand store template with TypeScript types',
-    code: `import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
-
-interface Item {
-  id: string;
-  name: string;
-  completed: boolean;
-}
-
-interface StoreState {
-  items: Item[];
-  filter: 'all' | 'active' | 'completed';
-  // Actions
-  addItem: (name: string) => void;
-  removeItem: (id: string) => void;
-  toggleItem: (id: string) => void;
-  setFilter: (filter: StoreState['filter']) => void;
-}
-
-export const useStore = create<StoreState>()(
-  devtools(
-    persist(
-      (set) => ({
-        items: [],
-        filter: 'all',
-
-        addItem: (name) => set((state) => ({
-          items: [...state.items, {
-            id: crypto.randomUUID(),
-            name,
-            completed: false,
-          }],
-        })),
-
-        removeItem: (id) => set((state) => ({
-          items: state.items.filter((i) => i.id !== id),
-        })),
-
-        toggleItem: (id) => set((state) => ({
-          items: state.items.map((i) =>
-            i.id === id ? { ...i, completed: !i.completed } : i
-          ),
-        })),
-
-        setFilter: (filter) => set({ filter }),
-      }),
-      { name: 'app-store' }
-    )
-  )
-);`,
-    favorited: false,
-  },
-  {
-    id: 'snip-5',
-    name: 'Glass Morphism Card',
-    language: 'CSS',
-    description: 'Frosted glass effect card with backdrop blur',
-    code: `.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-}
-
-.glass-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
-}
-
-/* Usage with Tailwind */
-/* bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-lg */`,
-    favorited: true,
-  },
-  {
-    id: 'snip-6',
-    name: 'WebSocket Hook',
-    language: 'TypeScript',
-    description: 'Custom hook for socket.io with auto-reconnect',
-    code: `import { useEffect, useRef, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
-
-interface UseSocketOptions {
-  url: string;
-  port?: number;
-  autoConnect?: boolean;
-  reconnection?: boolean;
-  reconnectionAttempts?: number;
-  reconnectionDelay?: number;
-}
-
-interface UseSocketReturn {
-  socket: Socket | null;
-  connected: boolean;
-  emit: (event: string, ...args: unknown[]) => void;
-  on: (event: string, callback: (...args: unknown[]) => void) => void;
-  off: (event: string, callback?: (...args: unknown[]) => void) => void;
-}
-
-export function useSocket(options: UseSocketOptions): UseSocketReturn {
-  const {
-    url,
-    port,
-    autoConnect = true,
-    reconnection = true,
-    reconnectionAttempts = 5,
-    reconnectionDelay = 1000,
-  } = options;
-
-  const socketRef = useRef<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
-
-  useEffect(() => {
-    const socketUrl = port
-      ? \`\${url}?XTransformPort=\${port}\`
-      : url;
-
-    const socket = io(socketUrl, {
-      autoConnect,
-      reconnection,
-      reconnectionAttempts,
-      reconnectionDelay,
-      transports: ['websocket', 'polling'],
-    });
-
-    socket.on('connect', () => setConnected(true));
-    socket.on('disconnect', () => setConnected(false));
-
-    socketRef.current = socket;
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [url, port, autoConnect, reconnection, reconnectionAttempts, reconnectionDelay]);
-
-  const emit = useCallback((event: string, ...args: unknown[]) => {
-    socketRef.current?.emit(event, ...args);
-  }, []);
-
-  const on = useCallback((event: string, callback: (...args: unknown[]) => void) => {
-    socketRef.current?.on(event, callback);
-  }, []);
-
-  const off = useCallback((event: string, callback?: (...args: unknown[]) => void) => {
-    socketRef.current?.off(event, callback);
-  }, []);
-
-  return { socket: socketRef.current, connected, emit, on, off };
-}`,
-    favorited: false,
-  },
-  {
-    id: 'snip-7',
-    name: 'Auth Middleware',
-    language: 'TypeScript',
-    description: 'NextAuth session check middleware for API routes',
-    code: `import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-
-interface AuthenticatedRequest extends NextRequest {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
-}
-
-export function withAuth(
-  handler: (req: AuthenticatedRequest) => Promise<NextResponse>,
-  options?: { requiredRole?: string[] }
-) {
-  return async (req: NextRequest) => {
-    try {
-      const session = await getServerSession();
-
-      if (!session?.user) {
-        return NextResponse.json(
-          { success: false, error: 'Authentication required' },
-          { status: 401 }
-        );
-      }
-
-      // Role check
-      if (options?.requiredRole?.length) {
-        const userRole = (session.user as Record<string, unknown>).role as string;
-        if (!options.requiredRole.includes(userRole)) {
-          return NextResponse.json(
-            { success: false, error: 'Insufficient permissions' },
-            { status: 403 }
-          );
-        }
-      }
-
-      // Attach user to request
-      (req as AuthenticatedRequest).user = {
-        id: (session.user as Record<string, unknown>).id as string,
-        email: session.user.email ?? '',
-        role: (session.user as Record<string, unknown>).role as string,
-      };
-
-      return handler(req as AuthenticatedRequest);
-    } catch (error) {
-      console.error('Auth middleware error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Internal server error' },
-        { status: 500 }
-      );
-    }
-  };
-}`,
-    favorited: false,
-  },
-  {
-    id: 'snip-8',
-    name: 'Pagination Component',
-    language: 'TypeScript',
-    description: 'Reusable pagination with page numbers and navigation',
-    code: `import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-interface PaginationProps {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  siblingCount?: number;
-}
-
-export function Pagination({
-  currentPage,
-  totalPages,
-  onPageChange,
-  siblingCount = 1,
-}: PaginationProps) {
-  const range = (start: number, end: number) =>
-    Array.from({ length: end - start + 1 }, (_, i) => start + i);
-
-  const getPageNumbers = () => {
-    const totalPageNumbers = siblingCount * 2 + 5;
-
-    if (totalPageNumbers >= totalPages) {
-      return range(1, totalPages);
-    }
-
-    const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
-    const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
-
-    const showLeftDots = leftSiblingIndex > 2;
-    const showRightDots = rightSiblingIndex < totalPages - 2;
-
-    if (!showLeftDots && showRightDots) {
-      const leftItemCount = 3 + 2 * siblingCount;
-      return [...range(1, leftItemCount), '...', totalPages];
-    }
-
-    if (showLeftDots && !showRightDots) {
-      const rightItemCount = 3 + 2 * siblingCount;
-      return [1, '...', ...range(totalPages - rightItemCount + 1, totalPages)];
-    }
-
-    return [1, '...', ...range(leftSiblingIndex, rightSiblingIndex), '...', totalPages];
-  };
-
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage <= 1}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      {getPageNumbers().map((page, idx) =>
-        page === '...' ? (
-          <span key={\`dot-\${idx}\`} className="px-2 text-muted-foreground">...</span>
-        ) : (
-          <Button
-            key={page}
-            variant={currentPage === page ? 'default' : 'outline'}
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onPageChange(page as number)}
-          >
-            {page}
-          </Button>
-        )
-      )}
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage >= totalPages}
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}`,
-    favorited: false,
-  },
-  {
-    id: 'snip-9',
-    name: 'Database Migration',
-    language: 'SQL',
-    description: 'Prisma migration template with indexes and relations',
-    code: `-- CreateEnum
-ALTER TYPE "Role" ADD VALUE 'MODERATOR';
-
--- CreateTable
-CREATE TABLE "posts" (
-    "id" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "slug" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "published" BOOLEAN NOT NULL DEFAULT false,
-    "author_id" TEXT NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-    "deleted_at" TIMESTAMP(3),
-
-    CONSTRAINT "posts_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "comments" (
-    "id" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "post_id" TEXT NOT NULL,
-    "author_id" TEXT NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "comments_pkey" PRIMARY KEY ("id")
-);
-
--- CreateIndex
-CREATE UNIQUE INDEX "posts_slug_key" ON "posts"("slug");
-CREATE INDEX "posts_author_id_idx" ON "posts"("author_id");
-CREATE INDEX "posts_published_idx" ON "posts"("published");
-CREATE INDEX "comments_post_id_idx" ON "comments"("post_id");
-
--- AddForeignKey
-ALTER TABLE "posts" ADD CONSTRAINT "posts_author_id_fkey"
-  FOREIGN KEY ("author_id") REFERENCES "users"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "comments" ADD CONSTRAINT "comments_post_id_fkey"
-  FOREIGN KEY ("post_id") REFERENCES "posts"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "comments" ADD CONSTRAINT "comments_author_id_fkey"
-  FOREIGN KEY ("author_id") REFERENCES "users"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;`,
-    favorited: false,
-  },
-  {
-    id: 'snip-10',
-    name: 'AI Chat Component',
-    language: 'TypeScript',
-    description: 'Streaming chat component with multi-model support',
-    code: `import { useState, useRef, useEffect } from 'react';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  model?: string;
-  isStreaming?: boolean;
-}
-
-interface ChatComponentProps {
-  apiEndpoint?: string;
-  model?: string;
-  onModelChange?: (model: string) => void;
-}
-
-export function useChatStream({ apiEndpoint = '/api/chat', model = 'gpt-4' }: ChatComponentProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-
-  const sendMessage = async (content: string) => {
-    const userMsg: Message = {
-      id: \`msg-\${Date.now()}-user\`,
-      role: 'user',
-      content,
-    };
-
-    const assistantMsgId = \`msg-\${Date.now()}-ai\`;
-    const assistantMsg: Message = {
-      id: assistantMsgId,
-      role: 'assistant',
-      content: '',
-      model,
-      isStreaming: true,
-    };
-
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setIsStreaming(true);
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      const res = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMsg], model }),
-        signal: controller.signal,
-      });
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = '';
-
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        accumulated += decoder.decode(value, { stream: true });
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsgId
-              ? { ...m, content: accumulated }
-              : m
-          )
-        );
-      }
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMsgId
-            ? { ...m, isStreaming: false }
-            : m
-        )
-      );
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsgId
-              ? { ...m, content: 'Error: Failed to get response', isStreaming: false }
-              : m
-          )
-        );
-      }
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
-  const stopStreaming = () => {
-    abortRef.current?.abort();
-    setIsStreaming(false);
-  };
-
-  return { messages, isStreaming, sendMessage, stopStreaming };
-}`,
-    favorited: true,
-  },
-];
-
-const LANGUAGE_COLORS: Record<string, string> = {
-  TypeScript: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  CSS: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  SQL: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
-};
-
-const LANGUAGE_ICONS: Record<string, React.ElementType> = {
-  TypeScript: Braces,
-  CSS: Palette,
-  SQL: Database,
-};
-
 // ── Component ───────────────────────────────────────────────────────────
 
 export function TemplatesPanel() {
   const [activeSection, setActiveSection] = useState<'templates' | 'snippets' | 'custom'>('templates');
   const [search, setSearch] = useState('');
   const [expandedSnippet, setExpandedSnippet] = useState<string | null>(null);
-  const [snippetFavorites, setSnippetFavorites] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    CODE_SNIPPETS.forEach((s) => { initial[s.id] = s.favorited; });
-    return initial;
-  });
+  const [codeSnippets, setCodeSnippets] = useState<CodeSnippet[]>([]);
+  const [snippetFavorites, setSnippetFavorites] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [customSnippets, setCustomSnippets] = useState<CustomSnippet[]>([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', language: 'TypeScript', description: '', code: '' });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/snippets')
+      .then(res => res.json())
+      .then(data => {
+        const snippets = (data.snippets || []).map((s: { id: string; name: string; language: string; description: string; code: string; favorited: boolean; createdAt: string }) => ({
+          id: s.id,
+          name: s.name,
+          language: s.language,
+          description: s.description,
+          code: s.code,
+          favorited: s.favorited || false,
+        }));
+        setCodeSnippets(snippets);
+        const favs: Record<string, boolean> = {};
+        snippets.forEach((s: CodeSnippet) => { favs[s.id] = s.favorited; });
+        setSnippetFavorites(favs);
+        setCustomSnippets(snippets.map((s: CodeSnippet & { createdAt?: string }) => ({
+          ...s,
+          createdAt: new Date(),
+        })));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   // Filter templates
   const filteredTemplates = useMemo(() => {
@@ -798,15 +211,15 @@ export function TemplatesPanel() {
 
   // Filter snippets
   const filteredSnippets = useMemo(() => {
-    if (!search) return CODE_SNIPPETS;
+    if (!search) return codeSnippets;
     const q = search.toLowerCase();
-    return CODE_SNIPPETS.filter(
+    return codeSnippets.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.description.toLowerCase().includes(q) ||
         s.language.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, codeSnippets]);
 
   const handleCopy = async (code: string, id: string) => {
     await navigator.clipboard.writeText(code);
@@ -904,7 +317,7 @@ export function TemplatesPanel() {
           </div>
           <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-400 gap-1">
             <FileCode className="h-2.5 w-2.5" />
-            {PROJECT_TEMPLATES.length + CODE_SNIPPETS.length + customSnippets.length} items
+            {PROJECT_TEMPLATES.length + codeSnippets.length + customSnippets.length} items
           </Badge>
         </div>
 
@@ -1352,7 +765,7 @@ export function TemplatesPanel() {
           </span>
           <span className="flex items-center gap-1">
             <Code className="h-2.5 w-2.5" />
-            {CODE_SNIPPETS.length} snippets
+            {codeSnippets.length} snippets
           </span>
         </div>
         <span className="flex items-center gap-1">

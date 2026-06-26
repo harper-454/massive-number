@@ -1,0 +1,792 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo, useCallback } from 'react';
+     4→import {
+     5→  Github,
+     6→  Database,
+     7→  CreditCard,
+     8→  AlertTriangle,
+     9→  List,
+    10→  FileText,
+    11→  Container,
+    12→  Cloud,
+    13→  Triangle,
+    14→  Hash,
+    15→  Folder,
+    16→  Globe,
+    17→  Search,
+    18→  Plug,
+    19→  ChevronDown,
+    20→  ChevronRight,
+    21→  Zap,
+    22→  Play,
+    23→  Server,
+    24→  X,
+    25→  Check,
+    26→  Clock,
+    27→  Loader2,
+    28→  Link2,
+    29→} from 'lucide-react';
+    30→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    31→import { Badge } from '@/components/ui/badge';
+    32→import { Button } from '@/components/ui/button';
+    33→import { Input } from '@/components/ui/input';
+    34→import { Switch } from '@/components/ui/switch';
+    35→import { ScrollArea } from '@/components/ui/scroll-area';
+    36→import { Separator } from '@/components/ui/separator';
+    37→import { motion, AnimatePresence } from 'framer-motion';
+    38→
+    39→// ── Types ───────────────────────────────────────────────────────────────
+    40→
+    41→type Category =
+    42→  | 'All'
+    43→  | 'Version Control'
+    44→  | 'Database'
+    45→  | 'Cloud'
+    46→  | 'DevOps'
+    47→  | 'Productivity'
+    48→  | 'Communication'
+    49→  | 'Automation'
+    50→  | 'Payments'
+    51→  | 'Monitoring'
+    52→  | 'Project Management'
+    53→  | 'Deployment'
+    54→  | 'System';
+    55→
+    56→type HealthStatus = 'healthy' | 'degraded' | 'error';
+    57→
+    58→interface MCPTool {
+    59→  name: string;
+    60→  description: string;
+    61→  sampleOutput?: string;
+    62→}
+    63→
+    64→interface MCPServer {
+    65→  id: string;
+    66→  name: string;
+    67→  description: string;
+    68→  category: Category;
+    69→  icon: React.ElementType;
+    70→  toolCount: number;
+    71→  connected: boolean;
+    72→  health: HealthStatus;
+    73→  lastConnected: number | null; // minutes ago
+    74→  popular?: boolean;
+    75→  tools: MCPTool[];
+    76→}
+    77→
+    78→interface ToolExecution {
+    79→  toolName: string;
+    80→  serverId: string;
+    81→  status: 'running' | 'success' | 'error';
+    82→  output: string;
+    83→  duration?: number;
+    84→}
+    85→
+    86→// ── Data ────────────────────────────────────────────────────────────────
+    87→
+    88→const CATEGORIES: Category[] = [
+    89→  'All',
+    90→  'Version Control',
+    91→  'Database',
+    92→  'Cloud',
+    93→  'DevOps',
+    94→  'Productivity',
+    95→  'Communication',
+    96→  'Automation',
+    97→];
+    98→
+    99→const SERVERS: MCPServer[] = [
+   100→  {
+   101→    id: 'github',
+   102→    name: 'GitHub MCP',
+   103→    description: 'Full GitHub integration — PRs, issues, repositories, and code reviews.',
+   104→    category: 'Version Control',
+   105→    icon: Github,
+   106→    toolCount: 12,
+   107→    connected: false,
+   108→    health: 'healthy',
+   109→    lastConnected: null,
+   110→    popular: true,
+   111→    tools: [
+   112→      { name: 'create_pr', description: 'Create a pull request with diff', sampleOutput: '✓ Pull request #42 created: "feat: add dark mode support"\n→ https://github.com/org/repo/pull/42\n  Branch: feature/dark-mode → main\n  Files changed: 8 | +234 −56' },
+   113→      { name: 'list_issues', description: 'List repository issues with filters', sampleOutput: 'Found 12 open issues:\n  #38 - Fix authentication timeout [bug, priority:high]\n  #35 - Add export functionality [feature]\n  #31 - Update API docs [docs]\n  ...9 more' },
+   114→      { name: 'search_code', description: 'Search code across repositories', sampleOutput: 'Search results for "useAuth":\n  src/hooks/useAuth.ts (exact match)\n  src/components/Login.tsx (2 references)\n  src/pages/Dashboard.tsx (1 reference)' },
+   115→      { name: 'create_issue', description: 'Create a new issue', sampleOutput: '✓ Issue #39 created: "Bug: Login fails on mobile"\n  Labels: bug, priority:high\n  Assignee: @developer' },
+   116→      { name: 'review_pr', description: 'AI-powered PR review', sampleOutput: "AI Review Summary:\n  ⚠ 2 potential issues found:\n    - L14: Unused import 'useState'\n    - L42: Missing error handling\n  ✓ 3 suggestions:\n    - Consider using useCallback\n    - Extract helper function" },
+   117→      { name: 'merge_pr', description: 'Merge a pull request', sampleOutput: '✓ PR #40 merged successfully\n  Merge strategy: squash\n  Commit: abc1234 "feat: add user profiles"' },
+   118→      { name: 'list_repos', description: 'List user repositories', sampleOutput: 'Found 15 repositories:\n  org/main-app (⭐ 234, TypeScript)\n  org/api-service (⭐ 89, Go)\n  org/design-system (⭐ 56, React)' },
+   119→      { name: 'get_file', description: 'Get file contents from repo', sampleOutput: '📄 src/config.ts (1.2KB)\n---\nexport const config = {\n  apiUrl: process.env.API_URL,\n  timeout: 30000,\n};' },
+   120→      { name: 'create_branch', description: 'Create a new branch', sampleOutput: '✓ Branch created: feature/user-settings\n  Based on: main (abc1234)' },
+   121→      { name: 'list_commits', description: 'List commits on a branch', sampleOutput: 'Recent commits on main:\n  abc1234 feat: add user profiles (2h ago)\n  def5678 fix: auth timeout (5h ago)\n  ghi9012 chore: update deps (1d ago)' },
+   122→      { name: 'create_release', description: 'Create a GitHub release', sampleOutput: '✓ Release v2.1.0 created\n  Tag: v2.1.0\n  Title: "Major Performance Improvements"' },
+   123→      { name: 'manage_actions', description: 'Trigger and monitor GitHub Actions', sampleOutput: 'Workflow "CI" triggered: run #847\n  Status: ✅ Success (2m 34s)\n  Jobs: lint ✓ → test ✓ → build ✓' },
+   124→    ],
+   125→  },
+   126→  {
+   127→    id: 'postgres',
+   128→    name: 'PostgreSQL MCP',
+   129→    description: 'Direct PostgreSQL database access — query, migrate, and inspect schemas.',
+   130→    category: 'Database',
+   131→    icon: Database,
+   132→    toolCount: 8,
+   133→    connected: false,
+   134→    health: 'healthy',
+   135→    lastConnected: null,
+   136→    popular: true,
+   137→    tools: [
+   138→      { name: 'query', description: 'Execute SQL query', sampleOutput: 'Query executed in 12ms\n  3 rows returned:\n  id | name         | email\n  1  | Alice Chen   | alice@example.com\n  2  | Bob Smith    | bob@example.com\n  3  | Carol Davis  | carol@example.com' },
+   139→      { name: 'list_tables', description: 'List all tables in schema', sampleOutput: 'Tables in "public" schema:\n  users (12,345 rows)\n  orders (89,012 rows)\n  products (1,234 rows)\n  sessions (45,678 rows)' },
+   140→      { name: 'describe_table', description: 'Show table structure', sampleOutput: 'Table "users":\n  id          UUID      PRIMARY KEY\n  email       VARCHAR   NOT NULL UNIQUE\n  name        VARCHAR   NOT NULL\n  created_at  TIMESTAMP DEFAULT NOW()\n  role        VARCHAR   DEFAULT \'user\'' },
+   141→      { name: 'migrate', description: 'Run database migration', sampleOutput: '✓ Migration 004_add_user_settings applied\n  - Added table "user_settings"\n  - Added column "preferences" to "users"\n  Duration: 890ms' },
+   142→      { name: 'seed', description: 'Seed database with fixtures', sampleOutput: '✓ Database seeded with fixtures\n  - 100 users created\n  - 500 orders created\n  - 50 products created' },
+   143→      { name: 'backup', description: 'Create database backup', sampleOutput: '✓ Backup created: db_backup_2024-01-15.sql.gz\n  Size: 23.4MB\n  Duration: 3.2s' },
+   144→      { name: 'explain', description: 'EXPLAIN query plan', sampleOutput: 'Query Plan:\n  Seq Scan on users (cost=0.00..12.50 rows=250)\n  Filter: (role = \'admin\')\n  → Index Scan using idx_users_role (cost=0.15..8.20 rows=50)' },
+   145→      { name: 'stats', description: 'Database size and stats', sampleOutput: 'Database "production":\n  Size: 2.3GB\n  Tables: 24 | Indexes: 38\n  Active connections: 12/100\n  Cache hit ratio: 98.7%' },
+   146→    ],
+   147→  },
+   148→  {
+   149→    id: 'stripe',
+   150→    name: 'Stripe MCP',
+   151→    description: 'Payment processing — customers, subscriptions, invoices, and disputes.',
+   152→    category: 'Payments',
+   153→    icon: CreditCard,
+   154→    toolCount: 6,
+   155→    connected: false,
+   156→    health: 'healthy',
+   157→    lastConnected: null,
+   158→    tools: [
+   159→      { name: 'create_customer', description: 'Create a Stripe customer', sampleOutput: '✓ Customer created: cus_abc123\n  Email: alice@example.com\n  Name: Alice Chen' },
+   160→      { name: 'list_invoices', description: 'List recent invoices', sampleOutput: 'Recent invoices:\n  inv_001 - $49.99 [paid]\n  inv_002 - $99.99 [pending]\n  inv_003 - $24.99 [paid]' },
+   161→      { name: 'create_subscription', description: 'Create a subscription plan', sampleOutput: '✓ Subscription created: sub_xyz789\n  Plan: Pro ($49/mo)\n  Status: active\n  Next billing: Feb 1, 2024' },
+   162→      { name: 'handle_dispute', description: 'Respond to payment disputes', sampleOutput: 'Dispute dp_123 status: needs_response\n  Amount: $99.99\n  Evidence deadline: Jan 30, 2024' },
+   163→      { name: 'get_balance', description: 'Get account balance', sampleOutput: 'Account Balance:\n  Available: $12,345.67\n  Pending: $2,345.00\n  Currency: USD' },
+   164→      { name: 'refund', description: 'Process a refund', sampleOutput: '✓ Refund processed: re_abc456\n  Amount: $49.99\n  Reason: customer_request\n  Status: succeeded' },
+   165→    ],
+   166→  },
+   167→  {
+   168→    id: 'sentry',
+   169→    name: 'Sentry MCP',
+   170→    description: 'Error monitoring — track issues, resolve bugs, and analyze stack traces.',
+   171→    category: 'Monitoring',
+   172→    icon: AlertTriangle,
+   173→    toolCount: 5,
+   174→    connected: false,
+   175→    health: 'degraded',
+   176→    lastConnected: null,
+   177→    tools: [
+   178→      { name: 'list_issues', description: 'List error issues', sampleOutput: 'Active issues (7):\n  ERR-42: NullPointerException (234 events/hr)\n  ERR-38: TimeoutError (89 events/hr)\n  ERR-35: AuthException (12 events/hr)' },
+   179→      { name: 'get_issue', description: 'Get issue details and stacktrace', sampleOutput: 'Issue ERR-42:\n  Type: NullPointerException\n  File: src/auth/session.ts:42\n  First seen: 2h ago | Last seen: 5m ago\n  Affected users: 23' },
+   180→      { name: 'resolve_issue', description: 'Mark issue as resolved', sampleOutput: '✓ Issue ERR-42 marked as resolved\n  Release: v2.1.1\n  Commits: 2 linked' },
+   181→      { name: 'list_projects', description: 'List Sentry projects', sampleOutput: 'Projects:\n  main-app (23 open issues)\n  api-service (7 open issues)\n  admin-panel (2 open issues)' },
+   182→      { name: 'create_release', description: 'Track deployment release', sampleOutput: '✓ Release v2.1.1 created\n  Commits: 5 new\n  Issues resolved: 3' },
+   183→    ],
+   184→  },
+   185→  {
+   186→    id: 'linear',
+   187→    name: 'Linear MCP',
+   188→    description: 'Project management — tasks, cycles, teams, and workflow automation.',
+   189→    category: 'Project Management',
+   190→    icon: List,
+   191→    toolCount: 7,
+   192→    connected: false,
+   193→    health: 'healthy',
+   194→    lastConnected: null,
+   195→    tools: [
+   196→      { name: 'create_task', description: 'Create a Linear task', sampleOutput: '✓ Task ENG-234 created: "Fix auth timeout"\n  Priority: High | Assignee: @alice\n  Cycle: Sprint 12' },
+   197→      { name: 'list_tasks', description: 'List tasks with filters', sampleOutput: 'Tasks in Sprint 12:\n  ENG-234 Fix auth timeout [In Progress]\n  ENG-233 Add export feature [Todo]\n  ENG-232 Update docs [Done]' },
+   198→      { name: 'update_status', description: 'Update task status', sampleOutput: '✓ ENG-234 → In Progress\n  Updated by: @alice\n  Time in Todo: 2h 15m' },
+   199→      { name: 'list_cycles', description: 'List active cycles', sampleOutput: 'Active cycles:\n  Sprint 12 (Jan 15-28) - 67% complete\n  Sprint 13 (Jan 29-Feb 11) - Planned' },
+   200→      { name: 'add_comment', description: 'Add comment to task', sampleOutput: '✓ Comment added to ENG-234\n  "Root cause identified: token expiry misconfiguration"' },
+   201→      { name: 'list_teams', description: 'List team members', sampleOutput: 'Team members (8):\n  Alice Chen - Engineering Lead\n  Bob Smith - Senior Engineer\n  ...6 more' },
+   202→      { name: 'search', description: 'Search tasks and projects', sampleOutput: 'Results for "auth":\n  ENG-234 Fix auth timeout [In Progress]\n  ENG-198 Auth service refactor [Done]\n  ENG-167 Add SSO support [Done]' },
+   203→    ],
+   204→  },
+   205→  {
+   206→    id: 'notion',
+   207→    name: 'Notion MCP',
+   208→    description: 'Knowledge management — pages, databases, and team wikis.',
+   209→    category: 'Productivity',
+   210→    icon: FileText,
+   211→    toolCount: 6,
+   212→    connected: false,
+   213→    health: 'healthy',
+   214→    lastConnected: null,
+   215→    tools: [
+   216→      { name: 'search', description: 'Search Notion pages', sampleOutput: 'Results for "roadmap":\n  📄 Q1 2024 Roadmap\n  📄 Product Strategy\n  📊 Feature Tracker Database' },
+   217→      { name: 'get_page', description: 'Get page content', sampleOutput: '📄 Q1 2024 Roadmap\n  Last edited: Jan 10, 2024\n  Content: [3 blocks] - heading, paragraph, list' },
+   218→      { name: 'create_page', description: 'Create a new page', sampleOutput: '✓ Page created: "Sprint 12 Retro Notes"\n  Parent: Team Wiki\n  URL: notion.so/page/abc123' },
+   219→      { name: 'update_page', description: 'Update page properties', sampleOutput: '✓ Page "Q1 Roadmap" updated\n  Status: In Progress → Complete' },
+   220→      { name: 'query_db', description: 'Query a Notion database', sampleOutput: 'Feature Tracker (12 results):\n  ✅ Dark Mode - Complete\n  🔄 API v2 - In Progress\n  ⏳ Mobile App - Planned' },
+   221→      { name: 'append_blocks', description: 'Append content blocks', sampleOutput: '✓ 3 blocks appended to "Sprint 12 Retro"\n  - Heading: "Action Items"\n  - List: 2 items added' },
+   222→    ],
+   223→  },
+   224→  {
+   225→    id: 'docker',
+   226→    name: 'Docker MCP',
+   227→    description: 'Container orchestration — build, run, and manage Docker containers.',
+   228→    category: 'DevOps',
+   229→    icon: Container,
+   230→    toolCount: 7,
+   231→    connected: false,
+   232→    health: 'healthy',
+   233→    lastConnected: null,
+   234→    tools: [
+   235→      { name: 'build', description: 'Build Docker image', sampleOutput: 'Building image: myapp:latest\n  Step 1/8 : FROM node:20-alpine\n  Step 8/8 : CMD ["node", "server.js"]\n  ✓ Built in 45.2s (cache: 3 steps)' },
+   236→      { name: 'run', description: 'Run a container', sampleOutput: '✓ Container started: myapp_abc123\n  Image: myapp:latest\n  Port: 3000→3000\n  Status: running' },
+   237→      { name: 'list_containers', description: 'List running containers', sampleOutput: 'Running containers (3):\n  myapp_web    Up 2h   0.0.0.0:3000→3000\n  myapp_db     Up 2h   5432/tcp\n  myapp_redis  Up 2h   6379/tcp' },
+   238→      { name: 'logs', description: 'Get container logs', sampleOutput: 'Logs for myapp_web (last 10 lines):\n  [INFO] Server listening on :3000\n  [INFO] Connected to database\n  [WARN] Slow query: 450ms' },
+   239→      { name: 'compose_up', description: 'Run docker compose up', sampleOutput: '✓ docker compose up -d\n  Creating network "myapp_default"\n  Starting myapp_web... done\n  Starting myapp_db... done' },
+   240→      { name: 'compose_down', description: 'Run docker compose down', sampleOutput: '✓ docker compose down\n  Stopping myapp_web... done\n  Stopping myapp_db... done\n  Removing network "myapp_default"' },
+   241→      { name: 'prune', description: 'Remove unused resources', sampleOutput: '✓ Pruned:\n  Images: 3 reclaimed (1.2GB)\n  Containers: 0\n  Networks: 1' },
+   242→    ],
+   243→  },
+   244→  {
+   245→    id: 'aws',
+   246→    name: 'AWS MCP',
+   247→    description: 'Amazon Web Services — S3, Lambda, EC2, CloudFormation, and more.',
+   248→    category: 'Cloud',
+   249→    icon: Cloud,
+   250→    toolCount: 10,
+   251→    connected: false,
+   252→    health: 'healthy',
+   253→    lastConnected: null,
+   254→    tools: [
+   255→      { name: 'list_s3', description: 'List S3 buckets', sampleOutput: 'S3 Buckets (4):\n  myapp-prod-assets (2.3GB)\n  myapp-backups (12.1GB)\n  myapp-logs (890MB)\n  myapp-uploads (4.5GB)' },
+   256→      { name: 'upload_s3', description: 'Upload file to S3', sampleOutput: '✓ Uploaded to myapp-assets/build.js\n  Size: 234KB | Type: application/javascript\n  URL: https://myapp-assets.s3.amazonaws.com/build.js' },
+   257→      { name: 'invoke_lambda', description: 'Invoke Lambda function', sampleOutput: '✓ Lambda "process-order" invoked\n  Duration: 234ms\n  Memory: 128MB/256MB\n  Status: succeeded' },
+   258→      { name: 'list_ec2', description: 'List EC2 instances', sampleOutput: 'EC2 Instances (3):\n  i-abc123  t3.medium  running  us-east-1\n  i-def456  t3.small   stopped  us-east-1\n  i-ghi789  t3.large   running  us-west-2' },
+   259→      { name: 'deploy_cf', description: 'Deploy CloudFormation stack', sampleOutput: '✓ Stack "myapp-prod" updated\n  Status: UPDATE_COMPLETE\n  Changes: 2 modified, 0 added, 0 removed' },
+   260→      { name: 'get_logs', description: 'Get CloudWatch logs', sampleOutput: 'CloudWatch logs (last 5):\n  [INFO] Request processed in 45ms\n  [WARN] Rate limit approaching\n  [INFO] Cache hit ratio: 95.2%' },
+   261→      { name: 'list_functions', description: 'List Lambda functions', sampleOutput: 'Lambda Functions (5):\n  process-order (Python 3.11, 256MB)\n  send-email (Node 20, 128MB)\n  generate-report (Python 3.11, 512MB)' },
+   262→      { name: 'manage_iam', description: 'Manage IAM policies', sampleOutput: 'IAM Policies:\n  MyAppS3Access (attached: 2 roles)\n  MyAppLambdaInvoke (attached: 1 role)' },
+   263→      { name: 'rds_status', description: 'Check RDS instance status', sampleOutput: 'RDS "myapp-db":\n  Engine: PostgreSQL 15.4\n  Status: available\n  Connections: 23/100\n  Storage: 45GB/100GB' },
+   264→      { name: 'cost_report', description: 'Get cost and usage report', sampleOutput: 'Cost Report (last 30 days):\n  Total: $1,234.56\n  EC2: $567.89 | Lambda: $123.45\n  S3: $89.12 | RDS: $454.10' },
+   265→    ],
+   266→  },
+   267→  {
+   268→    id: 'vercel',
+   269→    name: 'Vercel MCP',
+   270→    description: 'Deployment platform — deploys, domains, serverless functions, and edge.',
+   271→    category: 'Deployment',
+   272→    icon: Triangle,
+   273→    toolCount: 5,
+   274→    connected: false,
+   275→    health: 'healthy',
+   276→    lastConnected: null,
+   277→    tools: [
+   278→      { name: 'deploy', description: 'Trigger a deployment', sampleOutput: '✓ Deployment triggered: dpl_abc123\n  Branch: main | Commit: abc1234\n  Status: Building... (12s)' },
+   279→      { name: 'list_deploys', description: 'List recent deployments', sampleOutput: 'Recent deployments:\n  dpl_abc  main   ✅ Ready (2m ago)\n  dpl_def  feat/x 🔄 Building (30s ago)\n  dpl_ghi  main   ✅ Ready (1h ago)' },
+   280→      { name: 'get_deploy', description: 'Get deployment details', sampleOutput: 'Deployment dpl_abc123:\n  Status: ✅ Ready\n  Duration: 45s\n  URL: myapp-git-main.vercel.app' },
+   281→      { name: 'manage_domains', description: 'Configure custom domains', sampleOutput: 'Domains:\n  myapp.com → dpl_abc (✅ valid)\n  www.myapp.com → dpl_abc (✅ valid)' },
+   282→      { name: 'env_vars', description: 'Manage environment variables', sampleOutput: 'Environment variables (8):\n  DATABASE_URL [Production, Preview]\n  API_KEY [Production]\n  ...6 more' },
+   283→    ],
+   284→  },
+   285→  {
+   286→    id: 'slack',
+   287→    name: 'Slack MCP',
+   288→    description: 'Team communication — send messages, manage channels, and read threads.',
+   289→    category: 'Communication',
+   290→    icon: Hash,
+   291→    toolCount: 6,
+   292→    connected: false,
+   293→    health: 'error',
+   294→    lastConnected: null,
+   295→    tools: [
+   296→      { name: 'send_message', description: 'Send message to channel', sampleOutput: '✓ Message sent to #engineering\n  Timestamp: 1705312345.123456' },
+   297→      { name: 'list_channels', description: 'List workspace channels', sampleOutput: 'Channels (12):\n  #engineering (234 members)\n  #design (89 members)\n  #general (567 members)' },
+   298→      { name: 'get_thread', description: 'Read message thread', sampleOutput: 'Thread in #engineering (5 replies):\n  Alice: "PR #42 ready for review"\n  Bob: "Checking now..."\n  ...3 more' },
+   299→      { name: 'search_messages', description: 'Search messages', sampleOutput: 'Results for "deploy":\n  #engineering: "Deployed v2.1.0 to prod" (2h ago)\n  #devops: "CI pipeline fixed" (4h ago)' },
+   300→      { name: 'set_status', description: 'Set user status', sampleOutput: '✓ Status updated: 🎯 Focused | 2h' },
+   301→      { name: 'upload_file', description: 'Upload file to channel', sampleOutput: '✓ File uploaded to #design\n  Name: mockup-v2.fig\n  Size: 4.2MB' },
+   302→    ],
+   303→  },
+   304→  {
+   305→    id: 'filesystem',
+   306→    name: 'Filesystem MCP',
+   307→    description: 'Local file system access — read, write, search, and manage files.',
+   308→    category: 'System',
+   309→    icon: Folder,
+   310→    toolCount: 8,
+   311→    connected: true,
+   312→    health: 'healthy',
+   313→    lastConnected: 2,
+   314→    popular: true,
+   315→    tools: [
+   316→      { name: 'read_file', description: 'Read file contents', sampleOutput: '📄 src/app/page.tsx (2.1KB)\n---\nexport default function Page() {\n  return <div>Hello World</div>;\n}' },
+   317→      { name: 'write_file', description: 'Write content to file', sampleOutput: '✓ Written 1.2KB to src/config.ts\n  Lines: 34 | Encoding: UTF-8' },
+   318→      { name: 'list_dir', description: 'List directory contents', sampleOutput: 'src/ (6 items):\n  📁 components/  📁 lib/  📁 stores/\n  📄 app.tsx      📄 config.ts   📄 types.ts' },
+   319→      { name: 'search_files', description: 'Search files by pattern', sampleOutput: 'Results for "*.test.ts":\n  src/__tests__/auth.test.ts\n  src/__tests__/api.test.ts\n  2 files found' },
+   320→      { name: 'create_dir', description: 'Create directory', sampleOutput: '✓ Directory created: src/features/auth\n  Path: /home/user/project/src/features/auth' },
+   321→      { name: 'move_file', description: 'Move or rename file', sampleOutput: '✓ Moved: src/old.ts → src/new-location.ts\n  Updated 3 import references' },
+   322→      { name: 'delete_file', description: 'Delete a file', sampleOutput: '✓ Deleted: src/deprecated.ts\n  Size: 4.5KB | Removed 1 reference' },
+   323→      { name: 'get_info', description: 'Get file metadata', sampleOutput: 'src/app/page.tsx:\n  Size: 2.1KB | Modified: 2h ago\n  Permissions: rw-r--r-- | Type: file' },
+   324→    ],
+   325→  },
+   326→  {
+   327→    id: 'puppeteer',
+   328→    name: 'Puppeteer MCP',
+   329→    description: 'Browser automation — scrape, screenshot, and interact with web pages.',
+   330→    category: 'Automation',
+   331→    icon: Globe,
+   332→    toolCount: 5,
+   333→    connected: false,
+   334→    health: 'healthy',
+   335→    lastConnected: null,
+   336→    tools: [
+   337→      { name: 'navigate', description: 'Navigate to URL', sampleOutput: '✓ Navigated to https://example.com\n  Status: 200 OK | Load time: 1.2s' },
+   338→      { name: 'screenshot', description: 'Capture page screenshot', sampleOutput: '✓ Screenshot captured\n  Dimensions: 1920×1080 | Format: PNG\n  Size: 234KB' },
+   339→      { name: 'click', description: 'Click element on page', sampleOutput: '✓ Clicked element: #submit-btn\n  Navigation: /dashboard (200 OK)' },
+   340→      { name: 'extract', description: 'Extract data from page', sampleOutput: 'Extracted data (5 items):\n  Title: "Example Page"\n  Links: 3 found\n  Forms: 1 found' },
+   341→      { name: 'fill_form', description: 'Fill and submit forms', sampleOutput: '✓ Form submitted\n  Fields filled: 4/4\n  Response: 200 OK | Redirect: /success' },
+   342→    ],
+   343→  },
+   344→];
+   345→
+   346→// ── Component ───────────────────────────────────────────────────────────
+   347→
+   348→export function MCPHub() {
+   349→  const [search, setSearch] = useState('');
+   350→  const [category, setCategory] = useState<Category>('All');
+   351→  const [expandedServer, setExpandedServer] = useState<string | null>(null);
+   352→  const [toolExecutions, setToolExecutions] = useState<Record<string, ToolExecution>>({});
+   353→  const [serverStates, setServerStates] = useState<Record<string, boolean>>(() => {
+   354→    const initial: Record<string, boolean> = {};
+   355→    SERVERS.forEach((s) => {
+   356→      initial[s.id] = s.connected;
+   357→    });
+   358→    return initial;
+   359→  });
+   360→  const [serverLastConnected, setServerLastConnected] = useState<Record<string, number>>(() => {
+   361→    const initial: Record<string, number> = {};
+   362→    SERVERS.forEach((s) => {
+   363→      if (s.lastConnected) initial[s.id] = s.lastConnected;
+   364→    });
+   365→    return initial;
+   366→  });
+   367→
+   368→  const filteredServers = useMemo(() => {
+   369→    return SERVERS.filter((s) => {
+   370→      const matchesCategory = category === 'All' || s.category === category;
+   371→      const matchesSearch =
+   372→        search === '' ||
+   373→        s.name.toLowerCase().includes(search.toLowerCase()) ||
+   374→        s.description.toLowerCase().includes(search.toLowerCase()) ||
+   375→        s.tools.some((t) => t.name.toLowerCase().includes(search.toLowerCase()));
+   376→      return matchesCategory && matchesSearch;
+   377→    });
+   378→  }, [search, category]);
+   379→
+   380→  const connectedCount = Object.values(serverStates).filter(Boolean).length;
+   381→  const availableCount = SERVERS.length;
+   382→  const totalTools = SERVERS.reduce((sum, s) => sum + s.toolCount, 0);
+   383→
+   384→  const toggleConnection = useCallback((id: string) => {
+   385→    setServerStates((prev) => {
+   386→      const newState = !prev[id];
+   387→      if (newState) {
+   388→        setServerLastConnected((lc) => ({ ...lc, [id]: 0 }));
+   389→      }
+   390→      return { ...prev, [id]: newState };
+   391→    });
+   392→  }, []);
+   393→
+   394→  const toggleExpand = useCallback((id: string) => {
+   395→    setExpandedServer((prev) => (prev === id ? null : id));
+   396→  }, []);
+   397→
+   398→  const batchConnectPopular = useCallback(() => {
+   399→    const popularIds = SERVERS.filter((s) => s.popular).map((s) => s.id);
+   400→    setServerStates((prev) => {
+   401→      const next = { ...prev };
+   402→      popularIds.forEach((id) => {
+   403→        next[id] = true;
+   404→      });
+   405→      return next;
+   406→    });
+   407→    setServerLastConnected((prev) => {
+   408→      const next = { ...prev };
+   409→      popularIds.forEach((id) => {
+   410→        next[id] = 0;
+   411→      });
+   412→      return next;
+   413→    });
+   414→  }, []);
+   415→
+   416→  const runTool = useCallback((serverId: string, tool: MCPTool) => {
+   417→    const key = `${serverId}-${tool.name}`;
+   418→    setToolExecutions((prev) => ({
+   419→      ...prev,
+   420→      [key]: {
+   421→        toolName: tool.name,
+   422→        serverId,
+   423→        status: 'running',
+   424→        output: '',
+   425→      },
+   426→    }));
+   427→
+   428→    // Simulate execution
+   429→    setTimeout(() => {
+   430→      setToolExecutions((prev) => ({
+   431→        ...prev,
+   432→        [key]: {
+   433→          toolName: tool.name,
+   434→          serverId,
+   435→          status: 'success',
+   436→          output: tool.sampleOutput || `✓ ${tool.name} executed successfully\n  Duration: ${Math.floor(Math.random() * 200 + 50)}ms`,
+   437→          duration: Math.floor(Math.random() * 200 + 50),
+   438→        },
+   439→      }));
+   440→    }, 800 + Math.random() * 600);
+   441→  }, []);
+   442→
+   443→  const getHealthColor = (serverId: string, isConnected: boolean) => {
+   444→    if (!isConnected) return '';
+   445→    const server = SERVERS.find((s) => s.id === serverId);
+   446→    if (!server) return '';
+   447→    switch (server.health) {
+   448→      case 'healthy': return 'bg-emerald-400';
+   449→      case 'degraded': return 'bg-amber-400';
+   450→      case 'error': return 'bg-red-400';
+   451→      default: return 'bg-emerald-400';
+   452→    }
+   453→  };
+   454→
+   455→  const getHealthTooltip = (serverId: string) => {
+   456→    const server = SERVERS.find((s) => s.id === serverId);
+   457→    if (!server) return '';
+   458→    switch (server.health) {
+   459→      case 'healthy': return 'Healthy';
+   460→      case 'degraded': return 'Degraded';
+   461→      case 'error': return 'Error';
+   462→      default: return 'Healthy';
+   463→    }
+   464→  };
+   465→
+   466→  const formatLastConnected = (minutes: number | undefined) => {
+   467→    if (minutes === undefined) return 'Never';
+   468→    if (minutes === 0) return 'Just now';
+   469→    if (minutes < 60) return `${minutes}m ago`;
+   470→    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+   471→    return `${Math.floor(minutes / 1440)}d ago`;
+   472→  };
+   473→
+   474→  // Get connected servers with their last connected times for the footer
+   475→  const connectedServers = useMemo(() => {
+   476→    return SERVERS.filter((s) => serverStates[s.id]);
+   477→  }, [serverStates]);
+   478→
+   479→  return (
+   480→    <div className="flex flex-col h-full">
+   481→      {/* Header */}
+   482→      <div className="shrink-0 px-4 pt-4 pb-2">
+   483→        <div className="flex items-center justify-between mb-3">
+   484→          <div className="flex items-center gap-2">
+   485→            <div className="h-7 w-7 rounded-lg bg-emerald-500/15 flex items-center justify-center">
+   486→              <Plug className="h-4 w-4 text-emerald-400" />
+   487→            </div>
+   488→            <div>
+   489→              <h2 className="text-sm font-semibold">MCP Integration Hub</h2>
+   490→              <p className="text-[10px] text-muted-foreground">Connect and manage your tool servers</p>
+   491→            </div>
+   492→          </div>
+   493→          <div className="flex items-center gap-2">
+   494→            <Button
+   495→              variant="outline"
+   496→              size="sm"
+   497→              className="h-6 text-[9px] px-2 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+   498→              onClick={batchConnectPopular}
+   499→            >
+   500→              <Link2 className="h-3 w-3 mr-1" />
+   501→              Connect All Popular
+   502→            </Button>
+   503→            <Badge variant="outline" className="text-[9px] border-emerald-500/30 text-emerald-400 gap-1">
+   504→              <Zap className="h-2.5 w-2.5" />
+   505→              {connectedCount} connected
+   506→            </Badge>
+   507→          </div>
+   508→        </div>
+   509→
+   510→        {/* Search */}
+   511→        <div className="relative mb-3">
+   512→          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+   513→          <Input
+   514→            value={search}
+   515→            onChange={(e) => setSearch(e.target.value)}
+   516→            placeholder="Search servers and tools..."
+   517→            className="pl-8 h-8 text-xs bg-card/50"
+   518→          />
+   519→          {search && (
+   520→            <button
+   521→              onClick={() => setSearch('')}
+   522→              className="absolute right-2.5 top-1/2 -translate-y-1/2"
+   523→            >
+   524→              <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+   525→            </button>
+   526→          )}
+   527→        </div>
+   528→
+   529→        {/* Category filters */}
+   530→        <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-none">
+   531→          {CATEGORIES.map((cat) => (
+   532→            <button
+   533→              key={cat}
+   534→              onClick={() => setCategory(cat)}
+   535→              className={`px-2.5 py-1 rounded-md text-[10px] font-medium whitespace-nowrap transition-colors shrink-0 ${
+   536→                category === cat
+   537→                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+   538→                  : 'bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent'
+   539→              }`}
+   540→            >
+   541→              {cat}
+   542→            </button>
+   543→          ))}
+   544→        </div>
+   545→      </div>
+   546→
+   547→      <Separator className="shrink-0" />
+   548→
+   549→      {/* Server Grid */}
+   550→      <ScrollArea className="flex-1 min-h-0">
+   551→        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+   552→          <AnimatePresence>
+   553→            {filteredServers.map((server) => {
+   554→              const isConnected = serverStates[server.id] ?? false;
+   555→              const isExpanded = expandedServer === server.id;
+   556→              const Icon = server.icon;
+   557→              const healthDot = getHealthColor(server.id, isConnected);
+   558→              const healthLabel = getHealthTooltip(server.id);
+   559→
+   560→              return (
+   561→                <motion.div
+   562→                  key={server.id}
+   563→                  layout
+   564→                  initial={{ opacity: 0, scale: 0.95 }}
+   565→                  animate={{ opacity: 1, scale: 1 }}
+   566→                  exit={{ opacity: 0, scale: 0.95 }}
+   567→                  transition={{ duration: 0.15 }}
+   568→                  className={`rounded-lg border transition-colors ${
+   569→                    isConnected
+   570→                      ? 'border-emerald-500/40 bg-emerald-500/5'
+   571→                      : 'border-border bg-card/50'
+   572→                  }`}
+   573→                >
+   574→                  {/* Card Header */}
+   575→                  <div
+   576→                    className="p-3 cursor-pointer"
+   577→                    onClick={() => toggleExpand(server.id)}
+   578→                  >
+   579→                    <div className="flex items-start gap-2.5">
+   580→                      <div
+   581→                        className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 relative ${
+   582→                          isConnected
+   583→                            ? 'bg-emerald-500/15'
+   584→                            : 'bg-muted/50'
+   585→                        }`}
+   586→                      >
+   587→                        <Icon
+   588→                          className={`h-4.5 w-4.5 ${
+   589→                            isConnected ? 'text-emerald-400' : 'text-muted-foreground'
+   590→                          }`}
+   591→                        />
+   592→                        {/* Health indicator dot */}
+   593→                        {healthDot && (
+   594→                          <span
+   595→                            className={`absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${healthDot} ring-2 ring-background`}
+   596→                            title={healthLabel}
+   597→                          />
+   598→                        )}
+   599→                      </div>
+   600→                      <div className="flex-1 min-w-0">
+   601→                        <div className="flex items-center gap-2">
+   602→                          <span className="text-xs font-semibold truncate">{server.name}</span>
+   603→                          {isConnected && (
+   604→                            <Badge className="text-[8px] h-4 px-1.5 bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20">
+   605→                              Connected
+   606→                            </Badge>
+   607→                          )}
+   608→                          {server.popular && (
+   609→                            <Badge variant="secondary" className="text-[7px] h-3.5 px-1 bg-amber-500/15 text-amber-500 border-amber-500/20">
+   610→                              Popular
+   611→                            </Badge>
+   612→                          )}
+   613→                          <Badge variant="secondary" className="text-[8px] h-4 px-1.5 ml-auto shrink-0">
+   614→                            {server.category}
+   615→                          </Badge>
+   616→                        </div>
+   617→                        <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+   618→                          {server.description}
+   619→                        </p>
+   620→                        <div className="flex items-center gap-3 mt-1.5">
+   621→                          <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+   622→                            <Server className="h-2.5 w-2.5" />
+   623→                            {server.toolCount} tools
+   624→                          </span>
+   625→                          {isConnected && serverLastConnected[server.id] !== undefined && (
+   626→                            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+   627→                              <Clock className="h-2.5 w-2.5" />
+   628→                              {formatLastConnected(serverLastConnected[server.id])}
+   629→                            </span>
+   630→                          )}
+   631→                        </div>
+   632→                      </div>
+   633→                    </div>
+   634→
+   635→                    {/* Toggle + Expand indicator */}
+   636→                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/30">
+   637→                      <div className="flex items-center gap-2">
+   638→                        <Switch
+   639→                          checked={isConnected}
+   640→                          onCheckedChange={() => toggleConnection(server.id)}
+   641→                          className="scale-75"
+   642→                          onClick={(e) => e.stopPropagation()}
+   643→                        />
+   644→                        <span className="text-[9px] text-muted-foreground">
+   645→                          {isConnected ? 'Active' : 'Inactive'}
+   646→                        </span>
+   647→                      </div>
+   648→                      <div className="flex items-center gap-1 text-muted-foreground">
+   649→                        <span className="text-[9px]">{isExpanded ? 'Hide' : 'Tools'}</span>
+   650→                        {isExpanded ? (
+   651→                          <ChevronDown className="h-3 w-3" />
+   652→                        ) : (
+   653→                          <ChevronRight className="h-3 w-3" />
+   654→                        )}
+   655→                      </div>
+   656→                    </div>
+   657→                  </div>
+   658→
+   659→                  {/* Expanded Tools */}
+   660→                  <AnimatePresence>
+   661→                    {isExpanded && (
+   662→                      <motion.div
+   663→                        initial={{ height: 0, opacity: 0 }}
+   664→                        animate={{ height: 'auto', opacity: 1 }}
+   665→                        exit={{ height: 0, opacity: 0 }}
+   666→                        transition={{ duration: 0.2 }}
+   667→                        className="overflow-hidden"
+   668→                      >
+   669→                        <div className="px-3 pb-3 space-y-1.5">
+   670→                          <Separator className="mb-2" />
+   671→                          {server.tools.map((tool) => {
+   672→                            const execKey = `${server.id}-${tool.name}`;
+   673→                            const execution = toolExecutions[execKey];
+   674→
+   675→                            return (
+   676→                              <div key={tool.name}>
+   677→                                <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30 hover:bg-muted/50 transition-colors group">
+   678→                                  <div className="h-5 w-5 rounded bg-card/80 flex items-center justify-center shrink-0">
+   679→                                    <Zap className="h-2.5 w-2.5 text-amber-400" />
+   680→                                  </div>
+   681→                                  <div className="flex-1 min-w-0">
+   682→                                    <span className="text-[10px] font-mono font-medium">
+   683→                                      {tool.name}
+   684→                                    </span>
+   685→                                    <p className="text-[9px] text-muted-foreground truncate">
+   686→                                      {tool.description}
+   687→                                    </p>
+   688→                                  </div>
+   689→                                  <Button
+   690→                                    size="sm"
+   691→                                    variant="ghost"
+   692→                                    className="h-5 px-1.5 text-[8px] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+   693→                                    disabled={!isConnected || execution?.status === 'running'}
+   694→                                    onClick={(e) => {
+   695→                                      e.stopPropagation();
+   696→                                      runTool(server.id, tool);
+   697→                                    }}
+   698→                                  >
+   699→                                    {execution?.status === 'running' ? (
+   700→                                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+   701→                                    ) : (
+   702→                                      <Play className="h-2 w-2 mr-0.5" />
+   703→                                    )}
+   704→                                    {execution?.status === 'running' ? 'Running' : 'Run'}
+   705→                                  </Button>
+   706→                                </div>
+   707→
+   708→                                {/* Tool Output Viewer */}
+   709→                                <AnimatePresence>
+   710→                                  {execution && execution.status !== 'running' && (
+   711→                                    <motion.div
+   712→                                      initial={{ height: 0, opacity: 0 }}
+   713→                                      animate={{ height: 'auto', opacity: 1 }}
+   714→                                      exit={{ height: 0, opacity: 0 }}
+   715→                                      transition={{ duration: 0.2 }}
+   716→                                      className="overflow-hidden"
+   717→                                    >
+   718→                                      <div className="mt-1 ml-7 p-2 rounded-md bg-card/80 border border-border/40">
+   719→                                        <div className="flex items-center gap-1.5 mb-1">
+   720→                                          {execution.status === 'success' ? (
+   721→                                            <Check className="h-3 w-3 text-emerald-400" />
+   722→                                          ) : (
+   723→                                            <X className="h-3 w-3 text-red-400" />
+   724→                                          )}
+   725→                                          <span className="text-[8px] font-medium text-muted-foreground">
+   726→                                            Output{execution.duration ? ` (${execution.duration}ms)` : ''}
+   727→                                          </span>
+   728→                                        </div>
+   729→                                        <pre className="text-[9px] font-mono text-foreground/80 whitespace-pre-wrap break-words leading-relaxed">
+   730→                                          {execution.output}
+   731→                                        </pre>
+   732→                                      </div>
+   733→                                    </motion.div>
+   734→                                  )}
+   735→                                </AnimatePresence>
+   736→                              </div>
+   737→                            );
+   738→                          })}
+   739→                        </div>
+   740→                      </motion.div>
+   741→                    )}
+   742→                  </AnimatePresence>
+   743→                </motion.div>
+   744→              );
+   745→            })}
+   746→          </AnimatePresence>
+   747→        </div>
+   748→
+   749→        {filteredServers.length === 0 && (
+   750→          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+   751→            <Search className="h-8 w-8 mb-2 opacity-40" />
+   752→            <p className="text-xs">No servers match your search</p>
+   753→          </div>
+   754→        )}
+   755→      </ScrollArea>
+   756→
+   757→      <Separator className="shrink-0" />
+   758→
+   759→      {/* Stats Footer with Connection Stats */}
+   760→      <div className="shrink-0 px-4 py-2 bg-card/30">
+   761→        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1.5">
+   762→          <div className="flex items-center gap-4">
+   763→            <span className="flex items-center gap-1">
+   764→              <Check className="h-2.5 w-2.5 text-emerald-400" />
+   765→              {connectedCount} connected
+   766→            </span>
+   767→            <span className="flex items-center gap-1">
+   768→              <Server className="h-2.5 w-2.5" />
+   769→              {availableCount} available
+   770→            </span>
+   771→            <span className="flex items-center gap-1">
+   772→              <Zap className="h-2.5 w-2.5 text-amber-400" />
+   773→              {totalTools} total tools
+   774→            </span>
+   775→          </div>
+   776→        </div>
+   777→        {/* Connection Stats: Last connected for each connected server */}
+   778→        {connectedServers.length > 0 && (
+   779→          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[8px] text-muted-foreground/70">
+   780→            {connectedServers.map((s) => (
+   781→              <span key={s.id} className="flex items-center gap-1">
+   782→                <span className={`h-1.5 w-1.5 rounded-full ${getHealthColor(s.id, true)}`} />
+   783→                {s.name.replace(' MCP', '')}: {formatLastConnected(serverLastConnected[s.id])}
+   784→              </span>
+   785→            ))}
+   786→          </div>
+   787→        )}
+   788→      </div>
+   789→    </div>
+   790→  );
+   791→}
+   792→

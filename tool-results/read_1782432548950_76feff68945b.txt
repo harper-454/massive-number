@@ -1,0 +1,712 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo } from 'react';
+     4→import {
+     5→  Bell,
+     6→  CheckCircle2,
+     7→  AlertTriangle,
+     8→  XCircle,
+     9→  Info,
+    10→  MessageSquare,
+    11→  Bot,
+    12→  Plug,
+    13→  FileText,
+    14→  GitBranch,
+    15→  Package,
+    16→  User,
+    17→  Download,
+    18→  X,
+    19→  Check,
+    20→  CheckCheck,
+    21→  Trash2,
+    22→  Search,
+    23→  Clock,
+    24→  Sparkles,
+    25→  Globe,
+    26→  Code,
+    27→  Settings,
+    28→  Store,
+    29→  Crown,
+    30→  Palette,
+    31→  Zap,
+    32→  ChevronDown,
+    33→  ChevronRight,
+    34→  Filter,
+    35→  ArrowUpRight,
+    36→} from 'lucide-react';
+    37→import { Card, CardContent } from '@/components/ui/card';
+    38→import { Badge } from '@/components/ui/badge';
+    39→import { Button } from '@/components/ui/button';
+    40→import { ScrollArea } from '@/components/ui/scroll-area';
+    41→import { Separator } from '@/components/ui/separator';
+    42→import {
+    43→  Select,
+    44→  SelectContent,
+    45→  SelectItem,
+    46→  SelectTrigger,
+    47→  SelectValue,
+    48→} from '@/components/ui/select';
+    49→import { motion, AnimatePresence } from 'framer-motion';
+    50→
+    51→// ── Types ───────────────────────────────────────────────────────────────
+    52→
+    53→type NotificationType = 'info' | 'success' | 'warning' | 'error';
+    54→type NotificationFilter = 'all' | 'unread' | 'info' | 'success' | 'warning' | 'error';
+    55→type DateFilter = 'today' | '7days' | '30days' | 'all';
+    56→
+    57→interface Notification {
+    58→  id: string;
+    59→  type: NotificationType;
+    60→  title: string;
+    61→  description: string;
+    62→  timestamp: Date;
+    63→  read: boolean;
+    64→}
+    65→
+    66→interface TimelineItem {
+    67→  id: string;
+    68→  icon: React.ElementType;
+    69→  iconColor: string;
+    70→  action: string;
+    71→  timestamp: Date;
+    72→  entityLink?: string;
+    73→}
+    74→
+    75→interface QuickAction {
+    76→  id: string;
+    77→  label: string;
+    78→  icon: React.ElementType;
+    79→  navigateTo: string;
+    80→  color: string;
+    81→}
+    82→
+    83→// ── Data ────────────────────────────────────────────────────────────────
+    84→
+    85→const INITIAL_NOTIFICATIONS: Notification[] = [
+    86→  {
+    87→    id: 'notif-1',
+    88→    type: 'info',
+    89→    title: 'New model available',
+    90→    description: 'Qwen3 235B is now available for use in chat and agent modes.',
+    91→    timestamp: new Date(Date.now() - 2 * 60 * 1000),
+    92→    read: false,
+    93→  },
+    94→  {
+    95→    id: 'notif-2',
+    96→    type: 'success',
+    97→    title: 'MCP Server connected',
+    98→    description: 'GitHub MCP server connected successfully. You can now use GitHub tools.',
+    99→    timestamp: new Date(Date.now() - 5 * 60 * 1000),
+   100→    read: false,
+   101→  },
+   102→  {
+   103→    id: 'notif-3',
+   104→    type: 'warning',
+   105→    title: 'Token usage alert',
+   106→    description: 'Token usage is at 80% of your daily limit. Consider optimizing your prompts.',
+   107→    timestamp: new Date(Date.now() - 15 * 60 * 1000),
+   108→    read: false,
+   109→  },
+   110→  {
+   111→    id: 'notif-4',
+   112→    type: 'error',
+   113→    title: 'API connection failed',
+   114→    description: 'Failed to connect to Anthropic API — check your API key in Settings → Providers.',
+   115→    timestamp: new Date(Date.now() - 30 * 60 * 1000),
+   116→    read: false,
+   117→  },
+   118→  {
+   119→    id: 'notif-5',
+   120→    type: 'info',
+   121→    title: 'Platform update',
+   122→    description: 'MASSIVE NUMBER v2.1 is live with improved agent execution and MCP support.',
+   123→    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+   124→    read: true,
+   125→  },
+   126→  {
+   127→    id: 'notif-6',
+   128→    type: 'success',
+   129→    title: 'Agent completed',
+   130→    description: 'Agent "Build auth system" completed successfully with 47 files generated.',
+   131→    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
+   132→    read: true,
+   133→  },
+   134→  {
+   135→    id: 'notif-7',
+   136→    type: 'info',
+   137→    title: 'New integration available',
+   138→    description: 'Slack MCP server is now available in the marketplace.',
+   139→    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
+   140→    read: true,
+   141→  },
+   142→  {
+   143→    id: 'notif-8',
+   144→    type: 'warning',
+   145→    title: 'Storage usage',
+   146→    description: 'Project storage is at 75%. Consider archiving old projects.',
+   147→    timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
+   148→    read: true,
+   149→  },
+   150→  {
+   151→    id: 'notif-9',
+   152→    type: 'success',
+   153→    title: 'Deployment successful',
+   154→    description: 'Your project was deployed to production successfully.',
+   155→    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
+   156→    read: true,
+   157→  },
+   158→];
+   159→
+   160→const TIMELINE_ITEMS: TimelineItem[] = [
+   161→  {
+   162→    id: 'tl-1',
+   163→    icon: MessageSquare,
+   164→    iconColor: 'text-emerald-400',
+   165→    action: 'Sent message in chat #1',
+   166→    timestamp: new Date(Date.now() - 2 * 60 * 1000),
+   167→  },
+   168→  {
+   169→    id: 'tl-2',
+   170→    icon: Bot,
+   171→    iconColor: 'text-amber-400',
+   172→    action: "Launched agent 'Build auth system'",
+   173→    timestamp: new Date(Date.now() - 5 * 60 * 1000),
+   174→    entityLink: '#agents',
+   175→  },
+   176→  {
+   177→    id: 'tl-3',
+   178→    icon: Plug,
+   179→    iconColor: 'text-teal-400',
+   180→    action: 'Connected GitHub MCP server',
+   181→    timestamp: new Date(Date.now() - 10 * 60 * 1000),
+   182→    entityLink: '#mcp',
+   183→  },
+   184→  {
+   185→    id: 'tl-4',
+   186→    icon: FileText,
+   187→    iconColor: 'text-orange-400',
+   188→    action: "Generated spec 'Real-time Chat'",
+   189→    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
+   190→    entityLink: '#spec',
+   191→  },
+   192→  {
+   193→    id: 'tl-5',
+   194→    icon: GitBranch,
+   195→    iconColor: 'text-emerald-400',
+   196→    action: 'Pushed 3 commits to main',
+   197→    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+   198→    entityLink: '#git',
+   199→  },
+   200→  {
+   201→    id: 'tl-6',
+   202→    icon: Bot,
+   203→    iconColor: 'text-amber-400',
+   204→    action: "Agent completed 'Build auth system'",
+   205→    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
+   206→    entityLink: '#agents',
+   207→  },
+   208→  {
+   209→    id: 'tl-7',
+   210→    icon: Package,
+   211→    iconColor: 'text-orange-400',
+   212→    action: 'Installed Security Scanner from marketplace',
+   213→    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
+   214→    entityLink: '#marketplace',
+   215→  },
+   216→  {
+   217→    id: 'tl-8',
+   218→    icon: User,
+   219→    iconColor: 'text-teal-400',
+   220→    action: 'Shared session with alex@example.com',
+   221→    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
+   222→  },
+   223→];
+   224→
+   225→const QUICK_ACTIONS: QuickAction[] = [
+   226→  { id: 'qa-1', label: 'New Chat', icon: MessageSquare, navigateTo: 'chat', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25' },
+   227→  { id: 'qa-2', label: 'New Agent', icon: Bot, navigateTo: 'agent', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25' },
+   228→  { id: 'qa-3', label: 'Web Search', icon: Globe, navigateTo: 'search', color: 'text-teal-400 bg-teal-500/15 border-teal-500/30 hover:bg-teal-500/25' },
+   229→  { id: 'qa-4', label: 'Connect MCP', icon: Plug, navigateTo: 'mcp', color: 'text-orange-400 bg-orange-500/15 border-orange-500/30 hover:bg-orange-500/25' },
+   230→  { id: 'qa-5', label: 'New Spec', icon: FileText, navigateTo: 'spec', color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25' },
+   231→  { id: 'qa-6', label: 'View Marketplace', icon: Store, navigateTo: 'marketplace', color: 'text-amber-400 bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25' },
+   232→  { id: 'qa-7', label: 'Customize', icon: Palette, navigateTo: 'settings', color: 'text-teal-400 bg-teal-500/15 border-teal-500/30 hover:bg-teal-500/25' },
+   233→  { id: 'qa-8', label: 'View Comparison', icon: Crown, navigateTo: 'competitive', color: 'text-orange-400 bg-orange-500/15 border-orange-500/30 hover:bg-orange-500/25' },
+   234→];
+   235→
+   236→const NOTIFICATION_CONFIG: Record<NotificationType, { icon: React.ElementType; colorClass: string; bgClass: string; borderClass: string }> = {
+   237→  info: { icon: Info, colorClass: 'text-teal-400', bgClass: 'bg-teal-500/10', borderClass: 'border-teal-500/20' },
+   238→  success: { icon: CheckCircle2, colorClass: 'text-emerald-400', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20' },
+   239→  warning: { icon: AlertTriangle, colorClass: 'text-amber-400', bgClass: 'bg-amber-500/10', borderClass: 'border-amber-500/20' },
+   240→  error: { icon: XCircle, colorClass: 'text-red-400', bgClass: 'bg-red-500/10', borderClass: 'border-red-500/20' },
+   241→};
+   242→
+   243→// ── Helpers ─────────────────────────────────────────────────────────────
+   244→
+   245→function formatTimeAgo(date: Date): string {
+   246→  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+   247→  if (seconds < 60) return `${seconds}s ago`;
+   248→  const minutes = Math.floor(seconds / 60);
+   249→  if (minutes < 60) return `${minutes} min ago`;
+   250→  const hours = Math.floor(minutes / 60);
+   251→  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+   252→  const days = Math.floor(hours / 24);
+   253→  return `${days} day${days > 1 ? 's' : ''} ago`;
+   254→}
+   255→
+   256→function isToday(date: Date): boolean {
+   257→  const now = new Date();
+   258→  return date.toDateString() === now.toDateString();
+   259→}
+   260→
+   261→function isWithinDays(date: Date, days: number): boolean {
+   262→  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+   263→  return date >= cutoff;
+   264→}
+   265→
+   266→// ── Component ───────────────────────────────────────────────────────────
+   267→
+   268→export function NotificationsPanel() {
+   269→  const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
+   270→  const [notifFilter, setNotifFilter] = useState<NotificationFilter>('all');
+   271→  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+   272→  const [activeSection, setActiveSection] = useState<'notifications' | 'timeline' | 'actions'>('notifications');
+   273→  const [expandedTimeline, setExpandedTimeline] = useState<Set<string>>(new Set());
+   274→
+   275→  // Filtered notifications
+   276→  const filteredNotifications = useMemo(() => {
+   277→    let filtered = notifications;
+   278→
+   279→    // Type filter
+   280→    if (notifFilter === 'unread') {
+   281→      filtered = filtered.filter((n) => !n.read);
+   282→    } else if (notifFilter !== 'all') {
+   283→      filtered = filtered.filter((n) => n.type === notifFilter);
+   284→    }
+   285→
+   286→    // Date filter
+   287→    if (dateFilter === 'today') {
+   288→      filtered = filtered.filter((n) => isToday(n.timestamp));
+   289→    } else if (dateFilter === '7days') {
+   290→      filtered = filtered.filter((n) => isWithinDays(n.timestamp, 7));
+   291→    } else if (dateFilter === '30days') {
+   292→      filtered = filtered.filter((n) => isWithinDays(n.timestamp, 30));
+   293→    }
+   294→
+   295→    return filtered;
+   296→  }, [notifications, notifFilter, dateFilter]);
+   297→
+   298→  // Filtered timeline
+   299→  const filteredTimeline = useMemo(() => {
+   300→    if (dateFilter === 'today') {
+   301→      return TIMELINE_ITEMS.filter((t) => isToday(t.timestamp));
+   302→    }
+   303→    if (dateFilter === '7days') {
+   304→      return TIMELINE_ITEMS.filter((t) => isWithinDays(t.timestamp, 7));
+   305→    }
+   306→    if (dateFilter === '30days') {
+   307→      return TIMELINE_ITEMS.filter((t) => isWithinDays(t.timestamp, 30));
+   308→    }
+   309→    return TIMELINE_ITEMS;
+   310→  }, [dateFilter]);
+   311→
+   312→  const unreadCount = notifications.filter((n) => !n.read).length;
+   313→
+   314→  const markAsRead = (id: string) => {
+   315→    setNotifications((prev) =>
+   316→      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+   317→    );
+   318→  };
+   319→
+   320→  const markAllRead = () => {
+   321→    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+   322→  };
+   323→
+   324→  const dismissNotification = (id: string) => {
+   325→    setNotifications((prev) => prev.filter((n) => n.id !== id));
+   326→  };
+   327→
+   328→  const clearAll = () => {
+   329→    setNotifications([]);
+   330→  };
+   331→
+   332→  const FILTER_OPTIONS: { id: NotificationFilter; label: string; count?: number }[] = [
+   333→    { id: 'all', label: 'All', count: notifications.length },
+   334→    { id: 'unread', label: 'Unread', count: unreadCount },
+   335→    { id: 'info', label: 'Info' },
+   336→    { id: 'success', label: 'Success' },
+   337→    { id: 'warning', label: 'Warning' },
+   338→    { id: 'error', label: 'Error' },
+   339→  ];
+   340→
+   341→  const SECTIONS = [
+   342→    { id: 'notifications' as const, label: 'Notifications', icon: Bell, badge: unreadCount > 0 ? unreadCount : undefined },
+   343→    { id: 'timeline' as const, label: 'Timeline', icon: Clock },
+   344→    { id: 'actions' as const, label: 'Quick Actions', icon: Zap },
+   345→  ];
+   346→
+   347→  return (
+   348→    <div className="flex flex-col h-full">
+   349→      {/* Header */}
+   350→      <div className="shrink-0 px-4 pt-4 pb-2">
+   351→        <div className="flex items-center justify-between mb-3">
+   352→          <div className="flex items-center gap-2">
+   353→            <div className="h-7 w-7 rounded-lg bg-amber-500/15 flex items-center justify-center relative">
+   354→              <Bell className="h-4 w-4 text-amber-400" />
+   355→              {unreadCount > 0 && (
+   356→                <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 text-[8px] text-white flex items-center justify-center font-bold">
+   357→                  {unreadCount > 9 ? '9+' : unreadCount}
+   358→                </span>
+   359→              )}
+   360→            </div>
+   361→            <div>
+   362→              <h2 className="text-sm font-semibold">Notifications</h2>
+   363→              <p className="text-[10px] text-muted-foreground">Activity & alerts center</p>
+   364→            </div>
+   365→          </div>
+   366→          <div className="flex items-center gap-1">
+   367→            {unreadCount > 0 && (
+   368→              <Button
+   369→                size="sm"
+   370→                variant="ghost"
+   371→                className="h-6 px-2 text-[8px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-0.5"
+   372→                onClick={markAllRead}
+   373→              >
+   374→                <CheckCheck className="h-3 w-3" />
+   375→                Mark all read
+   376→              </Button>
+   377→            )}
+   378→            {notifications.length > 0 && (
+   379→              <Button
+   380→                size="sm"
+   381→                variant="ghost"
+   382→                className="h-6 px-2 text-[8px] text-red-400 hover:text-red-300 hover:bg-red-500/10 gap-0.5"
+   383→                onClick={clearAll}
+   384→              >
+   385→                <Trash2 className="h-3 w-3" />
+   386→                Clear all
+   387→              </Button>
+   388→            )}
+   389→          </div>
+   390→        </div>
+   391→
+   392→        {/* Section tabs */}
+   393→        <div className="flex gap-1 mb-2">
+   394→          {SECTIONS.map((section) => {
+   395→            const Icon = section.icon;
+   396→            return (
+   397→              <button
+   398→                key={section.id}
+   399→                onClick={() => setActiveSection(section.id)}
+   400→                className={`px-3 py-1.5 rounded-md text-[10px] font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 relative ${
+   401→                  activeSection === section.id
+   402→                    ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+   403→                    : 'bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent'
+   404→                }`}
+   405→              >
+   406→                <Icon className="h-3 w-3" />
+   407→                {section.label}
+   408→                {section.badge !== undefined && (
+   409→                  <span className="h-3.5 min-w-3.5 px-1 rounded-full bg-red-500 text-[7px] text-white flex items-center justify-center font-bold">
+   410→                    {section.badge}
+   411→                  </span>
+   412→                )}
+   413→              </button>
+   414→            );
+   415→          })}
+   416→        </div>
+   417→
+   418→        {/* Filter row (for notifications & timeline) */}
+   419→        {(activeSection === 'notifications' || activeSection === 'timeline') && (
+   420→          <div className="flex items-center gap-2">
+   421→            {/* Notification type filter (only for notifications) */}
+   422→            {activeSection === 'notifications' && (
+   423→              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none flex-1">
+   424→                {FILTER_OPTIONS.map((opt) => (
+   425→                  <button
+   426→                    key={opt.id}
+   427→                    onClick={() => setNotifFilter(opt.id)}
+   428→                    className={`px-2 py-0.5 rounded text-[9px] font-medium whitespace-nowrap transition-colors shrink-0 ${
+   429→                      notifFilter === opt.id
+   430→                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+   431→                        : 'text-muted-foreground hover:text-foreground border border-transparent'
+   432→                    }`}
+   433→                  >
+   434→                    {opt.label}
+   435→                    {opt.count !== undefined && (
+   436→                      <span className="ml-0.5 text-[8px] opacity-60">({opt.count})</span>
+   437→                    )}
+   438→                  </button>
+   439→                ))}
+   440→              </div>
+   441→            )}
+   442→            {/* Date filter */}
+   443→            <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
+   444→              <SelectTrigger className="h-6 w-28 text-[9px] bg-card/50 shrink-0">
+   445→                <Filter className="h-2.5 w-2.5 mr-1" />
+   446→                <SelectValue />
+   447→              </SelectTrigger>
+   448→              <SelectContent>
+   449→                <SelectItem value="today">Today</SelectItem>
+   450→                <SelectItem value="7days">Last 7 days</SelectItem>
+   451→                <SelectItem value="30days">Last 30 days</SelectItem>
+   452→                <SelectItem value="all">All time</SelectItem>
+   453→              </SelectContent>
+   454→            </Select>
+   455→          </div>
+   456→        )}
+   457→      </div>
+   458→
+   459→      <Separator className="shrink-0" />
+   460→
+   461→      {/* Content */}
+   462→      <ScrollArea className="flex-1 min-h-0">
+   463→        <div className="p-4 space-y-3">
+   464→          {/* Section 1: Notifications */}
+   465→          {activeSection === 'notifications' && (
+   466→            <>
+   467→              {filteredNotifications.length === 0 ? (
+   468→                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+   469→                  <Bell className="h-10 w-10 mb-3 opacity-30" />
+   470→                  <p className="text-xs font-medium mb-1">
+   471→                    {notifFilter === 'unread' ? 'All caught up!' : 'No notifications'}
+   472→                  </p>
+   473→                  <p className="text-[10px] text-muted-foreground/60">
+   474→                    {notifFilter === 'unread'
+   475→                      ? 'You have no unread notifications'
+   476→                      : 'No notifications match your current filter'}
+   477→                  </p>
+   478→                </div>
+   479→              ) : (
+   480→                <div className="space-y-2">
+   481→                  {filteredNotifications.map((notif, idx) => {
+   482→                    const config = NOTIFICATION_CONFIG[notif.type];
+   483→                    const NotifIcon = config.icon;
+   484→
+   485→                    return (
+   486→                      <motion.div
+   487→                        key={notif.id}
+   488→                        initial={{ opacity: 0, x: -8 }}
+   489→                        animate={{ opacity: 1, x: 0 }}
+   490→                        exit={{ opacity: 0, x: 8 }}
+   491→                        transition={{ delay: idx * 0.03 }}
+   492→                        className={`rounded-lg border p-3 transition-all group ${
+   493→                          notif.read
+   494→                            ? 'border-border/30 bg-card/30'
+   495→                            : `border-border/50 ${config.bgClass} ${config.borderClass}`
+   496→                        }`}
+   497→                      >
+   498→                        <div className="flex items-start gap-2.5">
+   499→                          {/* Icon */}
+   500→                          <div className={`mt-0.5 h-6 w-6 rounded-full flex items-center justify-center shrink-0 ${config.bgClass}`}>
+   501→                            <NotifIcon className={`h-3.5 w-3.5 ${config.colorClass}`} />
+   502→                          </div>
+   503→
+   504→                          {/* Content */}
+   505→                          <div className="flex-1 min-w-0">
+   506→                            <div className="flex items-center gap-1.5 mb-0.5">
+   507→                              <span className={`text-[10px] font-semibold ${notif.read ? 'text-muted-foreground' : 'text-foreground'}`}>
+   508→                                {notif.title}
+   509→                              </span>
+   510→                              {!notif.read && (
+   511→                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+   512→                              )}
+   513→                            </div>
+   514→                            <p className={`text-[9px] leading-relaxed ${notif.read ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
+   515→                              {notif.description}
+   516→                            </p>
+   517→                            <span className="text-[8px] text-muted-foreground/50 mt-1 block">
+   518→                              {formatTimeAgo(notif.timestamp)}
+   519→                            </span>
+   520→                          </div>
+   521→
+   522→                          {/* Actions */}
+   523→                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+   524→                            {!notif.read && (
+   525→                              <button
+   526→                                onClick={() => markAsRead(notif.id)}
+   527→                                className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+   528→                                aria-label="Mark as read"
+   529→                              >
+   530→                                <Check className="h-3 w-3" />
+   531→                              </button>
+   532→                            )}
+   533→                            <button
+   534→                              onClick={() => dismissNotification(notif.id)}
+   535→                              className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+   536→                              aria-label="Dismiss"
+   537→                            >
+   538→                              <X className="h-3 w-3" />
+   539→                            </button>
+   540→                          </div>
+   541→                        </div>
+   542→                      </motion.div>
+   543→                    );
+   544→                  })}
+   545→                </div>
+   546→              )}
+   547→            </>
+   548→          )}
+   549→
+   550→          {/* Section 2: Activity Timeline */}
+   551→          {activeSection === 'timeline' && (
+   552→            <>
+   553→              <div className="flex items-center justify-between mb-1">
+   554→                <div className="flex items-center gap-1.5">
+   555→                  <Clock className="h-3.5 w-3.5 text-amber-400" />
+   556→                  <span className="text-[10px] font-semibold uppercase tracking-wider">Activity Timeline</span>
+   557→                </div>
+   558→                <Button
+   559→                  size="sm"
+   560→                  variant="outline"
+   561→                  className="h-5 px-2 text-[8px] gap-1"
+   562→                >
+   563→                  <Download className="h-2.5 w-2.5" />
+   564→                  Export Activity
+   565→                </Button>
+   566→              </div>
+   567→
+   568→              {filteredTimeline.length === 0 ? (
+   569→                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+   570→                  <Clock className="h-10 w-10 mb-3 opacity-30" />
+   571→                  <p className="text-xs font-medium mb-1">No activity found</p>
+   572→                  <p className="text-[10px] text-muted-foreground/60">
+   573→                    No activity matches the selected date range
+   574→                  </p>
+   575→                </div>
+   576→              ) : (
+   577→                <div className="relative">
+   578→                  {/* Timeline line */}
+   579→                  <div className="absolute left-[15px] top-3 bottom-3 w-px bg-border/40" />
+   580→
+   581→                  <div className="space-y-0">
+   582→                    {filteredTimeline.map((item, idx) => {
+   583→                      const Icon = item.icon;
+   584→
+   585→                      return (
+   586→                        <motion.div
+   587→                          key={item.id}
+   588→                          initial={{ opacity: 0, x: -6 }}
+   589→                          animate={{ opacity: 1, x: 0 }}
+   590→                          transition={{ delay: idx * 0.04 }}
+   591→                          className="relative flex items-start gap-3 py-2.5 group"
+   592→                        >
+   593→                          {/* Timeline dot */}
+   594→                          <div className={`relative z-10 h-[30px] w-[30px] rounded-full flex items-center justify-center shrink-0 bg-background border border-border/50 group-hover:border-border transition-colors`}>
+   595→                            <Icon className={`h-3.5 w-3.5 ${item.iconColor}`} />
+   596→                          </div>
+   597→
+   598→                          {/* Content */}
+   599→                          <div className="flex-1 min-w-0 pt-1">
+   600→                            <div className="flex items-center gap-2">
+   601→                              <span className="text-[10px] text-foreground">{item.action}</span>
+   602→                              {item.entityLink && (
+   603→                                <a
+   604→                                  href={item.entityLink}
+   605→                                  className="text-[9px] text-muted-foreground hover:text-emerald-400 transition-colors inline-flex items-center gap-0.5"
+   606→                                  onClick={(e) => e.preventDefault()}
+   607→                                >
+   608→                                  <ArrowUpRight className="h-2.5 w-2.5" />
+   609→                                  view
+   610→                                </a>
+   611→                              )}
+   612→                            </div>
+   613→                            <span className="text-[8px] text-muted-foreground/60 mt-0.5 block">
+   614→                              {formatTimeAgo(item.timestamp)}
+   615→                            </span>
+   616→                          </div>
+   617→                        </motion.div>
+   618→                      );
+   619→                    })}
+   620→                  </div>
+   621→                </div>
+   622→              )}
+   623→            </>
+   624→          )}
+   625→
+   626→          {/* Section 3: Quick Actions */}
+   627→          {activeSection === 'actions' && (
+   628→            <>
+   629→              <div className="flex items-center gap-1.5 mb-3">
+   630→                <Zap className="h-3.5 w-3.5 text-amber-400" />
+   631→                <span className="text-[10px] font-semibold uppercase tracking-wider">Quick Actions</span>
+   632→              </div>
+   633→              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+   634→                {QUICK_ACTIONS.map((action, idx) => {
+   635→                  const Icon = action.icon;
+   636→
+   637→                  return (
+   638→                    <motion.button
+   639→                      key={action.id}
+   640→                      initial={{ opacity: 0, scale: 0.95 }}
+   641→                      animate={{ opacity: 1, scale: 1 }}
+   642→                      transition={{ delay: idx * 0.04 }}
+   643→                      whileHover={{ scale: 1.03 }}
+   644→                      whileTap={{ scale: 0.98 }}
+   645→                      className={`flex flex-col items-center justify-center gap-2 rounded-lg border p-4 transition-all ${action.color}`}
+   646→                      onClick={() => {
+   647→                        // Navigation would be handled by the parent
+   648→                      }}
+   649→                    >
+   650→                      <Icon className="h-5 w-5" />
+   651→                      <span className="text-[10px] font-medium">{action.label}</span>
+   652→                    </motion.button>
+   653→                  );
+   654→                })}
+   655→              </div>
+   656→
+   657→              {/* Additional context: summary stats */}
+   658→              <div className="mt-4">
+   659→                <div className="flex items-center gap-1.5 mb-2">
+   660→                  <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+   661→                  <span className="text-[10px] font-semibold uppercase tracking-wider">Session Summary</span>
+   662→                </div>
+   663→                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+   664→                  {[
+   665→                    { label: 'Messages', value: '24', icon: MessageSquare, color: 'text-emerald-400' },
+   666→                    { label: 'Agents Run', value: '3', icon: Bot, color: 'text-amber-400' },
+   667→                    { label: 'MCP Servers', value: '2', icon: Plug, color: 'text-teal-400' },
+   668→                    { label: 'Specs', value: '5', icon: FileText, color: 'text-orange-400' },
+   669→                  ].map((stat) => {
+   670→                    const Icon = stat.icon;
+   671→                    return (
+   672→                      <div
+   673→                        key={stat.label}
+   674→                        className="rounded-lg border border-border/50 bg-card/50 p-3 text-center"
+   675→                      >
+   676→                        <Icon className={`h-4 w-4 mx-auto mb-1 ${stat.color}`} />
+   677→                        <div className="text-lg font-bold text-foreground">{stat.value}</div>
+   678→                        <div className="text-[8px] text-muted-foreground">{stat.label}</div>
+   679→                      </div>
+   680→                    );
+   681→                  })}
+   682→                </div>
+   683→              </div>
+   684→            </>
+   685→          )}
+   686→        </div>
+   687→      </ScrollArea>
+   688→
+   689→      {/* Footer stats */}
+   690→      <Separator className="shrink-0" />
+   691→      <div className="shrink-0 px-4 py-2 flex items-center justify-between text-[10px] text-muted-foreground bg-card/30">
+   692→        <div className="flex items-center gap-4">
+   693→          <span className="flex items-center gap-1">
+   694→            <Bell className="h-2.5 w-2.5" />
+   695→            {notifications.length} notifications
+   696→          </span>
+   697→          {unreadCount > 0 && (
+   698→            <span className="flex items-center gap-1 text-amber-400">
+   699→              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+   700→              {unreadCount} unread
+   701→            </span>
+   702→          )}
+   703→        </div>
+   704→        <span className="flex items-center gap-1">
+   705→          <Clock className="h-2.5 w-2.5" />
+   706→          Last updated just now
+   707→        </span>
+   708→      </div>
+   709→    </div>
+   710→  );
+   711→}
+   712→

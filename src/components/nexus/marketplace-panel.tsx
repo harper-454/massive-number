@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Store,
   Search,
@@ -63,7 +63,7 @@ interface Plugin {
   installed: boolean;
 }
 
-// ── Data ────────────────────────────────────────────────────────────────
+// ── Category Config (config, not data) ──────────────────────────────────
 
 const CATEGORIES: MarketplaceCategory[] = [
   'All', 'AI', 'Testing', 'Design', 'DevOps', 'Database', 'Security', 'Documentation', 'Monitoring', 'Localization',
@@ -81,94 +81,58 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   Localization: Languages,
 };
 
-const PLUGINS: Plugin[] = [
-  {
-    id: 'p1', name: 'CodeGPT Agent', description: 'Autonomous code generation agent with multi-model orchestration and context-aware suggestions.',
-    author: 'MASSIVE NUMBER', rating: 4.9, downloads: 14200, price: 'free', verified: true, featured: true,
-    category: 'AI', icon: Bot, installed: true,
-  },
-  {
-    id: 'p2', name: 'TestForge', description: 'Auto-generate unit, integration, and E2E tests from your codebase with AI-powered coverage analysis.',
-    author: 'QA Labs', rating: 4.7, downloads: 8900, price: 'free', verified: true, featured: true,
-    category: 'Testing', icon: TestTube2, installed: false,
-  },
-  {
-    id: 'p3', name: 'DesignSync', description: 'Sync Figma designs to code automatically. Generate pixel-perfect components from design tokens.',
-    author: 'DesignOps Inc', rating: 4.6, downloads: 6300, price: 9.99, verified: true, featured: true,
-    category: 'Design', icon: Palette, installed: false,
-  },
-  {
-    id: 'p4', name: 'DeployBot', description: 'One-click deployment to AWS, GCP, Azure, and Vercel with rollback and monitoring.',
-    author: 'CloudForge', rating: 4.5, downloads: 11200, price: 'free', verified: true, featured: false,
-    category: 'DevOps', icon: Server, installed: true,
-  },
-  {
-    id: 'p5', name: 'SchemaGen', description: 'AI-powered database schema generation from natural language descriptions with Prisma integration.',
-    author: 'DB Tools', rating: 4.4, downloads: 5600, price: 'free', verified: false, featured: false,
-    category: 'Database', icon: Database, installed: false,
-  },
-  {
-    id: 'p6', name: 'SecureScan', description: 'Real-time vulnerability scanning and SAST analysis integrated directly in your coding workflow.',
-    author: 'SecureDev', rating: 4.8, downloads: 9400, price: 14.99, verified: true, featured: false,
-    category: 'Security', icon: Lock, installed: false,
-  },
-  {
-    id: 'p7', name: 'DocMind', description: 'Auto-generate and maintain API documentation, READMEs, and code comments with AI.',
-    author: 'DocForge', rating: 4.3, downloads: 7200, price: 'free', verified: true, featured: false,
-    category: 'Documentation', icon: BookOpen, installed: true,
-  },
-  {
-    id: 'p8', name: 'PerfWatch', description: 'Real-time performance monitoring, bundle analysis, and optimization suggestions.',
-    author: 'PerfLabs', rating: 4.6, downloads: 4800, price: 4.99, verified: false, featured: false,
-    category: 'Monitoring', icon: Activity, installed: false,
-  },
-  {
-    id: 'p9', name: 'LinguaCode', description: 'Automatic i18n and l10n for your app. Extract strings, generate translations, manage locales.',
-    author: 'GlobalDev', rating: 4.2, downloads: 3200, price: 'free', verified: true, featured: false,
-    category: 'Localization', icon: Languages, installed: false,
-  },
-  {
-    id: 'p10', name: 'SmartMigrate', description: 'AI-assisted database migration generator. Analyze schema changes and generate safe migrations.',
-    author: 'DB Tools', rating: 4.5, downloads: 4100, price: 'free', verified: false, featured: false,
-    category: 'Database', icon: Database, installed: false,
-  },
-  {
-    id: 'p11', name: 'A11y Checker', description: 'Accessibility auditing and auto-fix. WCAG 2.1 compliance checking built into your editor.',
-    author: 'InclusiveDev', rating: 4.7, downloads: 6700, price: 'free', verified: true, featured: false,
-    category: 'Testing', icon: TestTube2, installed: false,
-  },
-  {
-    id: 'p12', name: 'PromptLab', description: 'Advanced prompt engineering toolkit. Test, version, and optimize AI prompts with analytics.',
-    author: 'AI Tools Co', rating: 4.8, downloads: 10500, price: 7.99, verified: true, featured: false,
-    category: 'AI', icon: Sparkles, installed: true,
-  },
-  {
-    id: 'p13', name: 'ContainerKit', description: 'Docker and Kubernetes management directly from the IDE. Compose, deploy, monitor.',
-    author: 'CloudForge', rating: 4.4, downloads: 5900, price: 'free', verified: true, featured: false,
-    category: 'DevOps', icon: Server, installed: false,
-  },
-  {
-    id: 'p14', name: 'CryptoGuard', description: 'Secret detection and encryption management. Never commit API keys again.',
-    author: 'SecureDev', rating: 4.9, downloads: 12800, price: 'free', verified: true, featured: false,
-    category: 'Security', icon: ShieldCheck, installed: true,
-  },
-];
+// ── Marketplace Icon Map ────────────────────────────────────────────────
+
+const MARKETPLACE_ICON_MAP: Record<string, React.ElementType> = {
+  ai: Bot,
+  testing: TestTube2,
+  design: Palette,
+  devops: Server,
+  database: Database,
+  security: Lock,
+  documentation: BookOpen,
+  monitoring: Activity,
+  localization: Languages,
+};
 
 // ── Component ───────────────────────────────────────────────────────────
 
 export function MarketplacePanel() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<MarketplaceCategory>('All');
-  const [installedPlugins, setInstalledPlugins] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    PLUGINS.forEach((p) => {
-      initial[p.id] = p.installed;
-    });
-    return initial;
-  });
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
+  const [installedPlugins, setInstalledPlugins] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/marketplace')
+      .then(res => res.json())
+      .then(data => {
+        const mapped = (data.items || []).map((p: { id: string; name: string; description: string; author: string; rating: number; downloads: number; price: string; verified: boolean; category: string; installed: boolean }) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          author: p.author,
+          rating: p.rating,
+          downloads: p.downloads,
+          price: p.price === 'free' ? 'free' as const : parseFloat(String(p.price).replace(/[^0-9.]/g, '')) || 0,
+          verified: p.verified,
+          featured: p.rating >= 4.6 && p.downloads >= 5000,
+          category: (p.category?.charAt(0).toUpperCase() + p.category?.slice(1)) as MarketplaceCategory,
+          icon: MARKETPLACE_ICON_MAP[p.category?.toLowerCase()] || Package,
+          installed: p.installed,
+        }));
+        setPlugins(mapped);
+        const inst: Record<string, boolean> = {};
+        mapped.forEach((p: Plugin) => { inst[p.id] = p.installed; });
+        setInstalledPlugins(inst);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const filteredPlugins = useMemo(() => {
-    return PLUGINS.filter((p) => {
+    return plugins.filter((p) => {
       const matchesCategory = category === 'All' || p.category === category;
       const matchesSearch =
         search === '' ||
@@ -177,17 +141,25 @@ export function MarketplacePanel() {
         p.author.toLowerCase().includes(search.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [search, category]);
+  }, [search, category, plugins]);
 
   const featuredPlugins = filteredPlugins.filter((p) => p.featured);
   const regularPlugins = filteredPlugins.filter((p) => !p.featured);
 
   const totalInstalled = Object.values(installedPlugins).filter(Boolean).length;
-  const totalDownloads = PLUGINS.reduce((s, p) => s + p.downloads, 0);
-  const communityBuilt = PLUGINS.filter((p) => p.author !== 'MASSIVE NUMBER').length;
+  const totalDownloads = plugins.reduce((s, p) => s + p.downloads, 0);
+  const communityBuilt = plugins.filter((p) => p.author !== 'MASSIVE NUMBER').length;
 
   const toggleInstall = (id: string) => {
+    const action = installedPlugins[id] ? 'uninstall' : 'install';
     setInstalledPlugins((prev) => ({ ...prev, [id]: !prev[id] }));
+    fetch('/api/marketplace', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, itemId: id }),
+    }).catch(() => {
+      setInstalledPlugins((prev) => ({ ...prev, [id]: !prev[id] }));
+    });
   };
 
   const formatDownloads = (n: number) => {
@@ -465,7 +437,7 @@ export function MarketplacePanel() {
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1">
             <Package className="h-2.5 w-2.5" />
-            {PLUGINS.length} integrations available
+            {plugins.length} integrations available
           </span>
           <span className="flex items-center gap-1">
             <Users className="h-2.5 w-2.5" />

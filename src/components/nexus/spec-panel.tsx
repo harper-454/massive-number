@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileText,
   Sparkles,
@@ -83,119 +83,83 @@ const STATUS_CONFIG: Record<SpecStatus, { color: string; bg: string; label: stri
 
 const STATUS_FLOW: SpecStatus[] = ['draft', 'approved', 'implementing', 'complete'];
 
-const SAMPLE_SPECS: Spec[] = [
-  {
-    id: 'spec-1',
-    title: 'Real-time Chat Streaming',
-    description: 'Implement WebSocket-based streaming for AI chat responses',
-    requirements: [
-      { id: 'r1', text: 'Connect to WebSocket service on port 3003', checked: true },
-      { id: 'r2', text: 'Stream tokens incrementally in chat UI', checked: true },
-      { id: 'r3', text: 'Handle reconnection on disconnect', checked: true },
-      { id: 'r4', text: 'Show typing indicator during streaming', checked: true },
-    ],
-    designNotes: 'Use socket.io-client with XTransformPort gateway routing. Each message chunk should animate in with framer-motion.',
-    implementationSteps: [
-      { id: 's1', name: 'Setup socket connection', description: 'Initialize socket.io client with reconnection', completed: true },
-      { id: 's2', name: 'Add streaming state', description: 'Create Zustand store for streaming state', completed: true },
-      { id: 's3', name: 'Build message renderer', description: 'Animate tokens as they arrive', completed: true },
-      { id: 's4', name: 'Add error handling', description: 'Handle disconnects and retries gracefully', completed: true },
-    ],
-    testCriteria: [
-      { id: 't1', text: 'Messages stream without visible delay', passed: true },
-      { id: 't2', text: 'Reconnects within 3 seconds', passed: true },
-      { id: 't3', text: 'No duplicate tokens on reconnect', passed: true },
-    ],
-    complexity: 'medium',
-    affectedFiles: ['chat-panel.tsx', 'chat-store.ts', 'ws-service/index.ts'],
-    status: 'complete',
-    createdAt: '2 days ago',
-  },
-  {
-    id: 'spec-2',
-    title: 'MCP Integration Hub',
-    description: 'Visual hub for managing all MCP server connections and tools',
-    requirements: [
-      { id: 'r1', text: 'Display all available MCP servers in a grid', checked: true },
-      { id: 'r2', text: 'Toggle server connections on/off', checked: true },
-      { id: 'r3', text: 'Expand servers to view available tools', checked: true },
-      { id: 'r4', text: 'Filter by category and search', checked: true },
-      { id: 'r5', text: 'Execute tools directly from the hub', checked: false },
-    ],
-    designNotes: 'Use a card grid with expand/collapse for tools. Connected servers have emerald border. Category pills at top.',
-    implementationSteps: [
-      { id: 's1', name: 'Define server data model', description: 'Create TypeScript types and sample data', completed: true },
-      { id: 's2', name: 'Build server grid', description: 'Card layout with filters and search', completed: true },
-      { id: 's3', name: 'Add connection toggle', description: 'Switch component with state management', completed: true },
-      { id: 's4', name: 'Implement tool expansion', description: 'Animated expand/collapse for tool list', completed: true },
-      { id: 's5', name: 'Add tool execution', description: 'Execute button with feedback', completed: false },
-    ],
-    testCriteria: [
-      { id: 't1', text: 'All 12 servers display correctly', passed: true },
-      { id: 't2', text: 'Category filters work correctly', passed: true },
-      { id: 't3', text: 'Connection toggle persists state', passed: true },
-      { id: 't4', text: 'Tool execution returns results', passed: false },
-    ],
-    complexity: 'high',
-    affectedFiles: ['mcp-hub.tsx', 'api/mcp/route.ts', 'stores/mcp-store.ts'],
-    status: 'implementing',
-    createdAt: '1 day ago',
-  },
-];
-
 // ── Component ───────────────────────────────────────────────────────────
 
 export function SpecPanel() {
-  const [specs, setSpecs] = useState<Spec[]>(SAMPLE_SPECS);
-  const [selectedSpec, setSelectedSpec] = useState<string | null>('spec-2');
+  const [specs, setSpecs] = useState<Spec[]>([]);
+  const [selectedSpec, setSelectedSpec] = useState<string | null>(null);
   const [newSpecDesc, setNewSpecDesc] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showNewSpec, setShowNewSpec] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/specs')
+      .then(res => res.json())
+      .then(data => {
+        const mapped = (data.specs || []).map((s: { id: string; title: string; description: string; requirements: string[]; designNotes: string; implementationSteps: Array<{ name: string; description: string }>; testCriteria: string[]; estimatedComplexity: string; affectedFiles: string[]; status: string; createdAt: string }) => ({
+          id: s.id,
+          title: s.title,
+          description: s.description,
+          requirements: s.requirements.map((r: string, i: number) => ({ id: `r-${i}`, text: r, checked: s.status === 'completed' })),
+          designNotes: s.designNotes,
+          implementationSteps: s.implementationSteps.map((step: { name: string; description: string }, i: number) => ({ id: `s-${i}`, name: step.name, description: step.description, completed: s.status === 'completed' })),
+          testCriteria: s.testCriteria.map((t: string, i: number) => ({ id: `t-${i}`, text: t, passed: s.status === 'completed' })),
+          complexity: s.estimatedComplexity as Complexity,
+          affectedFiles: s.affectedFiles,
+          status: s.status === 'completed' ? 'complete' as SpecStatus : s.status as SpecStatus,
+          createdAt: new Date(s.createdAt).toLocaleDateString(),
+        }));
+        setSpecs(mapped);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const activeSpec = specs.find((s) => s.id === selectedSpec);
 
   const handleGenerateSpec = () => {
     if (!newSpecDesc.trim()) return;
     setIsGenerating(true);
-    setTimeout(() => {
-      const newSpec: Spec = {
-        id: `spec-${Date.now()}`,
-        title: newSpecDesc.length > 40 ? newSpecDesc.substring(0, 40) + '...' : newSpecDesc,
-        description: newSpecDesc,
-        requirements: [
-          { id: `r-${Date.now()}-1`, text: 'Define core functionality and user flows', checked: false },
-          { id: `r-${Date.now()}-2`, text: 'Implement data models and API endpoints', checked: false },
-          { id: `r-${Date.now()}-3`, text: 'Build UI components with proper state management', checked: false },
-          { id: `r-${Date.now()}-4`, text: 'Add error handling and edge cases', checked: false },
-          { id: `r-${Date.now()}-5`, text: 'Write integration tests', checked: false },
-        ],
-        designNotes: 'AI-generated design notes based on the specification description. Follow platform conventions for component structure and state management.',
-        implementationSteps: [
-          { id: `s-${Date.now()}-1`, name: 'Analyze requirements', description: 'Break down the specification into actionable tasks', completed: false },
-          { id: `s-${Date.now()}-2`, name: 'Design data model', description: 'Define TypeScript types and store schema', completed: false },
-          { id: `s-${Date.now()}-3`, name: 'Build API layer', description: 'Create API routes with proper validation', completed: false },
-          { id: `s-${Date.now()}-4`, name: 'Implement UI', description: 'Build components with dark theme and animations', completed: false },
-          { id: `s-${Date.now()}-5`, name: 'Add tests', description: 'Write unit and integration tests', completed: false },
-        ],
-        testCriteria: [
-          { id: `t-${Date.now()}-1`, text: 'Feature works as specified', passed: false },
-          { id: `t-${Date.now()}-2`, text: 'No console errors or warnings', passed: false },
-          { id: `t-${Date.now()}-3`, text: 'Responsive on all screen sizes', passed: false },
-        ],
-        complexity: 'medium' as Complexity,
-        affectedFiles: ['new-component.tsx', 'api/new-route.ts', 'stores/new-store.ts'],
-        status: 'draft',
-        createdAt: 'Just now',
-      };
-      setSpecs((prev) => [newSpec, ...prev]);
-      setSelectedSpec(newSpec.id);
-      setIsGenerating(false);
-      setNewSpecDesc('');
-      setShowNewSpec(false);
-    }, 2000);
+    fetch('/api/specs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: newSpecDesc }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.spec) {
+          const s = data.spec;
+          const newSpec: Spec = {
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            requirements: (s.requirements || []).map((r: string, i: number) => ({ id: `r-${i}`, text: r, checked: false })),
+            designNotes: s.designNotes || '',
+            implementationSteps: (s.implementationSteps || []).map((step: { name: string; description: string }, i: number) => ({ id: `s-${i}`, name: step.name, description: step.description, completed: false })),
+            testCriteria: (s.testCriteria || []).map((t: string, i: number) => ({ id: `t-${i}`, text: t, passed: false })),
+            complexity: (s.estimatedComplexity || 'medium') as Complexity,
+            affectedFiles: s.affectedFiles || [],
+            status: 'draft',
+            createdAt: 'Just now',
+          };
+          setSpecs((prev) => [newSpec, ...prev]);
+          setSelectedSpec(newSpec.id);
+        }
+        setIsGenerating(false);
+        setNewSpecDesc('');
+        setShowNewSpec(false);
+      })
+      .catch(() => setIsGenerating(false));
   };
 
   const handleStatusChange = (specId: string, newStatus: SpecStatus) => {
+    fetch('/api/specs', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: specId, status: newStatus === 'complete' ? 'completed' : newStatus }),
+    }).catch(() => {});
+
     setSpecs((prev) =>
       prev.map((s) => {
         if (s.id !== specId) return s;

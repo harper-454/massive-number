@@ -1,0 +1,1084 @@
+     1→'use client';
+     2→
+     3→import { useState, useCallback } from 'react';
+     4→import {
+     5→  Brain,
+     6→  Database,
+     7→  BookOpen,
+     8→  Clock,
+     9→  Plus,
+    10→  Trash2,
+    11→  Search,
+    12→  RefreshCw,
+    13→  Download,
+    14→  AlertTriangle,
+    15→  FileCode2,
+    16→  FileText,
+    17→  Hash,
+    18→  Check,
+    19→  X,
+    20→  ChevronDown,
+    21→  ChevronUp,
+    22→  Tag,
+    23→  MessageSquare,
+    24→  Coins,
+    25→  Timer,
+    26→  Activity,
+    27→  FolderOpen,
+    28→  ArrowUpRight,
+    29→  Shield,
+    30→  Zap,
+    31→  Code,
+    32→  Palette,
+    33→  Cpu,
+    34→} from 'lucide-react';
+    35→import { Button } from '@/components/ui/button';
+    36→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    37→import { Badge } from '@/components/ui/badge';
+    38→import { Input } from '@/components/ui/input';
+    39→import { Textarea } from '@/components/ui/textarea';
+    40→import { Separator } from '@/components/ui/separator';
+    41→import { ScrollArea } from '@/components/ui/scroll-area';
+    42→import { Progress } from '@/components/ui/progress';
+    43→import {
+    44→  AlertDialog,
+    45→  AlertDialogAction,
+    46→  AlertDialogCancel,
+    47→  AlertDialogContent,
+    48→  AlertDialogDescription,
+    49→  AlertDialogFooter,
+    50→  AlertDialogHeader,
+    51→  AlertDialogTitle,
+    52→  AlertDialogTrigger,
+    53→} from '@/components/ui/alert-dialog';
+    54→import {
+    55→  Dialog,
+    56→  DialogContent,
+    57→  DialogDescription,
+    58→  DialogFooter,
+    59→  DialogHeader,
+    60→  DialogTitle,
+    61→} from '@/components/ui/dialog';
+    62→import { motion, AnimatePresence } from 'framer-motion';
+    63→
+    64→/* ───────── Types ───────── */
+    65→
+    66→type MemoryCategory = 'codebase' | 'preference' | 'decision' | 'error' | 'style';
+    67→
+    68→interface MemoryEntry {
+    69→  id: string;
+    70→  category: MemoryCategory;
+    71→  content: string;
+    72→  source: string;
+    73→  date: string;
+    74→}
+    75→
+    76→interface IndexedFile {
+    77→  path: string;
+    78→  language: string;
+    79→  lastIndexed: string;
+    80→  relevance: number;
+    81→}
+    82→
+    83→interface KnowledgeEntry {
+    84→  id: string;
+    85→  topic: string;
+    86→  content: string;
+    87→}
+    88→
+    89→interface SessionEntry {
+    90→  id: string;
+    91→  date: string;
+    92→  duration: string;
+    93→  messages: number;
+    94→  models: string[];
+    95→  tokens: number;
+    96→  cost: number;
+    97→  summary?: string;
+    98→}
+    99→
+   100→/* ───────── Category Config ───────── */
+   101→
+   102→const CATEGORY_CONFIG: Record<MemoryCategory, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
+   103→  codebase: {
+   104→    label: 'Codebase',
+   105→    color: 'text-cyan-400',
+   106→    bgColor: 'bg-cyan-500/10 border-cyan-500/20',
+   107→    icon: <Code className="h-3 w-3" />,
+   108→  },
+   109→  preference: {
+   110→    label: 'Preference',
+   111→    color: 'text-amber-400',
+   112→    bgColor: 'bg-amber-500/10 border-amber-500/20',
+   113→    icon: <Zap className="h-3 w-3" />,
+   114→  },
+   115→  decision: {
+   116→    label: 'Decision',
+   117→    color: 'text-emerald-400',
+   118→    bgColor: 'bg-emerald-500/10 border-emerald-500/20',
+   119→    icon: <Check className="h-3 w-3" />,
+   120→  },
+   121→  error: {
+   122→    label: 'Error',
+   123→    color: 'text-red-400',
+   124→    bgColor: 'bg-red-500/10 border-red-500/20',
+   125→    icon: <AlertTriangle className="h-3 w-3" />,
+   126→  },
+   127→  style: {
+   128→    label: 'Style',
+   129→    color: 'text-orange-400',
+   130→    bgColor: 'bg-orange-500/10 border-orange-500/20',
+   131→    icon: <Palette className="h-3 w-3" />,
+   132→  },
+   133→};
+   134→
+   135→/* ───────── Sample Data ───────── */
+   136→
+   137→const SAMPLE_MEMORIES: MemoryEntry[] = [
+   138→  {
+   139→    id: 'mem-1',
+   140→    category: 'codebase',
+   141→    content: 'Project uses Next.js 16 with App Router and TypeScript strict mode',
+   142→    source: 'Chat #12 — Project Setup',
+   143→    date: '2026-06-24',
+   144→  },
+   145→  {
+   146→    id: 'mem-2',
+   147→    category: 'preference',
+   148→    content: 'User prefers functional components over class components',
+   149→    source: 'Chat #8 — Component Architecture',
+   150→    date: '2026-06-23',
+   151→  },
+   152→  {
+   153→    id: 'mem-3',
+   154→    category: 'decision',
+   155→    content: 'Using Prisma ORM with SQLite for data layer',
+   156→    source: 'Chat #5 — Database Design',
+   157→    date: '2026-06-22',
+   158→  },
+   159→  {
+   160→    id: 'mem-4',
+   161→    category: 'error',
+   162→    content: 'Next.js 16 requires dynamic route params to be awaited',
+   163→    source: 'Chat #15 — Bug Fix',
+   164→    date: '2026-06-24',
+   165→  },
+   166→  {
+   167→    id: 'mem-5',
+   168→    category: 'style',
+   169→    content: 'Use Tailwind CSS utility classes, avoid inline styles',
+   170→    source: 'Chat #3 — Styling Guide',
+   171→    date: '2026-06-21',
+   172→  },
+   173→];
+   174→
+   175→const SAMPLE_INDEXED_FILES: IndexedFile[] = [
+   176→  { path: 'src/app/page.tsx', language: 'TypeScript', lastIndexed: '2026-06-24T14:30', relevance: 95 },
+   177→  { path: 'prisma/schema.prisma', language: 'Prisma', lastIndexed: '2026-06-24T13:15', relevance: 88 },
+   178→  { path: 'src/stores/chat-store.ts', language: 'TypeScript', lastIndexed: '2026-06-24T12:00', relevance: 82 },
+   179→  { path: 'src/components/nexus/chat-panel.tsx', language: 'TSX', lastIndexed: '2026-06-24T11:45', relevance: 79 },
+   180→  { path: 'src/lib/db.ts', language: 'TypeScript', lastIndexed: '2026-06-23T16:20', relevance: 71 },
+   181→  { path: 'src/stores/model-store.ts', language: 'TypeScript', lastIndexed: '2026-06-23T15:00', relevance: 68 },
+   182→];
+   183→
+   184→const SAMPLE_KNOWLEDGE: KnowledgeEntry[] = [
+   185→  {
+   186→    id: 'know-1',
+   187→    topic: 'architecture',
+   188→    content: 'Full-stack Next.js 16 app with Prisma ORM, Zustand state management, and socket.io for real-time features',
+   189→  },
+   190→  {
+   191→    id: 'know-2',
+   192→    topic: 'api-pattern',
+   193→    content: 'All API routes follow REST conventions with proper error handling and TypeScript types',
+   194→  },
+   195→  {
+   196→    id: 'know-3',
+   197→    topic: 'styling',
+   198→    content: 'Tailwind CSS 4 with shadcn/ui components. Emerald/teal accent system. Dark theme by default.',
+   199→  },
+   200→  {
+   201→    id: 'know-4',
+   202→    topic: 'deployment',
+   203→    content: 'Bun runtime for both Next.js and mini-services. SQLite for persistence. Caddy gateway for port routing.',
+   204→  },
+   205→];
+   206→
+   207→const SAMPLE_SESSIONS: SessionEntry[] = [
+   208→  {
+   209→    id: 'session-1',
+   210→    date: '2026-06-24 14:30',
+   211→    duration: '1h 23m',
+   212→    messages: 47,
+   213→    models: ['gpt-4o', 'claude-sonnet'],
+   214→    tokens: 24500,
+   215→    cost: 1.23,
+   216→    summary: 'Built the customization hub and context memory panels. Integrated with existing store architecture.',
+   217→  },
+   218→  {
+   219→    id: 'session-2',
+   220→    date: '2026-06-24 10:15',
+   221→    duration: '45m',
+   222→    messages: 22,
+   223→    models: ['gpt-4o'],
+   224→    tokens: 12800,
+   225→    cost: 0.64,
+   226→    summary: 'Debugged WebSocket connection issues. Added polling fallback for gateway routing.',
+   227→  },
+   228→  {
+   229→    id: 'session-3',
+   230→    date: '2026-06-23 16:00',
+   231→    duration: '2h 10m',
+   232→    messages: 68,
+   233→    models: ['claude-sonnet', 'deepseek-r1'],
+   234→    tokens: 41200,
+   235→    cost: 2.08,
+   236→    summary: 'Implemented the agent execution pipeline with 6-step workflow and real-time streaming.',
+   237→  },
+   238→  {
+   239→    id: 'session-4',
+   240→    date: '2026-06-23 11:30',
+   241→    duration: '30m',
+   242→    messages: 15,
+   243→    models: ['gpt-4o'],
+   244→    tokens: 7200,
+   245→    cost: 0.36,
+   246→    summary: 'Set up Prisma schema and initial database migration. Created 8 API routes.',
+   247→  },
+   248→];
+   249→
+   250→/* ───────── Section Config ───────── */
+   251→
+   252→type SectionId = 'memory' | 'codebase' | 'knowledge' | 'sessions';
+   253→
+   254→const SECTIONS: { id: SectionId; label: string; icon: React.ReactNode; description: string }[] = [
+   255→  { id: 'memory', label: 'Conversation Memory', icon: <Brain className="h-4 w-4" />, description: 'Persistent memories learned from conversations' },
+   256→  { id: 'codebase', label: 'Codebase Context', icon: <Database className="h-4 w-4" />, description: 'Indexed files for AI context' },
+   257→  { id: 'knowledge', label: 'Project Knowledge', icon: <BookOpen className="h-4 w-4" />, description: 'Cross-session knowledge base' },
+   258→  { id: 'sessions', label: 'Session History', icon: <Clock className="h-4 w-4" />, description: 'Recent sessions with stats' },
+   259→];
+   260→
+   261→/* ───────── Main Component ───────── */
+   262→
+   263→export function ContextMemory() {
+   264→  const [activeSection, setActiveSection] = useState<SectionId>('memory');
+   265→  const [memories, setMemories] = useState<MemoryEntry[]>(SAMPLE_MEMORIES);
+   266→  const [indexedFiles, setIndexedFiles] = useState<IndexedFile[]>(SAMPLE_INDEXED_FILES);
+   267→  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>(SAMPLE_KNOWLEDGE);
+   268→  const [sessions] = useState<SessionEntry[]>(SAMPLE_SESSIONS);
+   269→
+   270→  // Add memory dialog
+   271→  const [showAddMemory, setShowAddMemory] = useState(false);
+   272→  const [newMemoryCategory, setNewMemoryCategory] = useState<MemoryCategory>('codebase');
+   273→  const [newMemoryContent, setNewMemoryContent] = useState('');
+   274→
+   275→  // Add knowledge dialog
+   276→  const [showAddKnowledge, setShowAddKnowledge] = useState(false);
+   277→  const [newKnowledgeTopic, setNewKnowledgeTopic] = useState('');
+   278→  const [newKnowledgeContent, setNewKnowledgeContent] = useState('');
+   279→
+   280→  // Add file dialog
+   281→  const [showAddFile, setShowAddFile] = useState(false);
+   282→  const [newFilePath, setNewFilePath] = useState('');
+   283→
+   284→  // Knowledge search
+   285→  const [knowledgeSearch, setKnowledgeSearch] = useState('');
+   286→
+   287→  // Expanded session
+   288→  const [expandedSession, setExpandedSession] = useState<string | null>(null);
+   289→
+   290→  /* ── Memory handlers ── */
+   291→
+   292→  const handleAddMemory = useCallback(() => {
+   293→    if (!newMemoryContent.trim()) return;
+   294→    const entry: MemoryEntry = {
+   295→      id: `mem-${Date.now()}`,
+   296→      category: newMemoryCategory,
+   297→      content: newMemoryContent.trim(),
+   298→      source: 'Manual entry',
+   299→      date: new Date().toISOString().split('T')[0],
+   300→    };
+   301→    setMemories((prev) => [entry, ...prev]);
+   302→    setNewMemoryContent('');
+   303→    setShowAddMemory(false);
+   304→  }, [newMemoryContent, newMemoryCategory]);
+   305→
+   306→  const deleteMemory = useCallback((id: string) => {
+   307→    setMemories((prev) => prev.filter((m) => m.id !== id));
+   308→  }, []);
+   309→
+   310→  /* ── Knowledge handlers ── */
+   311→
+   312→  const handleAddKnowledge = useCallback(() => {
+   313→    if (!newKnowledgeTopic.trim() || !newKnowledgeContent.trim()) return;
+   314→    const entry: KnowledgeEntry = {
+   315→      id: `know-${Date.now()}`,
+   316→      topic: newKnowledgeTopic.trim(),
+   317→      content: newKnowledgeContent.trim(),
+   318→    };
+   319→    setKnowledge((prev) => [entry, ...prev]);
+   320→    setNewKnowledgeTopic('');
+   321→    setNewKnowledgeContent('');
+   322→    setShowAddKnowledge(false);
+   323→  }, [newKnowledgeTopic, newKnowledgeContent]);
+   324→
+   325→  const deleteKnowledge = useCallback((id: string) => {
+   326→    setKnowledge((prev) => prev.filter((k) => k.id !== id));
+   327→  }, []);
+   328→
+   329→  /* ── File handlers ── */
+   330→
+   331→  const handleAddFile = useCallback(() => {
+   332→    if (!newFilePath.trim()) return;
+   333→    const ext = newFilePath.split('.').pop() || 'txt';
+   334→    const langMap: Record<string, string> = {
+   335→      ts: 'TypeScript', tsx: 'TSX', js: 'JavaScript', jsx: 'JSX',
+   336→      py: 'Python', prisma: 'Prisma', css: 'CSS', json: 'JSON', md: 'Markdown',
+   337→    };
+   338→    const entry: IndexedFile = {
+   339→      path: newFilePath.trim(),
+   340→      language: langMap[ext] || ext.toUpperCase(),
+   341→      lastIndexed: new Date().toISOString().slice(0, 16),
+   342→      relevance: Math.floor(Math.random() * 30 + 50),
+   343→    };
+   344→    setIndexedFiles((prev) => [entry, ...prev]);
+   345→    setNewFilePath('');
+   346→    setShowAddFile(false);
+   347→  }, [newFilePath]);
+   348→
+   349→  const handleReindex = useCallback((path: string) => {
+   350→    setIndexedFiles((prev) =>
+   351→      prev.map((f) =>
+   352→        f.path === path
+   353→          ? { ...f, lastIndexed: new Date().toISOString().slice(0, 16), relevance: Math.min(99, f.relevance + Math.floor(Math.random() * 5)) }
+   354→          : f
+   355→      )
+   356→    );
+   357→  }, []);
+   358→
+   359→  /* ── Filter knowledge ── */
+   360→
+   361→  const filteredKnowledge = knowledgeSearch.trim()
+   362→    ? knowledge.filter(
+   363→        (k) =>
+   364→          k.topic.toLowerCase().includes(knowledgeSearch.toLowerCase()) ||
+   365→          k.content.toLowerCase().includes(knowledgeSearch.toLowerCase())
+   366→      )
+   367→    : knowledge;
+   368→
+   369→  /* ───────── Section Renderers ───────── */
+   370→
+   371→  function renderMemory() {
+   372→    const categoryCounts = memories.reduce<Record<MemoryCategory, number>>((acc, m) => {
+   373→      acc[m.category] = (acc[m.category] || 0) + 1;
+   374→      return acc;
+   375→    }, {} as Record<MemoryCategory, number>);
+   376→
+   377→    return (
+   378→      <div className="space-y-4">
+   379→        <div className="flex items-center justify-between">
+   380→          <div>
+   381→            <h3 className="text-sm font-semibold">Conversation Memory</h3>
+   382→            <p className="text-xs text-muted-foreground mt-0.5">
+   383→              AI remembers important context across conversations. No competitor has this.
+   384→            </p>
+   385→          </div>
+   386→          <Button
+   387→            size="sm"
+   388→            className="h-7 gap-1.5 text-xs"
+   389→            onClick={() => setShowAddMemory(true)}
+   390→          >
+   391→            <Plus className="h-3 w-3" />
+   392→            Add Memory
+   393→          </Button>
+   394→        </div>
+   395→
+   396→        {/* Category summary */}
+   397→        <div className="flex items-center gap-2 flex-wrap">
+   398→          {(Object.keys(CATEGORY_CONFIG) as MemoryCategory[]).map((cat) => {
+   399→            const config = CATEGORY_CONFIG[cat];
+   400→            const count = categoryCounts[cat] || 0;
+   401→            return (
+   402→              <Badge
+   403→                key={cat}
+   404→                variant="outline"
+   405→                className={`text-[9px] h-5 px-2 gap-1 ${config.bgColor} ${config.color}`}
+   406→              >
+   407→                {config.icon}
+   408→                {config.label} ({count})
+   409→              </Badge>
+   410→            );
+   411→          })}
+   412→        </div>
+   413→
+   414→        {/* Memory list */}
+   415→        <div className="space-y-2">
+   416→          <AnimatePresence>
+   417→            {memories.map((memory, idx) => {
+   418→              const config = CATEGORY_CONFIG[memory.category];
+   419→              return (
+   420→                <motion.div
+   421→                  key={memory.id}
+   422→                  initial={{ opacity: 0, y: 6 }}
+   423→                  animate={{ opacity: 1, y: 0 }}
+   424→                  exit={{ opacity: 0, x: -20 }}
+   425→                  transition={{ duration: 0.2, delay: idx * 0.03 }}
+   426→                >
+   427→                  <Card className="border-border/50 hover:border-border/80 transition-colors">
+   428→                    <CardContent className="p-3">
+   429→                      <div className="flex items-start gap-3">
+   430→                        <div
+   431→                          className={`h-8 w-8 rounded-md flex items-center justify-center shrink-0 border ${config.bgColor} ${config.color}`}
+   432→                        >
+   433→                          {config.icon}
+   434→                        </div>
+   435→                        <div className="flex-1 min-w-0">
+   436→                          <div className="flex items-center gap-2 mb-0.5">
+   437→                            <Badge
+   438→                              variant="outline"
+   439→                              className={`text-[9px] h-4 px-1.5 ${config.bgColor} ${config.color} border-0`}
+   440→                            >
+   441→                              {config.label}
+   442→                            </Badge>
+   443→                            <span className="text-[9px] text-muted-foreground">{memory.date}</span>
+   444→                          </div>
+   445→                          <p className="text-sm text-foreground leading-snug">{memory.content}</p>
+   446→                          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+   447→                            <MessageSquare className="h-2.5 w-2.5" />
+   448→                            {memory.source}
+   449→                          </p>
+   450→                        </div>
+   451→                        <Button
+   452→                          size="icon"
+   453→                          variant="ghost"
+   454→                          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-400"
+   455→                          onClick={() => deleteMemory(memory.id)}
+   456→                        >
+   457→                          <Trash2 className="h-3 w-3" />
+   458→                        </Button>
+   459→                      </div>
+   460→                    </CardContent>
+   461→                  </Card>
+   462→                </motion.div>
+   463→              );
+   464→            })}
+   465→          </AnimatePresence>
+   466→        </div>
+   467→      </div>
+   468→    );
+   469→  }
+   470→
+   471→  function renderCodebase() {
+   472→    return (
+   473→      <div className="space-y-4">
+   474→        <div className="flex items-center justify-between">
+   475→          <div>
+   476→            <h3 className="text-sm font-semibold">Codebase Context</h3>
+   477→            <p className="text-xs text-muted-foreground mt-0.5">
+   478→              Files the AI has indexed for deep contextual understanding.
+   479→            </p>
+   480→          </div>
+   481→          <Button
+   482→            size="sm"
+   483→            variant="outline"
+   484→            className="h-7 gap-1.5 text-xs"
+   485→            onClick={() => setShowAddFile(true)}
+   486→          >
+   487→            <Plus className="h-3 w-3" />
+   488→            Add to Context
+   489→          </Button>
+   490→        </div>
+   491→
+   492→        {/* Stats */}
+   493→        <div className="grid grid-cols-3 gap-2">
+   494→          {[
+   495→            { label: 'Indexed Files', value: indexedFiles.length, icon: <FileCode2 className="h-3.5 w-3.5 text-cyan-400" /> },
+   496→            { label: 'Avg Relevance', value: `${Math.round(indexedFiles.reduce((s, f) => s + f.relevance, 0) / indexedFiles.length)}%`, icon: <Activity className="h-3.5 w-3.5 text-emerald-400" /> },
+   497→            { label: 'Languages', value: new Set(indexedFiles.map((f) => f.language)).size, icon: <Hash className="h-3.5 w-3.5 text-amber-400" /> },
+   498→          ].map((stat) => (
+   499→            <Card key={stat.label} className="border-border/50">
+   500→              <CardContent className="p-3 text-center">
+   501→                <div className="flex items-center justify-center gap-1.5 mb-1">
+   502→                  {stat.icon}
+   503→                </div>
+   504→                <div className="text-lg font-bold">{stat.value}</div>
+   505→                <div className="text-[9px] text-muted-foreground">{stat.label}</div>
+   506→              </CardContent>
+   507→            </Card>
+   508→          ))}
+   509→        </div>
+   510→
+   511→        {/* File list */}
+   512→        <div className="space-y-2">
+   513→          {indexedFiles.map((file, idx) => {
+   514→            const langColors: Record<string, string> = {
+   515→              TypeScript: 'text-cyan-400',
+   516→              TSX: 'text-cyan-400',
+   517→              JavaScript: 'text-amber-400',
+   518→              Prisma: 'text-orange-400',
+   519→              CSS: 'text-rose-400',
+   520→              JSON: 'text-amber-400',
+   521→              Markdown: 'text-muted-foreground',
+   522→            };
+   523→            const langColor = langColors[file.language] || 'text-muted-foreground';
+   524→            const relevanceColor =
+   525→              file.relevance >= 90
+   526→                ? 'text-emerald-400'
+   527→                : file.relevance >= 75
+   528→                  ? 'text-amber-400'
+   529→                  : 'text-muted-foreground';
+   530→
+   531→            return (
+   532→              <motion.div
+   533→                key={file.path}
+   534→                initial={{ opacity: 0, y: 4 }}
+   535→                animate={{ opacity: 1, y: 0 }}
+   536→                transition={{ duration: 0.15, delay: idx * 0.04 }}
+   537→              >
+   538→                <Card className="border-border/40 hover:border-border/70 transition-colors">
+   539→                  <CardContent className="p-3">
+   540→                    <div className="flex items-center gap-3">
+   541→                      <div className="h-8 w-8 rounded-md bg-muted/40 flex items-center justify-center shrink-0">
+   542→                        <FileCode2 className={`h-4 w-4 ${langColor}`} />
+   543→                      </div>
+   544→                      <div className="flex-1 min-w-0">
+   545→                        <div className="flex items-center gap-2">
+   546→                          <span className="text-sm font-medium font-mono truncate">
+   547→                            {file.path}
+   548→                          </span>
+   549→                          <Badge variant="outline" className="text-[8px] h-4 px-1 shrink-0">
+   550→                            {file.language}
+   551→                          </Badge>
+   552→                        </div>
+   553→                        <div className="flex items-center gap-3 mt-1">
+   554→                          <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+   555→                            <Clock className="h-2.5 w-2.5" />
+   556→                            {file.lastIndexed}
+   557→                          </span>
+   558→                          <span className={`text-[9px] font-mono flex items-center gap-1 ${relevanceColor}`}>
+   559→                            <ArrowUpRight className="h-2.5 w-2.5" />
+   560→                            {file.relevance}% relevance
+   561→                          </span>
+   562→                        </div>
+   563→                        <Progress
+   564→                          value={file.relevance}
+   565→                          className="h-1 mt-1.5"
+   566→                        />
+   567→                      </div>
+   568→                      <Button
+   569→                        size="icon"
+   570→                        variant="ghost"
+   571→                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-emerald-400"
+   572→                        onClick={() => handleReindex(file.path)}
+   573→                        title="Re-index file"
+   574→                      >
+   575→                        <RefreshCw className="h-3 w-3" />
+   576→                      </Button>
+   577→                    </div>
+   578→                  </CardContent>
+   579→                </Card>
+   580→              </motion.div>
+   581→            );
+   582→          })}
+   583→        </div>
+   584→      </div>
+   585→    );
+   586→  }
+   587→
+   588→  function renderKnowledge() {
+   589→    return (
+   590→      <div className="space-y-4">
+   591→        <div className="flex items-center justify-between">
+   592→          <div>
+   593→            <h3 className="text-sm font-semibold">Project Knowledge</h3>
+   594→            <p className="text-xs text-muted-foreground mt-0.5">
+   595→              A persistent knowledge base that survives across sessions.
+   596→            </p>
+   597→          </div>
+   598→          <Button
+   599→            size="sm"
+   600→            className="h-7 gap-1.5 text-xs"
+   601→            onClick={() => setShowAddKnowledge(true)}
+   602→          >
+   603→            <Plus className="h-3 w-3" />
+   604→            Add Knowledge
+   605→          </Button>
+   606→        </div>
+   607→
+   608→        {/* Search */}
+   609→        <div className="relative">
+   610→          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+   611→          <Input
+   612→            placeholder="Search knowledge base..."
+   613→            value={knowledgeSearch}
+   614→            onChange={(e) => setKnowledgeSearch(e.target.value)}
+   615→            className="pl-8 h-8 text-sm"
+   616→          />
+   617→          {knowledgeSearch && (
+   618→            <button
+   619→              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+   620→              onClick={() => setKnowledgeSearch('')}
+   621→            >
+   622→              <X className="h-3.5 w-3.5" />
+   623→            </button>
+   624→          )}
+   625→        </div>
+   626→
+   627→        {/* Knowledge entries */}
+   628→        <div className="space-y-2">
+   629→          <AnimatePresence>
+   630→            {filteredKnowledge.map((entry, idx) => (
+   631→              <motion.div
+   632→                key={entry.id}
+   633→                initial={{ opacity: 0, y: 4 }}
+   634→                animate={{ opacity: 1, y: 0 }}
+   635→                exit={{ opacity: 0, height: 0 }}
+   636→                transition={{ duration: 0.2, delay: idx * 0.03 }}
+   637→              >
+   638→                <Card className="border-border/50 hover:border-border/80 transition-colors">
+   639→                  <CardContent className="p-3">
+   640→                    <div className="flex items-start gap-3">
+   641→                      <div className="h-8 w-8 rounded-md bg-emerald-500/10 flex items-center justify-center shrink-0">
+   642→                        <Tag className="h-4 w-4 text-emerald-400" />
+   643→                      </div>
+   644→                      <div className="flex-1 min-w-0">
+   645→                        <div className="flex items-center gap-2">
+   646→                          <Badge
+   647→                            variant="outline"
+   648→                            className="text-[9px] h-4 px-1.5 bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+   649→                          >
+   650→                            {entry.topic}
+   651→                          </Badge>
+   652→                        </div>
+   653→                        <p className="text-sm text-foreground mt-1 leading-snug">
+   654→                          {entry.content}
+   655→                        </p>
+   656→                      </div>
+   657→                      <Button
+   658→                        size="icon"
+   659→                        variant="ghost"
+   660→                        className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-400"
+   661→                        onClick={() => deleteKnowledge(entry.id)}
+   662→                      >
+   663→                        <Trash2 className="h-3 w-3" />
+   664→                      </Button>
+   665→                    </div>
+   666→                  </CardContent>
+   667→                </Card>
+   668→              </motion.div>
+   669→            ))}
+   670→          </AnimatePresence>
+   671→          {filteredKnowledge.length === 0 && (
+   672→            <div className="text-center py-8 text-muted-foreground">
+   673→              <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-30" />
+   674→              <p className="text-sm">No knowledge entries found</p>
+   675→              <p className="text-xs mt-1">Try a different search or add a new entry</p>
+   676→            </div>
+   677→          )}
+   678→        </div>
+   679→      </div>
+   680→    );
+   681→  }
+   682→
+   683→  function renderSessions() {
+   684→    const totalTokens = sessions.reduce((s, sess) => s + sess.tokens, 0);
+   685→    const totalCost = sessions.reduce((s, sess) => s + sess.cost, 0);
+   686→    const totalMessages = sessions.reduce((s, sess) => s + sess.messages, 0);
+   687→
+   688→    return (
+   689→      <div className="space-y-4">
+   690→        <div className="flex items-center justify-between">
+   691→          <div>
+   692→            <h3 className="text-sm font-semibold">Session History</h3>
+   693→            <p className="text-xs text-muted-foreground mt-0.5">
+   694→              Review past sessions with detailed statistics.
+   695→            </p>
+   696→          </div>
+   697→          <AlertDialog>
+   698→            <AlertDialogTrigger asChild>
+   699→              <Button
+   700→                size="sm"
+   701→                variant="outline"
+   702→                className="h-7 gap-1.5 text-xs text-red-400 border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+   703→              >
+   704→                <Trash2 className="h-3 w-3" />
+   705→                Clear History
+   706→              </Button>
+   707→            </AlertDialogTrigger>
+   708→            <AlertDialogContent>
+   709→              <AlertDialogHeader>
+   710→                <AlertDialogTitle className="flex items-center gap-2">
+   711→                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+   712→                  Clear Session History?
+   713→                </AlertDialogTitle>
+   714→                <AlertDialogDescription>
+   715→                  This will permanently delete all session history. This action cannot be undone.
+   716→                </AlertDialogDescription>
+   717→              </AlertDialogHeader>
+   718→              <AlertDialogFooter>
+   719→                <AlertDialogCancel>Cancel</AlertDialogCancel>
+   720→                <AlertDialogAction className="bg-red-500 hover:bg-red-600 text-white">
+   721→                  Clear All
+   722→                </AlertDialogAction>
+   723→              </AlertDialogFooter>
+   724→            </AlertDialogContent>
+   725→          </AlertDialog>
+   726→        </div>
+   727→
+   728→        {/* Summary stats */}
+   729→        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+   730→          {[
+   731→            { label: 'Sessions', value: sessions.length, icon: <Clock className="h-3.5 w-3.5 text-emerald-400" /> },
+   732→            { label: 'Messages', value: totalMessages, icon: <MessageSquare className="h-3.5 w-3.5 text-amber-400" /> },
+   733→            { label: 'Tokens', value: totalTokens.toLocaleString(), icon: <Cpu className="h-3.5 w-3.5 text-cyan-400" /> },
+   734→            { label: 'Cost', value: `$${totalCost.toFixed(2)}`, icon: <Coins className="h-3.5 w-3.5 text-orange-400" /> },
+   735→          ].map((stat) => (
+   736→            <Card key={stat.label} className="border-border/50">
+   737→              <CardContent className="p-3 text-center">
+   738→                <div className="flex items-center justify-center mb-1">{stat.icon}</div>
+   739→                <div className="text-base font-bold">{stat.value}</div>
+   740→                <div className="text-[9px] text-muted-foreground">{stat.label}</div>
+   741→              </CardContent>
+   742→            </Card>
+   743→          ))}
+   744→        </div>
+   745→
+   746→        {/* Session list */}
+   747→        <div className="space-y-2">
+   748→          {sessions.map((session, idx) => {
+   749→            const isExpanded = expandedSession === session.id;
+   750→            return (
+   751→              <motion.div
+   752→                key={session.id}
+   753→                initial={{ opacity: 0, y: 4 }}
+   754→                animate={{ opacity: 1, y: 0 }}
+   755→                transition={{ duration: 0.15, delay: idx * 0.04 }}
+   756→              >
+   757→                <Card className="border-border/50 hover:border-border/80 transition-colors">
+   758→                  <CardContent className="p-3">
+   759→                    <button
+   760→                      className="w-full text-left"
+   761→                      onClick={() => setExpandedSession(isExpanded ? null : session.id)}
+   762→                    >
+   763→                      <div className="flex items-center gap-3">
+   764→                        <div className="h-8 w-8 rounded-md bg-muted/40 flex items-center justify-center shrink-0">
+   765→                          <Activity className="h-4 w-4 text-emerald-400" />
+   766→                        </div>
+   767→                        <div className="flex-1 min-w-0">
+   768→                          <div className="flex items-center justify-between">
+   769→                            <span className="text-sm font-medium">{session.date}</span>
+   770→                            <div className="flex items-center gap-1.5">
+   771→                              {isExpanded ? (
+   772→                                <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+   773→                              ) : (
+   774→                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+   775→                              )}
+   776→                            </div>
+   777→                          </div>
+   778→                          <div className="flex items-center gap-3 mt-0.5">
+   779→                            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+   780→                              <Timer className="h-2.5 w-2.5" />
+   781→                              {session.duration}
+   782→                            </span>
+   783→                            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+   784→                              <MessageSquare className="h-2.5 w-2.5" />
+   785→                              {session.messages} msgs
+   786→                            </span>
+   787→                            <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+   788→                              <Coins className="h-2.5 w-2.5" />
+   789→                              ${session.cost.toFixed(2)}
+   790→                            </span>
+   791→                          </div>
+   792→                        </div>
+   793→                      </div>
+   794→                    </button>
+   795→
+   796→                    <AnimatePresence>
+   797→                      {isExpanded && (
+   798→                        <motion.div
+   799→                          initial={{ opacity: 0, height: 0 }}
+   800→                          animate={{ opacity: 1, height: 'auto' }}
+   801→                          exit={{ opacity: 0, height: 0 }}
+   802→                          transition={{ duration: 0.2 }}
+   803→                        >
+   804→                          <Separator className="my-3" />
+   805→                          <div className="space-y-2 pl-11">
+   806→                            {/* Models used */}
+   807→                            <div className="flex items-center gap-2">
+   808→                              <span className="text-[10px] text-muted-foreground">Models:</span>
+   809→                              {session.models.map((model) => (
+   810→                                <Badge
+   811→                                  key={model}
+   812→                                  variant="outline"
+   813→                                  className="text-[8px] h-4 px-1.5 bg-emerald-500/5 text-emerald-400 border-emerald-500/20"
+   814→                                >
+   815→                                  {model}
+   816→                                </Badge>
+   817→                              ))}
+   818→                            </div>
+   819→
+   820→                            {/* Token usage */}
+   821→                            <div className="flex items-center gap-2">
+   822→                              <span className="text-[10px] text-muted-foreground">Tokens:</span>
+   823→                              <span className="text-[10px] font-mono">{session.tokens.toLocaleString()}</span>
+   824→                            </div>
+   825→
+   826→                            {/* Summary */}
+   827→                            {session.summary && (
+   828→                              <div className="mt-2 p-2 rounded-md bg-muted/20 border border-border/30">
+   829→                                <p className="text-xs text-muted-foreground leading-relaxed">
+   830→                                  {session.summary}
+   831→                                </p>
+   832→                              </div>
+   833→                            )}
+   834→
+   835→                            {/* Export */}
+   836→                            <Button
+   837→                              size="sm"
+   838→                              variant="ghost"
+   839→                              className="h-6 text-[10px] gap-1.5 text-muted-foreground"
+   840→                              onClick={() => {
+   841→                                const blob = new Blob(
+   842→                                  [JSON.stringify(session, null, 2)],
+   843→                                  { type: 'application/json' }
+   844→                                );
+   845→                                const url = URL.createObjectURL(blob);
+   846→                                const a = document.createElement('a');
+   847→                                a.href = url;
+   848→                                a.download = `session-${session.id}.json`;
+   849→                                a.click();
+   850→                                URL.revokeObjectURL(url);
+   851→                              }}
+   852→                            >
+   853→                              <Download className="h-3 w-3" />
+   854→                              Export Session
+   855→                            </Button>
+   856→                          </div>
+   857→                        </motion.div>
+   858→                      )}
+   859→                    </AnimatePresence>
+   860→                  </CardContent>
+   861→                </Card>
+   862→              </motion.div>
+   863→            );
+   864→          })}
+   865→        </div>
+   866→      </div>
+   867→    );
+   868→  }
+   869→
+   870→  /* ───────── Render ───────── */
+   871→
+   872→  const sectionContent: Record<SectionId, () => React.ReactNode> = {
+   873→    memory: renderMemory,
+   874→    codebase: renderCodebase,
+   875→    knowledge: renderKnowledge,
+   876→    sessions: renderSessions,
+   877→  };
+   878→
+   879→  return (
+   880→    <div className="flex h-full">
+   881→      {/* Section sidebar */}
+   882→      <div className="w-48 border-r border-border/40 bg-card/20 shrink-0 flex flex-col py-2">
+   883→        <div className="px-3 pb-2">
+   884→          <h2 className="text-xs font-bold tracking-wide text-muted-foreground uppercase">
+   885→            Context & Memory
+   886→          </h2>
+   887→        </div>
+   888→        <nav className="flex flex-col gap-0.5 px-2">
+   889→          {SECTIONS.map((section) => {
+   890→            const isActive = activeSection === section.id;
+   891→            return (
+   892→              <button
+   893→                key={section.id}
+   894→                onClick={() => setActiveSection(section.id)}
+   895→                className={`flex flex-col items-start gap-0.5 px-2.5 py-2 rounded-md transition-all text-left ${
+   896→                  isActive
+   897→                    ? 'bg-emerald-500/10 text-emerald-400'
+   898→                    : 'text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+   899→                }`}
+   900→              >
+   901→                <div className="flex items-center gap-2">
+   902→                  {section.icon}
+   903→                  <span className="text-sm font-medium">{section.label}</span>
+   904→                </div>
+   905→                <span className={`text-[9px] pl-6 ${isActive ? 'text-emerald-400/70' : 'text-muted-foreground/60'}`}>
+   906→                  {section.description}
+   907→                </span>
+   908→              </button>
+   909→            );
+   910→          })}
+   911→        </nav>
+   912→      </div>
+   913→
+   914→      {/* Section content */}
+   915→      <ScrollArea className="flex-1">
+   916→        <div className="p-5 max-w-2xl">
+   917→          <AnimatePresence mode="wait">
+   918→            <motion.div
+   919→              key={activeSection}
+   920→              initial={{ opacity: 0, x: 8 }}
+   921→              animate={{ opacity: 1, x: 0 }}
+   922→              exit={{ opacity: 0, x: -8 }}
+   923→              transition={{ duration: 0.15 }}
+   924→            >
+   925→              {sectionContent[activeSection]()}
+   926→            </motion.div>
+   927→          </AnimatePresence>
+   928→        </div>
+   929→      </ScrollArea>
+   930→
+   931→      {/* Add Memory Dialog */}
+   932→      <Dialog open={showAddMemory} onOpenChange={setShowAddMemory}>
+   933→        <DialogContent className="sm:max-w-md">
+   934→          <DialogHeader>
+   935→            <DialogTitle className="flex items-center gap-2">
+   936→              <Brain className="h-5 w-5 text-emerald-400" />
+   937→              Add Memory
+   938→            </DialogTitle>
+   939→            <DialogDescription>
+   940→              Add a persistent memory that the AI will recall in future conversations.
+   941→            </DialogDescription>
+   942→          </DialogHeader>
+   943→          <div className="space-y-3 py-2">
+   944→            <div className="space-y-1.5">
+   945→              <label className="text-xs font-medium">Category</label>
+   946→              <div className="flex items-center gap-2 flex-wrap">
+   947→                {(Object.keys(CATEGORY_CONFIG) as MemoryCategory[]).map((cat) => {
+   948→                  const config = CATEGORY_CONFIG[cat];
+   949→                  const isSelected = newMemoryCategory === cat;
+   950→                  return (
+   951→                    <button
+   952→                      key={cat}
+   953→                      onClick={() => setNewMemoryCategory(cat)}
+   954→                      className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium border transition-all ${
+   955→                        isSelected
+   956→                          ? `${config.bgColor} ${config.color} border-current`
+   957→                          : 'border-border/50 text-muted-foreground hover:border-border'
+   958→                      }`}
+   959→                    >
+   960→                      {config.icon}
+   961→                      {config.label}
+   962→                    </button>
+   963→                  );
+   964→                })}
+   965→              </div>
+   966→            </div>
+   967→            <div className="space-y-1.5">
+   968→              <label className="text-xs font-medium">Content</label>
+   969→              <Textarea
+   970→                placeholder="What should the AI remember?"
+   971→                value={newMemoryContent}
+   972→                onChange={(e) => setNewMemoryContent(e.target.value)}
+   973→                className="min-h-[80px] resize-none"
+   974→                autoFocus
+   975→              />
+   976→            </div>
+   977→          </div>
+   978→          <DialogFooter>
+   979→            <Button variant="ghost" onClick={() => setShowAddMemory(false)}>
+   980→              Cancel
+   981→            </Button>
+   982→            <Button
+   983→              onClick={handleAddMemory}
+   984→              disabled={!newMemoryContent.trim()}
+   985→              className="gap-1.5"
+   986→            >
+   987→              <Plus className="h-3.5 w-3.5" />
+   988→              Add Memory
+   989→            </Button>
+   990→          </DialogFooter>
+   991→        </DialogContent>
+   992→      </Dialog>
+   993→
+   994→      {/* Add Knowledge Dialog */}
+   995→      <Dialog open={showAddKnowledge} onOpenChange={setShowAddKnowledge}>
+   996→        <DialogContent className="sm:max-w-md">
+   997→          <DialogHeader>
+   998→            <DialogTitle className="flex items-center gap-2">
+   999→              <BookOpen className="h-5 w-5 text-emerald-400" />
+  1000→              Add Knowledge
+  1001→            </DialogTitle>
+  1002→            <DialogDescription>
+  1003→              Add a knowledge entry that persists across all sessions.
+  1004→            </DialogDescription>
+  1005→          </DialogHeader>
+  1006→          <div className="space-y-3 py-2">
+  1007→            <div className="space-y-1.5">
+  1008→              <label className="text-xs font-medium">Topic</label>
+  1009→              <Input
+  1010→                placeholder="e.g. architecture, api-pattern, deployment"
+  1011→                value={newKnowledgeTopic}
+  1012→                onChange={(e) => setNewKnowledgeTopic(e.target.value)}
+  1013→                autoFocus
+  1014→              />
+  1015→            </div>
+  1016→            <div className="space-y-1.5">
+  1017→              <label className="text-xs font-medium">Content</label>
+  1018→              <Textarea
+  1019→                placeholder="What should the AI know about this topic?"
+  1020→                value={newKnowledgeContent}
+  1021→                onChange={(e) => setNewKnowledgeContent(e.target.value)}
+  1022→                className="min-h-[80px] resize-none"
+  1023→              />
+  1024→            </div>
+  1025→          </div>
+  1026→          <DialogFooter>
+  1027→            <Button variant="ghost" onClick={() => setShowAddKnowledge(false)}>
+  1028→              Cancel
+  1029→            </Button>
+  1030→            <Button
+  1031→              onClick={handleAddKnowledge}
+  1032→              disabled={!newKnowledgeTopic.trim() || !newKnowledgeContent.trim()}
+  1033→              className="gap-1.5"
+  1034→            >
+  1035→              <Plus className="h-3.5 w-3.5" />
+  1036→              Add Knowledge
+  1037→            </Button>
+  1038→          </DialogFooter>
+  1039→        </DialogContent>
+  1040→      </Dialog>
+  1041→
+  1042→      {/* Add File Dialog */}
+  1043→      <Dialog open={showAddFile} onOpenChange={setShowAddFile}>
+  1044→        <DialogContent className="sm:max-w-md">
+  1045→          <DialogHeader>
+  1046→            <DialogTitle className="flex items-center gap-2">
+  1047→              <FolderOpen className="h-5 w-5 text-emerald-400" />
+  1048→              Add to Context
+  1049→            </DialogTitle>
+  1050→            <DialogDescription>
+  1051→              Add a file path to the AI&apos;s indexed context for deeper understanding.
+  1052→            </DialogDescription>
+  1053→          </DialogHeader>
+  1054→          <div className="space-y-3 py-2">
+  1055→            <div className="space-y-1.5">
+  1056→              <label className="text-xs font-medium">File Path</label>
+  1057→              <Input
+  1058→                placeholder="e.g. src/components/nexus/chat-panel.tsx"
+  1059→                value={newFilePath}
+  1060→                onChange={(e) => setNewFilePath(e.target.value)}
+  1061→                autoFocus
+  1062→                className="font-mono"
+  1063→              />
+  1064→            </div>
+  1065→          </div>
+  1066→          <DialogFooter>
+  1067→            <Button variant="ghost" onClick={() => setShowAddFile(false)}>
+  1068→              Cancel
+  1069→            </Button>
+  1070→            <Button
+  1071→              onClick={handleAddFile}
+  1072→              disabled={!newFilePath.trim()}
+  1073→              className="gap-1.5"
+  1074→            >
+  1075→              <Plus className="h-3.5 w-3.5" />
+  1076→              Add File
+  1077→            </Button>
+  1078→          </DialogFooter>
+  1079→        </DialogContent>
+  1080→      </Dialog>
+  1081→    </div>
+  1082→  );
+  1083→}
+  1084→
