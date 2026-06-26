@@ -47,29 +47,32 @@ import { useModelStore } from '@/stores/model-store';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io } from 'socket.io-client';
 
-// Static imports — bundles all panels together to avoid chunk load failures
-import { ChatPanel } from '@/components/nexus/chat-panel';
-import { AgentPanel } from '@/components/nexus/agent-panel';
-import { SearchPanel } from '@/components/nexus/search-panel';
-import EditorPanel from '@/components/nexus/editor-panel';
-import TerminalPanel from '@/components/nexus/terminal-panel';
-import FileExplorer from '@/components/nexus/file-explorer';
-import { SettingsPanel } from '@/components/nexus/settings-panel';
-import { CommandPalette } from '@/components/nexus/command-palette';
-import { MCPHub } from '@/components/nexus/mcp-hub';
-import { GitPanel } from '@/components/nexus/git-panel';
-import { CollabPanel } from '@/components/nexus/collab-panel';
-import { SpecPanel } from '@/components/nexus/spec-panel';
-import { MarketplacePanel } from '@/components/nexus/marketplace-panel';
-import { CompetitivePanel } from '@/components/nexus/competitive-panel';
-import { TemplatesPanel } from '@/components/nexus/templates-panel';
-import { NotificationsPanel } from '@/components/nexus/notifications-panel';
-import { CustomizationHub } from '@/components/nexus/customization-hub';
-import { ContextMemory } from '@/components/nexus/context-memory';
-import { AccountPanel } from '@/components/nexus/account-panel';
-import { HistoryPanel } from '@/components/nexus/history-panel';
-import { LibraryPanel } from '@/components/nexus/library-panel';
-import { DevSurfacesPanel } from '@/components/nexus/dev-surfaces-panel';
+import dynamic from 'next/dynamic';
+
+// Dynamic imports to reduce initial bundle size and memory usage
+// Each panel loads on-demand when the user clicks its nav item
+const ChatPanel = dynamic(() => import('@/components/nexus/chat-panel').then(m => ({ default: m.ChatPanel })), { ssr: false });
+const AgentPanel = dynamic(() => import('@/components/nexus/agent-panel').then(m => ({ default: m.AgentPanel })), { ssr: false });
+const SearchPanel = dynamic(() => import('@/components/nexus/search-panel').then(m => ({ default: m.SearchPanel })), { ssr: false });
+const EditorPanel = dynamic(() => import('@/components/nexus/editor-panel'), { ssr: false });
+const TerminalPanel = dynamic(() => import('@/components/nexus/terminal-panel'), { ssr: false });
+const FileExplorer = dynamic(() => import('@/components/nexus/file-explorer'), { ssr: false });
+const SettingsPanel = dynamic(() => import('@/components/nexus/settings-panel').then(m => ({ default: m.SettingsPanel })), { ssr: false });
+const CommandPalette = dynamic(() => import('@/components/nexus/command-palette').then(m => ({ default: m.CommandPalette })), { ssr: false });
+const MCPHub = dynamic(() => import('@/components/nexus/mcp-hub').then(m => ({ default: m.MCPHub })), { ssr: false });
+const GitPanel = dynamic(() => import('@/components/nexus/git-panel').then(m => ({ default: m.GitPanel })), { ssr: false });
+const CollabPanel = dynamic(() => import('@/components/nexus/collab-panel').then(m => ({ default: m.CollabPanel })), { ssr: false });
+const SpecPanel = dynamic(() => import('@/components/nexus/spec-panel').then(m => ({ default: m.SpecPanel })), { ssr: false });
+const MarketplacePanel = dynamic(() => import('@/components/nexus/marketplace-panel').then(m => ({ default: m.MarketplacePanel })), { ssr: false });
+const CompetitivePanel = dynamic(() => import('@/components/nexus/competitive-panel').then(m => ({ default: m.CompetitivePanel })), { ssr: false });
+const TemplatesPanel = dynamic(() => import('@/components/nexus/templates-panel').then(m => ({ default: m.TemplatesPanel })), { ssr: false });
+const NotificationsPanel = dynamic(() => import('@/components/nexus/notifications-panel').then(m => ({ default: m.NotificationsPanel })), { ssr: false });
+const CustomizationHub = dynamic(() => import('@/components/nexus/customization-hub').then(m => ({ default: m.CustomizationHub })), { ssr: false });
+const ContextMemory = dynamic(() => import('@/components/nexus/context-memory').then(m => ({ default: m.ContextMemory })), { ssr: false });
+const AccountPanel = dynamic(() => import('@/components/nexus/account-panel').then(m => ({ default: m.AccountPanel })), { ssr: false });
+const HistoryPanel = dynamic(() => import('@/components/nexus/history-panel').then(m => ({ default: m.HistoryPanel })), { ssr: false });
+const LibraryPanel = dynamic(() => import('@/components/nexus/library-panel').then(m => ({ default: m.LibraryPanel })), { ssr: false });
+const DevSurfacesPanel = dynamic(() => import('@/components/nexus/dev-surfaces-panel').then(m => ({ default: m.DevSurfacesPanel })), { ssr: false });
 
 // ── Navigation Items ─────────────────────────────────────────────────────
 
