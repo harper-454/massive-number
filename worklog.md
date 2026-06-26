@@ -862,3 +862,30 @@ Stage Summary:
 - Activity logging on all significant operations (MCP connect, spec create, collab add, etc.)
 - Seed endpoint creates 4 personas + 5 AI rules + 1 project on first run
 - Lint: 0 errors, 0 warnings
+
+---
+Task ID: 9
+Agent: Main Orchestrator
+Task: Update all AI models to current free models (June 2026) using web research
+
+Work Log:
+- Performed 18 web searches across Google, Groq, Cerebras, DeepSeek, Mistral, Qwen, SambaNova, OpenRouter, Together AI, Cohere, and HuggingFace
+- Identified 16 current free models across 10+ providers with permanent free tiers
+- Updated /api/models/route.ts with complete model catalog including provider URLs
+- Updated model-store.ts DEFAULT_MODELS with 16 free models (was 7 outdated paid models)
+- Updated chat/route.ts MODEL_COST_MAP (all $0) and MODEL_ID_MAP with new model routing
+- Updated model-selector.tsx: added 5 new provider colors/labels (groq, cerebras, cohere, sambanova, openrouter), "Ultra Fast" speed tier, FREE cost indicator
+- Updated settings-panel.tsx: new auto-routing config (6 tasks), fixed USAGE_BY_MODEL undefined error, added Sparkles import, new provider icons
+- Updated terminal-panel.tsx: new model status display with 15 models
+- Updated competitive-panel.tsx: "10+ AI providers (all free)" and "1M-10M context windows" features
+- Updated chat-panel.tsx: error message references 10+ free providers
+- Updated ws-service/index.ts: MODEL_MAP with all 20 model aliases
+- Browser verified: 16 models from 10+ providers all show as FREE, settings panel works, competitive panel renders correctly
+
+Stage Summary:
+- Replaced 7 outdated/paid models with 16 current FREE models from 10+ providers
+- All models have permanent free tiers (no trial credits)
+- Providers: Google (Gemini 2.5 Flash, Gemini 3 Flash, Gemini 2.5 Flash-Lite), DeepSeek (V4 Flash, R1), Meta (Llama 4 Scout 17B, Llama 4 Maverick 17B), Alibaba (Qwen3 Coder 480B, Qwen3.7 Max), Mistral (Mistral Large, Codestral), Groq (GPT-OSS 120B), Cerebras (GLM 4.7), Cohere (Command R+), SambaNova (DeepSeek R1), OpenRouter (Free Router)
+- Context windows range from 128K to 10M tokens
+- Fixed USAGE_BY_MODEL undefined error that was causing runtime crashes
+- Zero lint errors, zero browser console errors

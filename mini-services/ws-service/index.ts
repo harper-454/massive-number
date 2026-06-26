@@ -10,13 +10,26 @@ const io = new Server(httpServer, {
 const zaiPromise = ZAI.create();
 
 const MODEL_MAP: Record<string, string> = {
-  auto: "claude-sonnet-4-20250514",
-  "gpt-4o": "gpt-4o",
-  "claude-sonnet": "claude-sonnet-4-20250514",
-  "gemini-pro": "gemini-2.5-pro",
+  auto: "auto",
+  "gemini-2.5-flash": "gemini-2.5-flash",
+  "gemini-3-flash": "gemini-3-flash",
+  "gemini-pro": "gemini-2.5-flash",
+  "deepseek-v4-flash": "deepseek-v4-flash",
   "deepseek-r1": "deepseek-r1",
-  "llama-4": "llama-4-maverick",
-  "qwen3": "qwen3-235b",
+  "deepseek-chat": "deepseek-v4-flash",
+  "llama-4-scout": "llama-4-scout-17b",
+  "llama-4-maverick": "llama-4-maverick-17b",
+  "llama-4": "llama-4-scout-17b",
+  "qwen3-coder": "qwen3-coder-480b",
+  "qwen3.7-max": "qwen3.7-max",
+  "qwen3": "qwen3.7-max",
+  "mistral-large": "mistral-large",
+  "codestral": "codestral",
+  "gpt-oss-120b": "gpt-oss-120b",
+  "cerebras-glm-4.7": "cerebras-glm-4.7",
+  "command-r-plus": "command-r-plus",
+  "deepseek-r1-sambanova": "deepseek-r1-sambanova",
+  "openrouter-free": "openrouter-free",
 };
 
 io.on("connection", (socket) => {

@@ -57,11 +57,12 @@ const PLATFORMS: Platform[] = [
 const FEATURES: Feature[] = [
   // AI & Models
   { name: 'Multi-model orchestration', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
-  { name: '7+ AI providers', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+  { name: '10+ AI providers (all free)', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
   { name: 'Auto model routing', values: { MN: '⚡', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'AI & Models' },
-  { name: 'Cost optimization', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+  { name: 'Cost optimization (all free)', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
   { name: 'Custom AI personas', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
   { name: 'AI rules system', values: { MN: '⚡', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
+  { name: '1M-10M context windows', values: { MN: '⚡', Cursor: '❌', WS: '❌', Kiro: '❌', CC: '❌', VSC: '❌' }, category: 'AI & Models' },
 
   // Integrations
   { name: 'Visual MCP hub', values: { MN: '⚡', Cursor: '✅', WS: '❌', Kiro: '❌', CC: '❌', VSC: '✅' }, category: 'Integrations' },
@@ -115,7 +116,7 @@ function calculateScore(values: Record<string, FeatureValue>): number {
   return score;
 }
 
-const MAX_SCORE = FEATURES.length * 3; // 34 * 3 = 102
+const MAX_SCORE = FEATURES.length * 3; // dynamically calculated
 
 // Pre-calculate scores
 const SCORES: Record<string, number> = {};

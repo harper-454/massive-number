@@ -30,22 +30,30 @@ import { useModelStore } from '@/stores/model-store';
 
 const PROVIDER_COLORS: Record<string, string> = {
   multi: 'bg-gradient-to-r from-emerald-500 to-teal-500',
-  openai: 'bg-emerald-600',
-  anthropic: 'bg-orange-500',
   google: 'bg-red-500',
   deepseek: 'bg-cyan-600',
   meta: 'bg-violet-600',
   alibaba: 'bg-amber-600',
+  mistral: 'bg-orange-500',
+  groq: 'bg-emerald-600',
+  cerebras: 'bg-rose-500',
+  cohere: 'bg-teal-600',
+  sambanova: 'bg-yellow-600',
+  openrouter: 'bg-emerald-700',
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
   multi: 'Multi',
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
   google: 'Google',
   deepseek: 'DeepSeek',
   meta: 'Meta',
   alibaba: 'Alibaba',
+  mistral: 'Mistral',
+  groq: 'Groq',
+  cerebras: 'Cerebras',
+  cohere: 'Cohere',
+  sambanova: 'SambaNova',
+  openrouter: 'OpenRouter',
 };
 
 const CAPABILITY_ICONS: Record<string, React.ReactNode> = {
@@ -59,12 +67,20 @@ const CAPABILITY_ICONS: Record<string, React.ReactNode> = {
 
 const SPEED_LABELS: Record<string, { label: string; color: string }> = {
   optimal: { label: 'Optimal', color: 'text-emerald-400' },
+  ultra: { label: 'Ultra Fast', color: 'text-cyan-400' },
   fast: { label: 'Fast', color: 'text-green-400' },
   medium: { label: 'Medium', color: 'text-yellow-400' },
   slow: { label: 'Slow', color: 'text-red-400' },
 };
 
 function CostIndicator({ cost }: { cost: number }) {
+  if (cost === 0) {
+    return (
+      <span className="text-[10px] text-emerald-400 font-medium" title="Free tier — $0.00/1K tokens">
+        FREE
+      </span>
+    );
+  }
   const level = cost <= 0.001 ? 1 : cost <= 0.003 ? 2 : cost <= 0.005 ? 3 : 4;
   return (
     <div className="flex items-center gap-0.5" title={`$${cost.toFixed(4)}/1K tokens`}>
@@ -166,9 +182,11 @@ export function ModelSelector() {
                 <div className="flex items-center gap-3 pl-[18px]">
                   <div className="flex items-center gap-1">
                     <CostIndicator cost={model.costPer1kTokens} />
-                    <span className="text-[10px] text-muted-foreground">
-                      ${model.costPer1kTokens.toFixed(4)}/1K
-                    </span>
+                    {model.costPer1kTokens > 0 && (
+                      <span className="text-[10px] text-muted-foreground">
+                        ${model.costPer1kTokens.toFixed(4)}/1K
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <Zap className={`h-3 w-3 ${speedInfo.color}`} />

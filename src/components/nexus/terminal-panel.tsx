@@ -111,15 +111,23 @@ function simulateCommand(cmd: string): Omit<TerminalLine, 'id'>[] {
       ];
     case 'status':
       return [
-        { type: 'success', content: '╭─ AI Model Status ─────────────────╮' },
-        { type: 'success', content: '│ ✓ GPT-4o        Online  2.1k rpm  │' },
-        { type: 'success', content: '│ ✓ Claude Sonnet Online  1.8k rpm  │' },
-        { type: 'success', content: '│ ✓ Gemini Pro    Online  2.4k rpm  │' },
-        { type: 'success', content: '│ ✓ DeepSeek R1   Online  1.5k rpm  │' },
-        { type: 'success', content: '│ ✓ Llama 4       Online  3.0k rpm  │' },
-        { type: 'success', content: '│ ✓ Qwen3         Online  2.2k rpm  │' },
-        { type: 'success', content: '│ ⚙ Auto Router   Active            │' },
-        { type: 'success', content: '╰───────────────────────────────────╯' },
+        { type: 'success', content: '╭─ AI Model Status (All Free) ──────────────╮' },
+        { type: 'success', content: '│ ✓ Gemini 2.5 Flash   Online  2.4k rpm     │' },
+        { type: 'success', content: '│ ✓ Gemini 3 Flash     Online  2.1k rpm     │' },
+        { type: 'success', content: '│ ✓ DeepSeek V4 Flash  Online  1.8k rpm     │' },
+        { type: 'success', content: '│ ✓ DeepSeek R1        Online  1.5k rpm     │' },
+        { type: 'success', content: '│ ✓ Llama 4 Scout      Online  3.2k rpm     │' },
+        { type: 'success', content: '│ ✓ Llama 4 Maverick   Online  2.8k rpm     │' },
+        { type: 'success', content: '│ ✓ Qwen3 Coder 480B   Online  1.6k rpm     │' },
+        { type: 'success', content: '│ ✓ Qwen3.7 Max        Online  1.4k rpm     │' },
+        { type: 'success', content: '│ ✓ Mistral Large      Online  1.2k rpm     │' },
+        { type: 'success', content: '│ ✓ Codestral          Online  1.8k rpm     │' },
+        { type: 'success', content: '│ ✓ GPT-OSS 120B       Online  4.0k rpm     │' },
+        { type: 'success', content: '│ ✓ GLM 4.7 (Cerebras) Online  3.5k rpm     │' },
+        { type: 'success', content: '│ ✓ Command R+         Online  1.0k rpm     │' },
+        { type: 'success', content: '│ ✓ OpenRouter Free    Online  varies       │' },
+        { type: 'success', content: '│ ⚙ Auto Router        Active  10+ providers │' },
+        { type: 'success', content: '╰────────────────────────────────────────────╯' },
         { type: 'output', content: '' },
       ];
     case 'clear':

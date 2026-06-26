@@ -532,7 +532,7 @@ export function ChatPanel() {
       
       // Fallback: show error message but also try socket.io
       updateMessage(chatId, assistantMsgId, {
-        content: `I encountered an issue connecting to the AI service (${errorMessage}). Let me try an alternative approach...\n\n**Note:** Make sure your API keys are configured in Settings → Providers. MASSIVE NUMBER supports OpenAI, Anthropic, Google, DeepSeek, Meta, and more.`,
+        content: `I encountered an issue connecting to the AI service (${errorMessage}). Let me try an alternative approach...\n\n**Note:** MASSIVE NUMBER supports 10+ free providers: Google Gemini, DeepSeek, Meta Llama, Qwen, Mistral, Groq, Cerebras, Cohere, SambaNova, OpenRouter, and more. Configure your preferred providers in Settings → Providers.`,
         model: selectedModel,
         tokens: 0,
         cost: 0,

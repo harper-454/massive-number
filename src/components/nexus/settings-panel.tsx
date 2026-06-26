@@ -23,6 +23,7 @@ import {
   Code,
   Terminal,
   Search,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,12 +81,16 @@ const INITIAL_PROVIDERS: ProviderInfo[] = [];
 // ── Provider icon map ────────────────────────────────────────────────────────
 
 const PROVIDER_ICON_MAP: Record<string, React.ReactNode> = {
-  openai: <Cloud className="h-5 w-5" />,
-  anthropic: <Bot className="h-5 w-5" />,
   google: <Globe className="h-5 w-5" />,
   deepseek: <Zap className="h-5 w-5" />,
   meta: <Cpu className="h-5 w-5" />,
   alibaba: <MessageSquare className="h-5 w-5" />,
+  mistral: <Bot className="h-5 w-5" />,
+  groq: <Zap className="h-5 w-5" />,
+  cerebras: <Cpu className="h-5 w-5" />,
+  cohere: <Cloud className="h-5 w-5" />,
+  sambanova: <Zap className="h-5 w-5" />,
+  openrouter: <Globe className="h-5 w-5" />,
 };
 
 // ── Component ───────────────────────────────────────────────────────────
@@ -162,7 +167,23 @@ export function SettingsPanel() {
     setAddDialogOpen(false);
   };
 
-  const maxTokens = Math.max(...USAGE_BY_MODEL.map((m) => m.tokens));
+  // ── Usage by model (derived from model store, all free) ─────────────────
+  const USAGE_BY_MODEL = models.map((m) => ({
+    model: m.name,
+    tokens: m.contextWindow,
+    cost: m.costPer1kTokens,
+    color: m.provider === 'google' ? 'bg-red-500' :
+           m.provider === 'deepseek' ? 'bg-cyan-500' :
+           m.provider === 'meta' ? 'bg-violet-500' :
+           m.provider === 'alibaba' ? 'bg-amber-500' :
+           m.provider === 'mistral' ? 'bg-orange-500' :
+           m.provider === 'groq' ? 'bg-emerald-500' :
+           m.provider === 'cerebras' ? 'bg-rose-500' :
+           m.provider === 'cohere' ? 'bg-teal-500' :
+           'bg-emerald-500',
+  }));
+
+  const maxTokens = Math.max(...USAGE_BY_MODEL.map((m) => m.tokens), 1);
 
   // ── Speed rating helper ──────────────────────────────────────────────────
   const speedStars = (speed: string) => {
@@ -176,33 +197,38 @@ export function SettingsPanel() {
     return '★'.repeat(count) + '☆'.repeat(5 - count);
   };
 
-  // ── Auto-routing config ──────────────────────────────────────────────────
+  // ── Auto-routing config (updated June 2026 — all free models) ────────────
   const autoRouting: { task: string; icon: React.ReactNode; model: string }[] =
     [
       {
         task: 'General Chat',
         icon: <MessageSquare className="h-4 w-4" />,
-        model: 'gpt-4o',
+        model: 'gemini-2.5-flash',
       },
       {
         task: 'Code Generation',
         icon: <Code className="h-4 w-4" />,
-        model: 'claude-sonnet',
+        model: 'qwen3-coder-480b',
       },
       {
         task: 'Agent Tasks',
         icon: <Bot className="h-4 w-4" />,
-        model: 'claude-sonnet',
+        model: 'qwen3.7-max',
       },
       {
         task: 'Web Search',
         icon: <Search className="h-4 w-4" />,
-        model: 'gemini-pro',
+        model: 'gemini-2.5-flash',
       },
       {
-        task: 'Terminal',
-        icon: <Terminal className="h-4 w-4" />,
+        task: 'Reasoning',
+        icon: <Sparkles className="h-4 w-4" />,
         model: 'deepseek-r1',
+      },
+      {
+        task: 'Ultra Fast',
+        icon: <Zap className="h-4 w-4" />,
+        model: 'llama-4-scout-17b',
       },
     ];
 
@@ -789,7 +815,7 @@ export function SettingsPanel() {
               {/* Cost breakdown */}
               <section className="space-y-3">
                 <h3 className="text-sm font-medium text-zinc-300">
-                  Cost Breakdown by Model
+                  Context Window by Model
                 </h3>
                 <Card className="border-zinc-800 bg-zinc-900/60">
                   <CardContent className="space-y-3 p-4">
@@ -798,14 +824,16 @@ export function SettingsPanel() {
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-zinc-300">{item.model}</span>
                           <span className="text-zinc-500">
-                            {item.tokens.toLocaleString()} tok · ${item.cost.toFixed(2)}
+                            {item.tokens >= 1000000
+                              ? `${(item.tokens / 1000000).toFixed(0)}M`
+                              : `${(item.tokens / 1000).toFixed(0)}K`} ctx · {item.cost === 0 ? 'FREE' : `$${item.cost.toFixed(4)}/1K`}
                           </span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-zinc-800">
                           <div
                             className={`h-2 rounded-full ${item.color} transition-all duration-500`}
                             style={{
-                              width: `${(item.tokens / maxTokens) * 100}%`,
+                              width: `${Math.min((item.tokens / maxTokens) * 100, 100)}%`,
                             }}
                           />
                         </div>
@@ -848,9 +876,9 @@ export function SettingsPanel() {
                 </Card>
               </section>
 
-              {/* Cost bar chart */}
+              {/* Context window chart */}
               <section className="space-y-3">
-                <h3 className="text-sm font-medium text-zinc-300">Token Distribution</h3>
+                <h3 className="text-sm font-medium text-zinc-300">Provider Coverage</h3>
                 <Card className="border-zinc-800 bg-zinc-900/60">
                   <CardContent className="space-y-3 p-4">
                     {USAGE_BY_MODEL.map((item) => (
@@ -858,14 +886,16 @@ export function SettingsPanel() {
                         <div className="mb-1 flex items-center justify-between text-xs text-zinc-300">
                           <span>{item.model}</span>
                           <span className="text-zinc-500">
-                            {item.tokens.toLocaleString()} tokens
+                            {item.tokens >= 1000000
+                              ? `${(item.tokens / 1000000).toFixed(0)}M ctx`
+                              : `${(item.tokens / 1000).toFixed(0)}K ctx`}
                           </span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-zinc-800">
                           <div
                             className={`h-2 rounded-full ${item.color} transition-all duration-500`}
                             style={{
-                              width: `${(item.tokens / maxTokens) * 100}%`,
+                              width: `${Math.min((item.tokens / maxTokens) * 100, 100)}%`,
                             }}
                           />
                         </div>

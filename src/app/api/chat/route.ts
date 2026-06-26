@@ -2,26 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
 
-// Model cost mapping per 1K tokens
+// Model cost mapping per 1K tokens — ALL FREE as of June 2026
 const MODEL_COST_MAP: Record<string, number> = {
-  auto: 0.003,
-  'gpt-4o': 0.005,
-  'claude-sonnet-4-20250514': 0.003,
-  'gemini-2.5-pro': 0.002,
-  'deepseek-r1': 0.001,
-  'llama-4-maverick': 0.0005,
-  'qwen3-235b': 0.001,
+  auto: 0,
+  'gemini-2.5-flash': 0,
+  'gemini-3-flash': 0,
+  'gemini-2.5-flash-lite': 0,
+  'deepseek-v4-flash': 0,
+  'deepseek-r1': 0,
+  'llama-4-scout-17b': 0,
+  'llama-4-maverick-17b': 0,
+  'qwen3-coder-480b': 0,
+  'qwen3.7-max': 0,
+  'mistral-large': 0,
+  'codestral': 0,
+  'gpt-oss-120b': 0,
+  'cerebras-glm-4.7': 0,
+  'command-r-plus': 0,
+  'deepseek-r1-sambanova': 0,
+  'openrouter-free': 0,
 };
 
 // Map friendly model names to SDK-compatible model IDs
+// Updated June 2026 — all free models
 const MODEL_ID_MAP: Record<string, string> = {
   auto: 'auto',
-  'gpt-4o': 'gpt-4o',
-  'claude-sonnet': 'claude-sonnet-4-20250514',
-  'gemini-pro': 'gemini-2.5-pro',
-  'deepseek-chat': 'deepseek-r1',
-  'llama-3.1': 'llama-4-maverick',
-  'qwen3-235b': 'qwen3-235b',
+  'gemini-2.5-flash': 'gemini-2.5-flash',
+  'gemini-3-flash': 'gemini-3-flash',
+  'gemini-2.5-flash-lite': 'gemini-2.5-flash-lite',
+  'gemini-pro': 'gemini-2.5-flash',
+  'deepseek-v4-flash': 'deepseek-v4-flash',
+  'deepseek-chat': 'deepseek-v4-flash',
+  'deepseek-r1': 'deepseek-r1',
+  'llama-4-scout': 'llama-4-scout-17b',
+  'llama-4-maverick': 'llama-4-maverick-17b',
+  'llama-4': 'llama-4-scout-17b',
+  'qwen3-coder': 'qwen3-coder-480b',
+  'qwen3.7-max': 'qwen3.7-max',
+  'qwen3': 'qwen3.7-max',
+  'mistral-large': 'mistral-large',
+  'codestral': 'codestral',
+  'gpt-oss-120b': 'gpt-oss-120b',
+  'cerebras-glm-4.7': 'cerebras-glm-4.7',
+  'command-r-plus': 'command-r-plus',
+  'deepseek-r1-sambanova': 'deepseek-r1-sambanova',
+  'openrouter-free': 'openrouter-free',
 };
 
 function resolveModel(model: string): string {
