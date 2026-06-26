@@ -48,3 +48,25 @@ Stage Summary:
 - In production deployment with proper RAM, all features work correctly
 - Created warmup.sh for pre-compiling routes before browser testing
 - VLM-based screenshot testing proved more reliable than DOM snapshots
+---
+Task ID: 1
+Agent: main
+Task: Fix dev surfaces not launching when clicked
+
+Work Log:
+- Identified root cause: "Launch" button in dev-surfaces-panel.tsx had no onClick handler (dead button)
+- Added `onLaunchSurface` callback prop to DevSurfacesPanel component
+- Created SURFACE_LAUNCH_TARGET mapping (surface type → panel view): modeling→editor, backend→terminal, etc.
+- Added `handleLaunch` function with visual feedback (loading spinner, "Launching..." text)
+- Wired up Launch button onClick in detail pane
+- Added hover-based Launch overlay on surface cards for quick launch
+- Updated page.tsx PanelContent to accept and pass onLaunchSurface callback
+- Fixed lint errors: replaced useEffect setState with useState initializer, used key prop for command palette remount
+- Browser tested: Modeling surface → Editor panel ✓, Backend surface → Terminal panel ✓
+
+Stage Summary:
+- Dev surfaces now launch correctly, navigating to the appropriate panel based on surface type
+- Surface type mapping: modeling/game/web-design/frontend/fullstack/mobile/api→editor, backend/data/devops→terminal
+- Launch button shows loading spinner during transition
+- Quick-launch overlay appears on card hover
+- Zero lint errors

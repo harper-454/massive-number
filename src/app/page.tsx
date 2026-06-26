@@ -130,13 +130,12 @@ const ALL_ITEMS = NAV_SECTIONS.flatMap(s => s.items);
 function TitleBar() {
   const { selectedModel, models } = useModelStore();
   const activeModel = models.find(m => m.id === selectedModel);
-  const [time, setTime] = useState('');
+  const [time, setTime] = useState(() => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
     }, 1000);
-    setTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
     return () => clearInterval(timer);
   }, []);
 
@@ -274,7 +273,7 @@ function Sidebar({
 
 // ── Panel Router ─────────────────────────────────────────────────────────
 
-function PanelContent({ view }: { view: PanelView }) {
+function PanelContent({ view, onLaunchSurface }: { view: PanelView; onLaunchSurface?: (surface: Record<string, unknown>, targetPanel: string) => void }) {
   const getPanel = (): React.ReactNode => {
     switch (view) {
       case 'chat': return <panels.ChatPanel />;
@@ -297,7 +296,7 @@ function PanelContent({ view }: { view: PanelView }) {
       case 'account': return <panels.AccountPanel />;
       case 'history': return <panels.HistoryPanel />;
       case 'library': return <panels.LibraryPanel />;
-      case 'dev-surfaces': return <panels.DevSurfacesPanel />;
+      case 'dev-surfaces': return <panels.DevSurfacesPanel onLaunchSurface={onLaunchSurface} />;
       default: return null;
     }
   };
@@ -373,10 +372,6 @@ function QuickCommandPalette({
   onSelect: (id: string) => void;
 }) {
   const [query, setQuery] = useState('');
-
-  useEffect(() => {
-    if (open) setQuery('');
-  }, [open]);
 
   if (!open) return null;
 
@@ -538,7 +533,12 @@ export default function Home() {
 
           {/* Panel content */}
           <div className="flex-1 min-h-0">
-            <PanelContent view={activeView} />
+            <PanelContent
+              view={activeView}
+              onLaunchSurface={(surface, targetPanel) => {
+                setActiveView(targetPanel as PanelView);
+              }}
+            />
           </div>
         </div>
       </div>
@@ -550,6 +550,7 @@ export default function Home() {
       <AnimatePresence>
         {commandPaletteOpen && (
           <QuickCommandPalette
+            key={commandPaletteOpen ? 'open' : 'closed'}
             open={commandPaletteOpen}
             onOpenChange={setCommandPaletteOpen}
             onSelect={handleCommandSelect}

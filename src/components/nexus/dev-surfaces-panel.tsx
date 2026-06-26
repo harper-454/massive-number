@@ -22,6 +22,7 @@ import {
   Star,
   Loader2,
   Settings2,
+  Play,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,21 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// Surface type → panel view mapping for launching
+const SURFACE_LAUNCH_TARGET: Record<string, string> = {
+  modeling: 'editor',
+  game: 'editor',
+  'web-design': 'editor',
+  backend: 'terminal',
+  frontend: 'editor',
+  fullstack: 'editor',
+  mobile: 'editor',
+  data: 'terminal',
+  api: 'editor',
+  devops: 'terminal',
+  custom: 'editor',
+};
 
 interface DevSurface {
   id: string;
@@ -93,15 +109,32 @@ const SURFACE_EMOJIS: Record<string, string> = {
   devops: '🚀',
 };
 
-export function DevSurfacesPanel() {
+interface DevSurfacesPanelProps {
+  onLaunchSurface?: (surface: DevSurface, targetPanel: string) => void;
+}
+
+export function DevSurfacesPanel({ onLaunchSurface }: DevSurfacesPanelProps) {
   const [surfaces, setSurfaces] = useState<DevSurface[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSurface, setSelectedSurface] = useState<DevSurface | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [launching, setLaunching] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('custom');
   const [newDesc, setNewDesc] = useState('');
   const [newColor, setNewColor] = useState('#10b981');
+
+  const handleLaunch = (surface: DevSurface) => {
+    const targetPanel = SURFACE_LAUNCH_TARGET[surface.type] || 'editor';
+    setLaunching(surface.id);
+    // Small delay for visual feedback
+    setTimeout(() => {
+      setLaunching(null);
+      if (onLaunchSurface) {
+        onLaunchSurface(surface, targetPanel);
+      }
+    }, 600);
+  };
 
   const fetchSurfaces = async () => {
     setLoading(true);
@@ -231,8 +264,24 @@ export function DevSurfacesPanel() {
                     onClick={() => setSelectedSurface(isSelected ? null : surface)}
                   >
                     <CardContent className="p-3">
-                      <div className={`h-20 rounded-lg bg-gradient-to-br ${c.gradient} flex items-center justify-center mb-2 relative`}>
+                      <div className={`h-20 rounded-lg bg-gradient-to-br ${c.gradient} flex items-center justify-center mb-2 relative group`}>
                         <span className="text-3xl">{emoji}</span>
+                        {/* Launch overlay on hover */}
+                        <div className="absolute inset-0 rounded-lg bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                          <Button
+                            size="sm"
+                            className="h-7 gap-1 text-[10px] bg-emerald-600 hover:bg-emerald-700"
+                            onClick={(e) => { e.stopPropagation(); handleLaunch(surface); }}
+                            disabled={launching === surface.id}
+                          >
+                            {launching === surface.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Play className="h-3 w-3" />
+                            )}
+                            Launch
+                          </Button>
+                        </div>
                         {surface.status === 'active' && (
                           <div className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-emerald-400" />
                         )}
@@ -297,9 +346,17 @@ export function DevSurfacesPanel() {
 
                         {/* Actions */}
                         <div className="space-y-2">
-                          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2">
-                            <Sparkles className="h-4 w-4" />
-                            Launch {s.name}
+                          <Button
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 gap-2"
+                            onClick={() => handleLaunch(s)}
+                            disabled={launching === s.id}
+                          >
+                            {launching === s.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-4 w-4" />
+                            )}
+                            {launching === s.id ? 'Launching...' : `Launch ${s.name}`}
                           </Button>
                           <div className="grid grid-cols-3 gap-2">
                             <Button variant="outline" size="sm" className="text-xs gap-1">
