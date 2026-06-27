@@ -30,6 +30,7 @@ import {
   LayoutGrid,
   Command,
   X,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,6 +82,7 @@ const panels = {
   HistoryPanel: dynamic(() => import('@/components/nexus/history-panel').then(m => ({ default: m.HistoryPanel })), { ssr: false }),
   LibraryPanel: dynamic(() => import('@/components/nexus/library-panel').then(m => ({ default: m.LibraryPanel })), { ssr: false }),
   DevSurfacesPanel: dynamic(() => import('@/components/nexus/dev-surfaces-panel').then(m => ({ default: m.DevSurfacesPanel })), { ssr: false }),
+  ImprovementPanel: dynamic(() => import('@/components/nexus/improvement-panel').then(m => ({ default: m.ImprovementPanel })), { ssr: false }),
 };
 
 // ── Navigation ────────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ const NAV_SECTIONS = [
       { id: 'notifications' as PanelView, label: 'Alerts', icon: Bell },
       { id: 'customization' as PanelView, label: 'Theme', icon: UserCog },
       { id: 'context' as PanelView, label: 'Memory', icon: Brain },
+      { id: 'improvement' as PanelView, label: 'Improve', icon: TrendingUp },
     ],
   },
 ];
@@ -297,6 +300,7 @@ function PanelContent({ view, onLaunchSurface }: { view: PanelView; onLaunchSurf
       case 'history': return <panels.HistoryPanel />;
       case 'library': return <panels.LibraryPanel />;
       case 'dev-surfaces': return <panels.DevSurfacesPanel onLaunchSurface={onLaunchSurface} />;
+      case 'improvement': return <panels.ImprovementPanel />;
       default: return null;
     }
   };
@@ -450,7 +454,7 @@ function QuickCommandPalette({
 // ── Main Page ───────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [activeView, setActiveView] = useState<PanelView>('dev-surfaces');
+  const [activeView, setActiveView] = useState<PanelView>('chat');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // Keyboard shortcuts

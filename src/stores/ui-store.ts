@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type PanelView = 'chat' | 'editor' | 'agent' | 'search' | 'terminal' | 'files' | 'settings' | 'mcp' | 'git' | 'collab' | 'spec' | 'marketplace' | 'competitive' | 'templates' | 'notifications' | 'customization' | 'context' | 'account' | 'history' | 'library' | 'dev-surfaces';
+export type PanelView = 'chat' | 'editor' | 'agent' | 'search' | 'terminal' | 'files' | 'settings' | 'mcp' | 'git' | 'collab' | 'spec' | 'marketplace' | 'competitive' | 'templates' | 'notifications' | 'customization' | 'context' | 'account' | 'history' | 'library' | 'dev-surfaces' | 'improvement';
 
 interface UIStore {
   // Panel layout

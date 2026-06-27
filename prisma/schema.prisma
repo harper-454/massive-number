@@ -449,3 +449,45 @@ model ProjectTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// ── AI Improvement Loops - Self-improving system ─────────────────────────
+
+model ImprovementLoop {
+  id          String    @id @default(cuid())
+  type        String    // performance, ux, model-quality, error-recovery, feature-suggestion
+  title       String
+  description String
+  status      String    @default("pending")  // pending, running, completed, failed
+  priority    Int       @default(0)
+  impact      String    @default("medium")   // low, medium, high, critical
+  result      String?   // JSON string with loop results
+  metrics     String    @default("{}")  // before/after metrics
+  runCount    Int       @default(0)
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model AppMetric {
+  id         String   @id @default(cuid())
+  category   String   // performance, usage, error, latency, satisfaction
+  name       String
+  value      Float
+  unit       String   // ms, count, percentage, score
+  tags       String   @default("{}")
+  recordedAt DateTime @default(now())
+}
+
+model FeatureSuggestion {
+  id            String    @id @default(cuid())
+  source        String    // ai-loop, user-feedback, model-analysis
+  title         String
+  description   String
+  category      String    // ui, performance, feature, integration, model
+  priority      Int       @default(0)
+  votes         Int       @default(0)
+  status        String    @default("suggested")  // suggested, planned, implemented, rejected
+  implementedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
