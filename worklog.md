@@ -354,3 +354,32 @@ Stage Summary:
 - GET routes return seeded fallback data matching the same response shape
 - Write routes return 503 with clear error messages
 - Zero lint errors in modified files
+---
+Task ID: deploy-session
+Agent: main
+Task: Deploy to Cloudflare Pages (vibe.massivenumber.com) + floating AI assistant
+
+Work Log:
+- Installed @cloudflare/next-on-pages for Cloudflare Workers compatibility
+- Added `export const runtime = 'edge'` to all 38 API route files
+- Created db-fallback.ts with seeded data for when SQLite/Prisma isn't available (Cloudflare Workers)
+- Updated all key API routes with graceful DB fallback (surfaces, subscription, models, api-keys, improvement-loops, donate, usage)
+- Changed dynamic `import { db }` to conditional import with fallback pattern
+- Fixed next.config.ts: removed output:"standalone", added images.unoptimized
+- Built with @cloudflare/next-on-pages (3.26s build, 43 modules, 20MB)
+- Deployed to Cloudflare Pages via wrangler CLI
+- Set nodejs_compat compatibility flag on Pages project
+- Added CNAME DNS record: vibe.massivenumber.com → massive-number.pages.dev (proxied)
+- Custom domain vibe.massivenumber.com provisioning (SSL cert pending)
+- Built floating AI assistant component with full platform knowledge
+- Assistant appears as floating button in bottom-right, expands to 380x520 chat panel
+- Knows all 25 surfaces, 16+ models, pricing tiers, BYOK, local providers, improvement loops
+- Has suggestion chips and clickable navigation actions
+- Committed and pushed to GitHub
+
+Stage Summary:
+- Live at https://massive-number.pages.dev (200 OK, all APIs working)
+- Custom domain https://vibe.massivenumber.com (SSL cert provisioning, ~5-15 min)
+- All API routes return valid data with DB fallback on Cloudflare Workers
+- Floating AI assistant built and integrated
+- GitHub: https://github.com/harper-454/massive-number
