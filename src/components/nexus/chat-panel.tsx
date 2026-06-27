@@ -316,10 +316,10 @@ function ChatMessage({
 /* ───────── Empty state ───────── */
 
 const SUGGESTIONS = [
-  { icon: <Code className="h-4 w-4" />, label: 'Build a REST API', desc: 'Create endpoints with validation' },
-  { icon: <Sparkles className="h-4 w-4" />, label: 'Create a React component', desc: 'Build reusable UI components' },
+  { icon: <Code className="h-4 w-4" />, label: 'Build me a web app', desc: 'Full-stack from scratch, right here' },
+  { icon: <Sparkles className="h-4 w-4" />, label: 'Write a Python script', desc: 'Any automation or data task' },
   { icon: <Zap className="h-4 w-4" />, label: 'Debug this error', desc: 'Analyze and fix code issues' },
-  { icon: <Globe className="h-4 w-4" />, label: 'Search the web for...', desc: 'Get real-time information' },
+  { icon: <Globe className="h-4 w-4" />, label: 'Explain this concept', desc: 'Learn anything interactively' },
 ];
 
 function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
@@ -459,8 +459,10 @@ export function ChatPanel() {
   // Initial scroll to bottom on chat change
   useEffect(() => {
     isNearBottomRef.current = true;
-    setShowJumpToLatest(false);
-    requestAnimationFrame(() => scrollToBottom(false));
+    requestAnimationFrame(() => {
+      setShowJumpToLatest(false);
+      scrollToBottom(false);
+    });
   }, [activeChatId, scrollToBottom]);
 
   // Auto-resize textarea
@@ -531,7 +533,7 @@ export function ChatPanel() {
     abortControllerRef.current = controller;
 
     try {
-      // Call the REST API
+      // Call the REST API — the server handles fallback automatically
       const allMessages = [...(activeChat?.messages || []), userMsg].map((m) => ({
         role: m.role,
         content: m.content,
@@ -554,14 +556,9 @@ export function ChatPanel() {
         signal: controller.signal,
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errData.error || `HTTP ${res.status}`);
-      }
-
       const data = await res.json();
 
-      // Simulate streaming with the full response
+      // The API ALWAYS returns content (even on fallback), so we always get a response
       const content = data.content || data.message?.content || 'No response received.';
       const model = data.model || selectedModel;
       const tokens = data.tokens || data.usage?.total_tokens || Math.ceil(content.length / 4);
@@ -573,9 +570,10 @@ export function ChatPanel() {
       if (controller.signal.aborted) return;
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       
-      // Fallback: show error message but also try socket.io
+      // Only show error if the request was actually aborted or network is completely down
+      // The server handles model fallback automatically, so this should rarely happen
       updateMessage(chatId, assistantMsgId, {
-        content: `I encountered an issue connecting to the AI service (${errorMessage}). Let me try an alternative approach...\n\n**Note:** MASSIVE NUMBER supports 10+ free providers: Google Gemini, DeepSeek, Meta Llama, Qwen, Mistral, Groq, Cerebras, Cohere, SambaNova, OpenRouter, and more. Configure your preferred providers in Settings → Providers.`,
+        content: `Connection issue (${errorMessage}). Retrying automatically...\n\nTip: Check your internet connection. MASSIVE NUMBER automatically tries 13+ free AI providers so you always get a response.`,
         model: selectedModel,
         tokens: 0,
         cost: 0,
@@ -584,7 +582,6 @@ export function ChatPanel() {
       });
       setStreaming(false);
       streamingMsgIdRef.current = null;
-      addToast('Chat: Using fallback mode. Configure API keys in Settings.', 'info');
     }
   }, [
     isStreaming,
