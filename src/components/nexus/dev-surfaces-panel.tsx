@@ -23,6 +23,21 @@ import {
   Loader2,
   Settings2,
   Play,
+  Shapes,
+  Shield,
+  Music,
+  Video,
+  Map,
+  Cpu,
+  Database,
+  Cuboid,
+  PuzzleIcon,
+  Zap,
+  Blocks,
+  BrainCircuit,
+  Hammer,
+  Network,
+  Filter,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,6 +68,22 @@ const SURFACE_LAUNCH_TARGET: Record<string, string> = {
   api: 'editor',
   devops: 'terminal',
   custom: 'editor',
+  // New surfaces
+  '3d-modeling': 'editor',
+  unity: 'editor',
+  unreal: 'editor',
+  godot: 'editor',
+  'chrome-ext': 'editor',
+  'vscode-ext': 'editor',
+  web3: 'editor',
+  'ml-training': 'terminal',
+  'devops-pro': 'terminal',
+  security: 'terminal',
+  audio: 'editor',
+  video: 'editor',
+  gis: 'editor',
+  iot: 'terminal',
+  database: 'editor',
 };
 
 interface DevSurface {
@@ -81,6 +112,22 @@ const SURFACE_ICONS: Record<string, React.ReactNode> = {
   data: <BarChart3 className="h-6 w-6" />,
   api: <Cable className="h-6 w-6" />,
   devops: <Rocket className="h-6 w-6" />,
+  // New surfaces
+  '3d-modeling': <Cuboid className="h-6 w-6" />,
+  unity: <Blocks className="h-6 w-6" />,
+  unreal: <Shapes className="h-6 w-6" />,
+  godot: <Gamepad2 className="h-6 w-6" />,
+  'chrome-ext': <PuzzleIcon className="h-6 w-6" />,
+  'vscode-ext': <Zap className="h-6 w-6" />,
+  web3: <Network className="h-6 w-6" />,
+  'ml-training': <BrainCircuit className="h-6 w-6" />,
+  'devops-pro': <Hammer className="h-6 w-6" />,
+  security: <Shield className="h-6 w-6" />,
+  audio: <Music className="h-6 w-6" />,
+  video: <Video className="h-6 w-6" />,
+  gis: <Map className="h-6 w-6" />,
+  iot: <Cpu className="h-6 w-6" />,
+  database: <Database className="h-6 w-6" />,
 };
 
 const SURFACE_COLORS: Record<string, { bg: string; border: string; text: string; gradient: string }> = {
@@ -94,6 +141,22 @@ const SURFACE_COLORS: Record<string, { bg: string; border: string; text: string;
   data: { bg: 'bg-yellow-500/15', border: 'border-yellow-500/30', text: 'text-yellow-400', gradient: 'from-yellow-500/20 to-amber-600/20' },
   api: { bg: 'bg-orange-500/15', border: 'border-orange-500/30', text: 'text-orange-400', gradient: 'from-orange-500/20 to-red-600/20' },
   devops: { bg: 'bg-zinc-500/15', border: 'border-zinc-500/30', text: 'text-zinc-400', gradient: 'from-zinc-500/20 to-zinc-700/20' },
+  // New surfaces
+  '3d-modeling': { bg: 'bg-pink-500/15', border: 'border-pink-500/30', text: 'text-pink-400', gradient: 'from-pink-500/20 to-rose-600/20' },
+  unity: { bg: 'bg-purple-500/15', border: 'border-purple-500/30', text: 'text-purple-400', gradient: 'from-purple-500/20 to-violet-600/20' },
+  unreal: { bg: 'bg-fuchsia-500/15', border: 'border-fuchsia-500/30', text: 'text-fuchsia-400', gradient: 'from-fuchsia-500/20 to-purple-600/20' },
+  godot: { bg: 'bg-sky-500/15', border: 'border-sky-500/30', text: 'text-sky-400', gradient: 'from-sky-400/20 to-cyan-600/20' },
+  'chrome-ext': { bg: 'bg-green-500/15', border: 'border-green-500/30', text: 'text-green-400', gradient: 'from-green-500/20 to-emerald-600/20' },
+  'vscode-ext': { bg: 'bg-cyan-500/15', border: 'border-cyan-500/30', text: 'text-cyan-400', gradient: 'from-cyan-500/20 to-sky-600/20' },
+  web3: { bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-400', gradient: 'from-amber-400/20 to-yellow-600/20' },
+  'ml-training': { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', gradient: 'from-red-500/20 to-rose-600/20' },
+  'devops-pro': { bg: 'bg-slate-500/15', border: 'border-slate-500/30', text: 'text-slate-400', gradient: 'from-slate-500/20 to-zinc-700/20' },
+  security: { bg: 'bg-red-600/15', border: 'border-red-600/30', text: 'text-red-500', gradient: 'from-red-600/20 to-red-800/20' },
+  audio: { bg: 'bg-purple-500/15', border: 'border-purple-500/30', text: 'text-purple-400', gradient: 'from-purple-500/20 to-fuchsia-600/20' },
+  video: { bg: 'bg-rose-600/15', border: 'border-rose-600/30', text: 'text-rose-500', gradient: 'from-rose-600/20 to-pink-700/20' },
+  gis: { bg: 'bg-emerald-600/15', border: 'border-emerald-600/30', text: 'text-emerald-500', gradient: 'from-emerald-600/20 to-green-700/20' },
+  iot: { bg: 'bg-teal-500/15', border: 'border-teal-500/30', text: 'text-teal-400', gradient: 'from-teal-500/20 to-cyan-700/20' },
+  database: { bg: 'bg-violet-600/15', border: 'border-violet-600/30', text: 'text-violet-500', gradient: 'from-violet-600/20 to-purple-800/20' },
 };
 
 const SURFACE_EMOJIS: Record<string, string> = {
@@ -107,11 +170,40 @@ const SURFACE_EMOJIS: Record<string, string> = {
   data: '📊',
   api: '🔌',
   devops: '🚀',
+  // New surfaces
+  '3d-modeling': '🧊',
+  unity: '🕹️',
+  unreal: '🔥',
+  godot: '🎯',
+  'chrome-ext': '🧩',
+  'vscode-ext': '⚡',
+  web3: '⛓️',
+  'ml-training': '🧠',
+  'devops-pro': '🏗️',
+  security: '🛡️',
+  audio: '🎵',
+  video: '🎬',
+  gis: '🗺️',
+  iot: '📡',
+  database: '🗄️',
 };
 
 interface DevSurfacesPanelProps {
   onLaunchSurface?: (surface: DevSurface, targetPanel: string) => void;
 }
+
+// Category definitions for filtering
+const SURFACE_CATEGORIES = [
+  { id: 'all', label: 'All', types: [] },
+  { id: 'game', label: 'Game Dev', types: ['game', 'unity', 'unreal', 'godot'] },
+  { id: 'web', label: 'Web', types: ['web-design', 'chrome-ext', 'vscode-ext', 'frontend'] },
+  { id: 'data', label: 'Data', types: ['data', 'ml-training', 'database', 'gis'] },
+  { id: 'infra', label: 'Infra', types: ['backend', 'devops', 'devops-pro', 'security', 'iot'] },
+  { id: 'creative', label: 'Creative', types: ['modeling', '3d-modeling', 'audio', 'video'] },
+  { id: 'code', label: 'Code', types: ['fullstack', 'api', 'mobile', 'web3'] },
+] as const;
+
+type CategoryId = typeof SURFACE_CATEGORIES[number]['id'];
 
 export function DevSurfacesPanel({ onLaunchSurface }: DevSurfacesPanelProps) {
   const [surfaces, setSurfaces] = useState<DevSurface[]>([]);
@@ -123,6 +215,7 @@ export function DevSurfacesPanel({ onLaunchSurface }: DevSurfacesPanelProps) {
   const [newType, setNewType] = useState('custom');
   const [newDesc, setNewDesc] = useState('');
   const [newColor, setNewColor] = useState('#10b981');
+  const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
 
   const handleLaunch = (surface: DevSurface) => {
     const targetPanel = SURFACE_LAUNCH_TARGET[surface.type] || 'editor';
@@ -186,6 +279,14 @@ export function DevSurfacesPanel({ onLaunchSurface }: DevSurfacesPanelProps) {
 
   const colors = (type: string) => SURFACE_COLORS[type] || SURFACE_COLORS.devops;
 
+  // Filter surfaces by active category
+  const filteredSurfaces = activeCategory === 'all'
+    ? surfaces
+    : surfaces.filter((s) => {
+        const cat = SURFACE_CATEGORIES.find((c) => c.id === activeCategory);
+        return cat && cat.types.includes(s.type as typeof cat.types[number]);
+      });
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -210,7 +311,7 @@ export function DevSurfacesPanel({ onLaunchSurface }: DevSurfacesPanelProps) {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="text-[9px]">
-              {surfaces.length} surfaces
+              {filteredSurfaces.length} surfaces
             </Badge>
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
@@ -240,12 +341,42 @@ export function DevSurfacesPanel({ onLaunchSurface }: DevSurfacesPanelProps) {
 
       <Separator className="shrink-0" />
 
+      {/* Category filter */}
+      <div className="shrink-0 px-4 py-2 flex items-center gap-1.5 overflow-x-auto">
+        <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        {SURFACE_CATEGORIES.map((cat) => (
+          <Button
+            key={cat.id}
+            variant={activeCategory === cat.id ? 'default' : 'ghost'}
+            size="sm"
+            className={`h-6 px-2.5 text-[10px] shrink-0 ${
+              activeCategory === cat.id
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={() => {
+              setActiveCategory(cat.id);
+              setSelectedSurface(null);
+            }}
+          >
+            {cat.label}
+            {cat.id !== 'all' && (
+              <span className="ml-1 text-[8px] opacity-60">
+                {surfaces.filter((s) => cat.types.includes(s.type as typeof cat.types[number])).length}
+              </span>
+            )}
+          </Button>
+        ))}
+      </div>
+
+      <Separator className="shrink-0" />
+
       {/* Main content */}
       <div className="flex-1 min-h-0 flex">
         {/* Surface grid */}
         <ScrollArea className={`${selectedSurface ? 'w-1/2' : 'w-full'} transition-all`}>
           <div className="p-4 grid grid-cols-2 gap-3">
-            {surfaces.map((surface, idx) => {
+            {filteredSurfaces.map((surface, idx) => {
               const c = colors(surface.type);
               const emoji = SURFACE_EMOJIS[surface.type] || '🔧';
               const isSelected = selectedSurface?.id === surface.id;

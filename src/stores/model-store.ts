@@ -14,10 +14,23 @@ export interface ModelInfo {
   providerUrl?: string;
 }
 
+// Health status for a model
+export interface ModelHealth {
+  modelId: string;
+  status: 'healthy' | 'degraded' | 'down' | 'unknown';
+  latencyMs: number;
+  lastChecked: Date;
+  errorRate: number;
+  consecutiveFailures: number;
+}
+
 interface ModelStore {
   models: ModelInfo[];
   selectedModel: string;
   isLoading: boolean;
+  modelHealth: ModelHealth[];
+  autoSwitch: boolean;
+  fallbackChain: string[];
 
   // Actions
   setModels: (models: ModelInfo[]) => void;
@@ -25,6 +38,9 @@ interface ModelStore {
   toggleModel: (modelId: string) => void;
   getSelectedModel: () => ModelInfo | undefined;
   fetchModels: () => Promise<void>;
+  checkModelHealth: () => Promise<void>;
+  getBestAvailableModel: () => ModelInfo;
+  setAutoSwitch: (enabled: boolean) => void;
 }
 
 // Default models - kept in sync with /api/models route
@@ -239,10 +255,27 @@ const DEFAULT_MODELS: ModelInfo[] = [
   },
 ];
 
+// Default fallback chain — ordered by reliability/speed for auto-switching
+const DEFAULT_FALLBACK_CHAIN: string[] = [
+  'gemini-2.5-flash',
+  'deepseek-v4-flash',
+  'gemini-3-flash',
+  'llama-4-scout-17b',
+  'qwen3-coder-480b',
+  'deepseek-r1',
+  'mistral-large',
+  'codestral',
+  'command-r-plus',
+  'openrouter-free',
+];
+
 export const useModelStore = create<ModelStore>((set, get) => ({
   models: DEFAULT_MODELS,
   selectedModel: 'auto',
   isLoading: false,
+  modelHealth: [],
+  autoSwitch: true,
+  fallbackChain: DEFAULT_FALLBACK_CHAIN,
 
   setModels: (models) => set({ models }),
   setSelectedModel: (modelId) => set({ selectedModel: modelId }),
@@ -274,4 +307,79 @@ export const useModelStore = create<ModelStore>((set, get) => ({
       set({ isLoading: false });
     }
   },
+
+  checkModelHealth: async () => {
+    try {
+      const res = await fetch('/api/model-health');
+      if (res.ok) {
+        const data = await res.json();
+        const healthEntries: ModelHealth[] = (data.models || []).map(
+          (m: { id: string; status: string; latencyMs: number; lastChecked: string; errorRate: number; consecutiveFailures?: number }) => ({
+            modelId: m.id,
+            status: (m.status === 'healthy' || m.status === 'degraded' || m.status === 'down' || m.status === 'unknown')
+              ? m.status
+              : 'unknown',
+            latencyMs: m.latencyMs || 0,
+            lastChecked: new Date(m.lastChecked),
+            errorRate: m.errorRate || 0,
+            consecutiveFailures: m.consecutiveFailures || 0,
+          })
+        );
+
+        // Also store fallback chain from API response
+        const fallbackOrder: string[] = data.fallbackOrder || DEFAULT_FALLBACK_CHAIN;
+
+        set({ modelHealth: healthEntries, fallbackChain: fallbackOrder });
+
+        // If auto-switch is enabled, check if selected model is down and switch
+        const state = get();
+        if (state.autoSwitch && state.selectedModel !== 'auto') {
+          const selectedHealth = healthEntries.find(
+            (h) => h.modelId === state.selectedModel
+          );
+          if (selectedHealth && selectedHealth.status === 'down') {
+            // Auto-switch to best available
+            const best = get().getBestAvailableModel();
+            if (best && best.id !== state.selectedModel) {
+              set({ selectedModel: best.id });
+            }
+          }
+        }
+      }
+    } catch {
+      // Health check failed — keep existing health data
+    }
+  },
+
+  getBestAvailableModel: () => {
+    const state = get();
+    const enabledModels = state.models.filter((m) => m.enabled && m.id !== 'auto');
+
+    // Try fallback chain first
+    for (const fallbackId of state.fallbackChain) {
+      const health = state.modelHealth.find((h) => h.modelId === fallbackId);
+      const model = enabledModels.find((m) => m.id === fallbackId);
+      if (model && health && (health.status === 'healthy' || health.status === 'degraded')) {
+        return model;
+      }
+    }
+
+    // If no healthy model in fallback chain, try any enabled healthy model
+    for (const model of enabledModels) {
+      const health = state.modelHealth.find((h) => h.modelId === model.id);
+      if (health && (health.status === 'healthy' || health.status === 'degraded')) {
+        return model;
+      }
+    }
+
+    // If no health data at all, return first enabled model
+    if (enabledModels.length > 0) {
+      return enabledModels[0];
+    }
+
+    // Absolute fallback — return the 'auto' model
+    return state.models[0];
+  },
+
+  setAutoSwitch: (enabled) => set({ autoSwitch: enabled }),
 }));

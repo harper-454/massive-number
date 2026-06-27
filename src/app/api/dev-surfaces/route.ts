@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { Prisma } from '@prisma/client';
 
-// Default dev surfaces to seed — colors match the design spec
+// Default dev surfaces to seed — 25 surfaces across all domains
 const DEFAULT_DEV_SURFACES = [
   {
     name: 'Modeling',
@@ -114,13 +114,181 @@ const DEFAULT_DEV_SURFACES = [
     status: 'active',
     sortOrder: 9,
   },
+  // ── New Surfaces (15 additions) ────────────────────────────────────────
+  {
+    name: '3D Modeling',
+    type: '3d-modeling',
+    description: 'Professional 3D asset creation, sculpting, rigging, and animation with industry-standard tools',
+    icon: '🧊',
+    color: '#ec4899',
+    tools: JSON.stringify(['blender', 'three.js', 'spline', 'zbrush', 'maya']),
+    layout: JSON.stringify({ left: 'outliner', center: '3d-viewport', right: 'properties', bottom: 'timeline' }),
+    status: 'active',
+    sortOrder: 10,
+  },
+  {
+    name: 'Game SDK - Unity',
+    type: 'unity',
+    description: 'Full Unity game development with C# scripting, Prefabs, Physics, and NavMesh systems',
+    icon: '🕹️',
+    color: '#a855f7',
+    tools: JSON.stringify(['unity-editor', 'c-sharp', 'prefabs', 'physics', 'navmesh']),
+    layout: JSON.stringify({ left: 'hierarchy', center: 'scene-view', right: 'inspector', bottom: 'console' }),
+    status: 'active',
+    sortOrder: 11,
+  },
+  {
+    name: 'Game SDK - Unreal',
+    type: 'unreal',
+    description: 'Full Unreal Engine development with Blueprints, C++, Niagara VFX, and Lumen lighting',
+    icon: '🔥',
+    color: '#6366f1',
+    tools: JSON.stringify(['unreal-engine', 'blueprints', 'cpp', 'niagara', 'lumen']),
+    layout: JSON.stringify({ left: 'world-outliner', center: 'viewport', right: 'details', bottom: 'output-log' }),
+    status: 'active',
+    sortOrder: 12,
+  },
+  {
+    name: 'Game SDK - Godot',
+    type: 'godot',
+    description: 'Full Godot Engine development with GDScript, Scenes, Physics, and Shader editing',
+    icon: '🎯',
+    color: '#3b82f6',
+    tools: JSON.stringify(['godot-engine', 'gdscript', 'scenes', 'physics', 'shaders']),
+    layout: JSON.stringify({ left: 'scene-tree', center: '2d-3d-view', right: 'inspector', bottom: 'output' }),
+    status: 'active',
+    sortOrder: 13,
+  },
+  {
+    name: 'Chrome Extension',
+    type: 'chrome-ext',
+    description: 'Browser extension development with Manifest V3, Content Scripts, Background Workers, and Chrome APIs',
+    icon: '🧩',
+    color: '#22c55e',
+    tools: JSON.stringify(['manifest-v3', 'content-scripts', 'background-workers', 'devtools', 'chrome-apis']),
+    layout: JSON.stringify({ left: 'file-tree', center: 'editor', right: 'manifest-editor', bottom: 'debugger' }),
+    status: 'active',
+    sortOrder: 14,
+  },
+  {
+    name: 'VS Code Extension',
+    type: 'vscode-ext',
+    description: 'VS Code extension development with Extension API, Language Server, Webviews, and Debug Adapter',
+    icon: '⚡',
+    color: '#0ea5e9',
+    tools: JSON.stringify(['extension-api', 'language-server', 'webviews', 'tree-views', 'debug-adapter']),
+    layout: JSON.stringify({ left: 'api-explorer', center: 'extension-host', right: 'webview-preview', bottom: 'debug-console' }),
+    status: 'active',
+    sortOrder: 15,
+  },
+  {
+    name: 'Blockchain/Web3',
+    type: 'web3',
+    description: 'Decentralized app development with Solidity, Hardhat, Ethers.js, IPFS, and Smart Contracts',
+    icon: '⛓️',
+    color: '#f59e0b',
+    tools: JSON.stringify(['solidity', 'hardhat', 'ethers-js', 'ipfs', 'smart-contracts']),
+    layout: JSON.stringify({ left: 'contracts', center: 'solidity-editor', right: 'deploy-panel', bottom: 'terminal' }),
+    status: 'active',
+    sortOrder: 16,
+  },
+  {
+    name: 'AI/ML Training',
+    type: 'ml-training',
+    description: 'Machine learning model training with PyTorch, TensorFlow, JAX, training loops, and GPU optimization',
+    icon: '🧠',
+    color: '#ef4444',
+    tools: JSON.stringify(['pytorch', 'tensorflow', 'jax', 'training-loops', 'gpu-optimization']),
+    layout: JSON.stringify({ left: 'experiments', center: 'notebook', right: 'tensorboard', bottom: 'gpu-monitor' }),
+    status: 'active',
+    sortOrder: 17,
+  },
+  {
+    name: 'DevOps Pro',
+    type: 'devops-pro',
+    description: 'Advanced infrastructure with Kubernetes, Terraform, Ansible, monitoring, and SRE practices',
+    icon: '🏗️',
+    color: '#64748b',
+    tools: JSON.stringify(['kubernetes', 'terraform', 'ansible', 'monitoring', 'sre']),
+    layout: JSON.stringify({ left: 'clusters', center: 'yaml-editor', right: 'monitoring', bottom: 'terminal' }),
+    status: 'active',
+    sortOrder: 18,
+  },
+  {
+    name: 'Security',
+    type: 'security',
+    description: 'Application security with penetration testing, OWASP, SAST/DAST, vulnerability scanning, and compliance',
+    icon: '🛡️',
+    color: '#dc2626',
+    tools: JSON.stringify(['pentesting', 'owasp', 'sast-dast', 'vulnerability-scanning', 'compliance']),
+    layout: JSON.stringify({ left: 'scan-results', center: 'code-audit', right: 'report', bottom: 'terminal' }),
+    status: 'active',
+    sortOrder: 19,
+  },
+  {
+    name: 'Audio/Music',
+    type: 'audio',
+    description: 'Audio and music development with Web Audio API, Tone.js, MIDI, DAW integration, and sound design',
+    icon: '🎵',
+    color: '#a855f7',
+    tools: JSON.stringify(['web-audio-api', 'tone-js', 'midi', 'daw-integration', 'sound-design']),
+    layout: JSON.stringify({ left: 'tracks', center: 'waveform-editor', right: 'mixer', bottom: 'piano-roll' }),
+    status: 'active',
+    sortOrder: 20,
+  },
+  {
+    name: 'Video/Streaming',
+    type: 'video',
+    description: 'Video processing and streaming with FFmpeg, WebRTC, streaming protocols, and video pipeline tools',
+    icon: '🎬',
+    color: '#e11d48',
+    tools: JSON.stringify(['ffmpeg', 'webrtc', 'streaming-protocols', 'video-processing', 'transcoding']),
+    layout: JSON.stringify({ left: 'media-browser', center: 'preview', right: 'pipeline-editor', bottom: 'console' }),
+    status: 'active',
+    sortOrder: 21,
+  },
+  {
+    name: 'Maps/GIS',
+    type: 'gis',
+    description: 'Geographic information systems with Mapbox, Leaflet, GeoJSON, spatial analysis, and location services',
+    icon: '🗺️',
+    color: '#059669',
+    tools: JSON.stringify(['mapbox', 'leaflet', 'geojson', 'spatial-analysis', 'location-services']),
+    layout: JSON.stringify({ left: 'layers', center: 'map-view', right: 'data-table', bottom: 'console' }),
+    status: 'active',
+    sortOrder: 22,
+  },
+  {
+    name: 'IoT/Embedded',
+    type: 'iot',
+    description: 'IoT and embedded systems with Arduino, Raspberry Pi, MQTT, sensor data, and edge computing',
+    icon: '📡',
+    color: '#0891b2',
+    tools: JSON.stringify(['arduino', 'raspberry-pi', 'mqtt', 'sensor-data', 'edge-computing']),
+    layout: JSON.stringify({ left: 'devices', center: 'code-editor', right: 'serial-monitor', bottom: 'terminal' }),
+    status: 'active',
+    sortOrder: 23,
+  },
+  {
+    name: 'Database Design',
+    type: 'database',
+    description: 'Database schema design, ER diagrams, query optimization, and migration management',
+    icon: '🗄️',
+    color: '#7c3aed',
+    tools: JSON.stringify(['schema-design', 'er-diagrams', 'query-optimization', 'migration-management', 'sql-editor']),
+    layout: JSON.stringify({ left: 'schema-tree', center: 'er-diagram', right: 'query-editor', bottom: 'results' }),
+    status: 'active',
+    sortOrder: 24,
+  },
 ];
 
-// Seed default surfaces if table is empty
+// Seed default surfaces — adds missing surfaces to handle upgrades
 async function seedIfEmpty() {
-  const count = await db.devSurface.count();
-  if (count === 0) {
-    for (const surface of DEFAULT_DEV_SURFACES) {
+  const existing = await db.devSurface.findMany({ select: { type: true } });
+  const existingTypes = new Set(existing.map((s) => s.type));
+
+  for (const surface of DEFAULT_DEV_SURFACES) {
+    if (!existingTypes.has(surface.type)) {
       await db.devSurface.create({ data: surface });
     }
   }

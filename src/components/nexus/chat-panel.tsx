@@ -383,7 +383,10 @@ export function ChatPanel() {
   const [isListening, setIsListening] = useState(false);
   const [activePersona, setActivePersona] = useState<string>('default');
   const [personas, setPersonas] = useState<Persona[]>([DEFAULT_PERSONA]);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const isNearBottomRef = useRef(true);
 
   useEffect(() => {
     fetch('/api/personas')
@@ -413,12 +416,52 @@ export function ChatPanel() {
   const tokenCount = estimateTokens(input);
   const currentPersona = personas.find((p) => p.id === activePersona) || DEFAULT_PERSONA;
 
-  // Auto-scroll
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  // Scroll to bottom helper
+  const scrollToBottom = useCallback((smooth = true) => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
+    if (viewport) {
+      viewport.scrollTo({
+        top: viewport.scrollHeight,
+        behavior: smooth ? 'smooth' : 'instant',
+      });
     }
-  }, [activeChat?.messages]);
+  }, []);
+
+  // Handle scroll events to detect if user scrolled up
+  const handleScroll = useCallback(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
+    if (viewport) {
+      const { scrollTop, scrollHeight, clientHeight } = viewport;
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      isNearBottomRef.current = nearBottom;
+      setShowJumpToLatest(!nearBottom);
+    }
+  }, []);
+
+  // Attach scroll listener to the viewport after mount
+  useEffect(() => {
+    const root = scrollAreaRef.current;
+    if (!root) return;
+    const viewport = root.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
+    if (!viewport) return;
+    viewport.addEventListener('scroll', handleScroll, { passive: true });
+    return () => viewport.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  // Auto-scroll only when near bottom
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => scrollToBottom(false));
+    }
+  }, [activeChat?.messages, scrollToBottom]);
+
+  // Initial scroll to bottom on chat change
+  useEffect(() => {
+    isNearBottomRef.current = true;
+    setShowJumpToLatest(false);
+    requestAnimationFrame(() => scrollToBottom(false));
+  }, [activeChatId, scrollToBottom]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -688,21 +731,49 @@ export function ChatPanel() {
 
       {/* Messages area */}
       {activeChat && activeChat.messages.length > 0 ? (
-        <ScrollArea className="flex-1">
-          <div ref={scrollRef} className="max-w-3xl mx-auto py-4">
-            <AnimatePresence initial={false}>
-              {activeChat.messages.map((msg) => (
-                <ChatMessage
-                  key={msg.id}
-                  message={msg}
-                  isStreaming={msg.isStreaming}
-                  isLastAssistant={msg.id === lastAssistantMsgId}
-                  onRegenerate={msg.id === lastAssistantMsgId ? handleRegenerate : undefined}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        </ScrollArea>
+        <div className="flex-1 relative min-h-0">
+          <ScrollArea className="h-full" ref={scrollAreaRef}>
+            <div className="max-w-3xl mx-auto py-4">
+              <AnimatePresence initial={false}>
+                {activeChat.messages.map((msg) => (
+                  <ChatMessage
+                    key={msg.id}
+                    message={msg}
+                    isStreaming={msg.isStreaming}
+                    isLastAssistant={msg.id === lastAssistantMsgId}
+                    onRegenerate={msg.id === lastAssistantMsgId ? handleRegenerate : undefined}
+                  />
+                ))}
+              </AnimatePresence>
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+          {/* Jump to Latest button */}
+          <AnimatePresence>
+            {showJumpToLatest && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.15 }}
+                className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10"
+              >
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20"
+                  onClick={() => {
+                    isNearBottomRef.current = true;
+                    setShowJumpToLatest(false);
+                    scrollToBottom(true);
+                  }}
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Jump to Latest
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       ) : (
         <div className="flex-1 overflow-auto">
           <EmptyState onSuggestionClick={handleSuggestionClick} />
