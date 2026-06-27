@@ -1,5 +1,6 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { isDbAvailable } from '@/lib/db-fallback';
 
 // ── Loop type definitions ────────────────────────────────────────────────
 
@@ -115,9 +116,23 @@ const LOOP_TYPES = {
   },
 };
 
+// ── Fallback loop data for when DB is unavailable ────────────────────────
+
+function getFallbackLoops() {
+  const now = new Date().toISOString();
+  return [
+    { id: 'fallback-1', type: 'performance', title: 'Performance Optimization Loop', description: 'Continuously monitors and optimizes app load times, API response times, and render performance', priority: 5, impact: 'high', status: 'pending', result: null, metrics: '{}', runCount: 0, lastRunAt: null, createdAt: now, updatedAt: now },
+    { id: 'fallback-2', type: 'ux', title: 'UX Improvement Loop', description: 'Tracks user interaction patterns and identifies friction points in the interface', priority: 4, impact: 'high', status: 'pending', result: null, metrics: '{}', runCount: 0, lastRunAt: null, createdAt: now, updatedAt: now },
+    { id: 'fallback-3', type: 'model-quality', title: 'Model Quality Loop', description: 'Monitors AI model response quality and satisfaction scores across all providers', priority: 5, impact: 'critical', status: 'pending', result: null, metrics: '{}', runCount: 0, lastRunAt: null, createdAt: now, updatedAt: now },
+    { id: 'fallback-4', type: 'error-recovery', title: 'Error Recovery Loop', description: 'Tracks error patterns and creates better fallback strategies and error messages', priority: 3, impact: 'medium', status: 'pending', result: null, metrics: '{}', runCount: 0, lastRunAt: null, createdAt: now, updatedAt: now },
+    { id: 'fallback-5', type: 'feature-suggestion', title: 'Feature Suggestion Loop', description: 'Analyzes usage patterns to suggest new features users need most', priority: 2, impact: 'medium', status: 'pending', result: null, metrics: '{}', runCount: 0, lastRunAt: null, createdAt: now, updatedAt: now },
+  ];
+}
+
 // ── Seed initial loops if empty ──────────────────────────────────────────
 
 async function seedIfEmpty() {
+  const { db } = await import('@/lib/db');
   const count = await db.improvementLoop.count();
   if (count > 0) return;
 
@@ -137,6 +152,7 @@ async function seedIfEmpty() {
 // ── Seed initial metrics if empty ────────────────────────────────────────
 
 async function seedMetricsIfEmpty() {
+  const { db } = await import('@/lib/db');
   const count = await db.appMetric.count();
   if (count > 0) return;
 
@@ -162,9 +178,26 @@ async function seedMetricsIfEmpty() {
 
 export async function GET() {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      const loops = getFallbackLoops();
+      return NextResponse.json({
+        loops,
+        summary: {
+          total: loops.length,
+          active: 0,
+          completed: 0,
+          pending: loops.length,
+          failed: 0,
+          lastRunAt: null,
+        },
+      });
+    }
+
     await seedIfEmpty();
     await seedMetricsIfEmpty();
 
+    const { db } = await import('@/lib/db');
     const loops = await db.improvementLoop.findMany({
       orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
     });
@@ -188,7 +221,18 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Failed to fetch improvement loops:', error);
-    return NextResponse.json({ error: 'Failed to fetch improvement loops' }, { status: 500 });
+    const loops = getFallbackLoops();
+    return NextResponse.json({
+      loops,
+      summary: {
+        total: loops.length,
+        active: 0,
+        completed: 0,
+        pending: loops.length,
+        failed: 0,
+        lastRunAt: null,
+      },
+    });
   }
 }
 
@@ -196,6 +240,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot create improvement loops on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await req.json();
     const { type, title, description, priority, impact } = body;
 
@@ -208,6 +260,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` }, { status: 400 });
     }
 
+    const { db } = await import('@/lib/db');
     const loop = await db.improvementLoop.create({
       data: {
         type,
@@ -231,6 +284,14 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot run improvement loops on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await req.json();
     const { id } = body;
 
@@ -238,6 +299,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Loop id is required' }, { status: 400 });
     }
 
+    const { db } = await import('@/lib/db');
     const loop = await db.improvementLoop.findUnique({ where: { id } });
     if (!loop) {
       return NextResponse.json({ error: 'Loop not found' }, { status: 404 });
@@ -320,6 +382,14 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot delete improvement loops on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
 
@@ -327,6 +397,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Loop id is required' }, { status: 400 });
     }
 
+    const { db } = await import('@/lib/db');
     const loop = await db.improvementLoop.findUnique({ where: { id } });
     if (!loop) {
       return NextResponse.json({ error: 'Loop not found' }, { status: 404 });

@@ -1,0 +1,8 @@
+name = "massive-number"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+NEXT_PUBLIC_APP_NAME = "Massive Number"
+NEXT_PUBLIC_DOMAIN = "vibe.massivenumber.com"
+NEXT_PUBLIC_PREMIUM_PRICE = "8"

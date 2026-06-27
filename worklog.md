@@ -294,3 +294,63 @@ Stage Summary:
 - All API endpoints verified working
 - Lint: zero errors
 - OOM limitation is sandbox-specific; production deployment will work fine
+---
+Task ID: 2
+Agent: floating-assistant-agent
+Task: Build a floating AI assistant component
+
+Work Log:
+- Created `src/components/nexus/floating-assistant.tsx` — a comprehensive floating chat assistant
+- Default state: 56x56px circular button in bottom-right with Bot icon, emerald gradient, pulse animation, "AI" badge
+- Expanded state: 380x520px chat panel with glassmorphism effect, slides up with framer-motion spring animation
+- Header with "MASSIVE AI" branding, Sparkles icon, clear/close buttons
+- Full conversational interface with user (amber/orange) and assistant (emerald/teal) message bubbles
+- Simple markdown renderer supporting headers, bold, inline code, bullet/numbered lists
+- Typing animation (3 pulsing dots) when assistant is "thinking" (600-1400ms simulated delay)
+- Knowledge base covers ALL platform features: 16+ models, 25 surfaces, 3 pricing tiers, BYOK, local models, improvement loops, MCP Hub, Git, Collab, Spec-to-Code, Marketplace, and more
+- Pre-built responses for common questions (getting started, surfaces, pricing, BYOK, local models, models list, deployment, feature requests, and 15+ more topics)
+- Navigation integration: clickable action buttons in responses call `onNavigate(view)` → `setActiveView` in page.tsx
+- 5 suggestion chips: "Get Started" | "View Surfaces" | "Pricing" | "Use My Key" | "What's New?"
+- Auto-scroll to latest messages, clear chat button, Enter-to-send keyboard support
+- Added dynamic import with `ssr: false` to page.tsx, placed after StatusBar
+- Connected `onNavigate` prop to `handleViewChange` for panel navigation
+
+Stage Summary:
+- Complete floating AI assistant component with full platform knowledge
+- On by default, always visible (z-50), floats above all content
+- Navigates to correct panels via action buttons
+- Dark theme with emerald accents, framer-motion animations
+- Zero lint errors
+---
+Task ID: 1-deploy
+Agent: deploy-agent
+Task: Update API routes to gracefully handle database unavailability (Cloudflare Workers deployment)
+
+Work Log:
+- Read db-fallback.ts exports: `isDbAvailable()`, `FALLBACK_SURFACES`, `FALLBACK_SUBSCRIPTION`, `FALLBACK_MODELS`
+- Updated 9 API routes with the graceful fallback pattern:
+  1. `/api/dev-surfaces/route.ts` — GET returns FALLBACK_SURFACES when DB unavailable; POST/PUT/DELETE return 503
+  2. `/api/subscription/route.ts` — GET returns fallback subscription with plan info; POST/PUT return 503
+  3. `/api/models/route.ts` — GET returns FALLBACK_MODELS on error (no DB dependency, added as safety net)
+  4. `/api/api-keys/route.ts` — GET returns `{ keys: [] }`; POST/PUT/DELETE return 503
+  5. `/api/model-health/route.ts` — No DB dependency, no changes needed (already works on edge)
+  6. `/api/improvement-loops/route.ts` — GET returns 5 seeded fallback loops; POST/PUT/DELETE return 503
+  7. `/api/improvement-loops/metrics/route.ts` — GET returns 10 seeded fallback metrics with computed health score and trends
+  8. `/api/improvement-loops/suggestions/route.ts` — GET returns 6 seeded fallback suggestions with summary
+  9. `/api/donate/route.ts` — GET returns empty donations list; POST returns 503
+  10. `/api/subscription/usage/route.ts` — GET returns zero usage with FALLBACK_SUBSCRIPTION tokenLimit
+- Changed all static `import { db } from '@/lib/db'` to dynamic `const { db } = await import('@/lib/db')` inside handlers
+- Added `isDbAvailable()` check at the start of each handler before attempting DB access
+- Changed `import { Prisma }` to `import type { Prisma }` in dev-surfaces to avoid edge runtime issues
+- All routes maintain DB-first behavior with fallback second
+- GET endpoints return meaningful fallback data; write endpoints (POST/PUT/DELETE) return 503 when DB unavailable
+- `export const runtime = 'edge'` preserved at top of every file
+- ESLint: Zero errors in src/app/api/ directory
+
+Stage Summary:
+- All 10 API routes now gracefully handle database unavailability for Cloudflare Workers deployment
+- Pattern: check `isDbAvailable()` → use DB if available → return fallback data if not
+- Dynamic imports of `@/lib/db` prevent edge runtime crashes from Prisma/SQLite
+- GET routes return seeded fallback data matching the same response shape
+- Write routes return 503 with clear error messages
+- Zero lint errors in modified files

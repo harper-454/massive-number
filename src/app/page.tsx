@@ -59,6 +59,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 
 // Dynamic imports — on-demand panel loading for memory efficiency
+// Floating AI Assistant — always visible
+const FloatingAssistant = dynamic(() => import('@/components/nexus/floating-assistant').then(m => ({ default: m.FloatingAssistant })), { ssr: false });
+
 const panels = {
   ChatPanel: dynamic(() => import('@/components/nexus/chat-panel').then(m => ({ default: m.ChatPanel })), { ssr: false }),
   AgentPanel: dynamic(() => import('@/components/nexus/agent-panel').then(m => ({ default: m.AgentPanel })), { ssr: false }),
@@ -549,6 +552,9 @@ export default function Home() {
 
       {/* Status bar */}
       <StatusBar />
+
+      {/* Floating AI Assistant */}
+      <FloatingAssistant onNavigate={handleViewChange} />
 
       {/* Command palette */}
       <AnimatePresence>

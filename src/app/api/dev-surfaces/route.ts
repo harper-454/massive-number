@@ -1,6 +1,7 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { Prisma } from '@prisma/client';
+import { isDbAvailable, FALLBACK_SURFACES } from '@/lib/db-fallback';
+import type { Prisma } from '@prisma/client';
 
 // Default dev surfaces to seed — 25 surfaces across all domains
 const DEFAULT_DEV_SURFACES = [
@@ -284,6 +285,7 @@ const DEFAULT_DEV_SURFACES = [
 
 // Seed default surfaces — adds missing surfaces to handle upgrades
 async function seedIfEmpty() {
+  const { db } = await import('@/lib/db');
   const existing = await db.devSurface.findMany({ select: { type: true } });
   const existingTypes = new Set(existing.map((s) => s.type));
 
@@ -297,8 +299,14 @@ async function seedIfEmpty() {
 // GET - List all dev surfaces
 export async function GET() {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json({ surfaces: FALLBACK_SURFACES });
+    }
+
     await seedIfEmpty();
 
+    const { db } = await import('@/lib/db');
     const surfaces = await db.devSurface.findMany({
       orderBy: { sortOrder: 'asc' },
     });
@@ -313,16 +321,21 @@ export async function GET() {
     return NextResponse.json({ surfaces: parsedSurfaces });
   } catch (error) {
     console.error('DevSurfaces GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve dev surfaces' },
-      { status: 500 }
-    );
+    return NextResponse.json({ surfaces: FALLBACK_SURFACES });
   }
 }
 
 // POST - Create custom dev surface
 export async function POST(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot create surfaces on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { name, type, description, icon, color, tools, layout } = body;
 
@@ -332,6 +345,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const { db } = await import('@/lib/db');
 
     // Get the next sort order
     const maxSortOrder = await db.devSurface.aggregate({
@@ -371,6 +386,14 @@ export async function POST(request: NextRequest) {
 // PUT - Update dev surface
 export async function PUT(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot update surfaces on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { id, name, description, icon, color, tools, layout, sortOrder, status } = body;
 
@@ -380,6 +403,8 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const { db } = await import('@/lib/db');
 
     // Check if surface exists
     const existing = await db.devSurface.findUnique({ where: { id } });
@@ -425,6 +450,14 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete dev surface
 export async function DELETE(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot delete surfaces on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { id } = body;
 
@@ -434,6 +467,8 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const { db } = await import('@/lib/db');
 
     // Check if surface exists
     const existing = await db.devSurface.findUnique({ where: { id } });

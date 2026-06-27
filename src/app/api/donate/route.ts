@@ -1,9 +1,18 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { isDbAvailable } from '@/lib/db-fallback';
 
 // POST — create donation checkout session (simulated Stripe)
 export async function POST(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot process donations on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { userId, amount, currency = 'usd', message } = body;
 
@@ -17,6 +26,8 @@ export async function POST(request: NextRequest) {
     // Predefined amounts validation
     const validAmounts = [5, 10, 25, 50];
     const isCustom = !validAmounts.includes(amount);
+
+    const { db } = await import('@/lib/db');
 
     // Create donation record
     const donation = await db.donation.create({
@@ -49,9 +60,19 @@ export async function POST(request: NextRequest) {
 // GET — list donation history
 export async function GET(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json({
+        donations: [],
+        total: 0,
+        count: 0,
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
+    const { db } = await import('@/lib/db');
     const where = userId ? { userId } : {};
     const donations = await db.donation.findMany({
       where,
@@ -68,9 +89,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Donate GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve donations' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      donations: [],
+      total: 0,
+      count: 0,
+    });
   }
 }

@@ -1,4 +1,6 @@
+export const runtime = 'edge';
 import { NextResponse } from 'next/server';
+import { FALLBACK_MODELS } from '@/lib/db-fallback';
 
 // Current free models as of June 2026 - sourced from web research across
 // Google AI Studio, Groq, Cerebras, SambaNova, OpenRouter, DeepSeek, Mistral,
@@ -264,9 +266,13 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Models GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve models' },
-      { status: 500 }
-    );
+    // Return fallback models from db-fallback
+    return NextResponse.json({
+      models: FALLBACK_MODELS,
+      default: 'auto',
+      total: FALLBACK_MODELS.length,
+      providers: [...new Set(FALLBACK_MODELS.map(m => m.provider))].length,
+      lastUpdated: '2026-06-26',
+    });
   }
 }

@@ -1,5 +1,6 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { isDbAvailable } from '@/lib/db-fallback';
 
 // Helper: mask API key
 function maskKey(key: string): string {
@@ -10,9 +11,15 @@ function maskKey(key: string): string {
 // GET — list API keys (masked)
 export async function GET(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json({ keys: [] });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || 'default';
 
+    const { db } = await import('@/lib/db');
     const keys = await db.apiKey.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -27,16 +34,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ keys: safeKeys });
   } catch (error) {
     console.error('API Keys GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to list API keys' },
-      { status: 500 }
-    );
+    return NextResponse.json({ keys: [] });
   }
 }
 
 // POST — add API key
 export async function POST(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot add API keys on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { userId = 'default', provider, label, key, baseUrl, models, isLocal } = body;
 
@@ -55,6 +67,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { db } = await import('@/lib/db');
     const apiKey = await db.apiKey.create({
       data: {
         userId,
@@ -85,6 +98,14 @@ export async function POST(request: NextRequest) {
 // PUT — update API key (enable/disable, update label, test)
 export async function PUT(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot update API keys on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { id, enabled, label, baseUrl, models } = body;
 
@@ -95,6 +116,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const { db } = await import('@/lib/db');
     const existing = await db.apiKey.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json(
@@ -136,6 +158,14 @@ export async function PUT(request: NextRequest) {
 // DELETE — remove API key
 export async function DELETE(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot delete API keys on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -146,6 +176,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const { db } = await import('@/lib/db');
     const existing = await db.apiKey.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json(

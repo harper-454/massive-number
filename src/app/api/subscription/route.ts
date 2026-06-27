@@ -1,5 +1,6 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { isDbAvailable, FALLBACK_SUBSCRIPTION } from '@/lib/db-fallback';
 
 // ── Plan definitions ──────────────────────────────────────────────────────
 
@@ -50,9 +51,30 @@ export type PlanKey = keyof typeof PLANS;
 // GET — current subscription
 export async function GET(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      const planInfo = PLANS.free;
+      return NextResponse.json({
+        subscription: {
+          id: 'fallback',
+          userId: 'default',
+          plan: FALLBACK_SUBSCRIPTION.plan,
+          status: FALLBACK_SUBSCRIPTION.status,
+          currentPeriodStart: FALLBACK_SUBSCRIPTION.currentPeriodStart,
+          currentPeriodEnd: FALLBACK_SUBSCRIPTION.currentPeriodEnd,
+          cancelAtPeriodEnd: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        planInfo,
+        plans: PLANS,
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || 'default';
 
+    const { db } = await import('@/lib/db');
     let subscription = await db.subscription.findUnique({
       where: { userId },
     });
@@ -78,16 +100,36 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Subscription GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve subscription' },
-      { status: 500 }
-    );
+    const planInfo = PLANS.free;
+    return NextResponse.json({
+      subscription: {
+        id: 'fallback',
+        userId: 'default',
+        plan: FALLBACK_SUBSCRIPTION.plan,
+        status: FALLBACK_SUBSCRIPTION.status,
+        currentPeriodStart: FALLBACK_SUBSCRIPTION.currentPeriodStart,
+        currentPeriodEnd: FALLBACK_SUBSCRIPTION.currentPeriodEnd,
+        cancelAtPeriodEnd: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      planInfo,
+      plans: PLANS,
+    });
   }
 }
 
 // POST — create checkout / change plan (simulated)
 export async function POST(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot change plan on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { userId = 'default', plan } = body;
 
@@ -98,6 +140,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { db } = await import('@/lib/db');
     let subscription = await db.subscription.findUnique({ where: { userId } });
 
     if (!subscription) {
@@ -142,9 +185,18 @@ export async function POST(request: NextRequest) {
 // PUT — update/cancel subscription
 export async function PUT(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      return NextResponse.json(
+        { error: 'Database not available — cannot update subscription on edge runtime' },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { userId = 'default', action } = body;
 
+    const { db } = await import('@/lib/db');
     const subscription = await db.subscription.findUnique({ where: { userId } });
     if (!subscription) {
       return NextResponse.json(

@@ -1,13 +1,41 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { isDbAvailable, FALLBACK_SUBSCRIPTION } from '@/lib/db-fallback';
 import { PLANS, type PlanKey } from '@/app/api/subscription/route';
 
 // GET — token usage stats for current period
 export async function GET(request: NextRequest) {
   try {
+    const dbOk = await isDbAvailable();
+    if (!dbOk) {
+      const planInfo = PLANS.free;
+      const period = new Date().toISOString().slice(0, 7);
+      const monthlyUsage = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now);
+        d.setMonth(d.getMonth() - i);
+        const p = d.toISOString().slice(0, 7);
+        monthlyUsage.push({ period: p, totalTokens: 0, cost: 0 });
+      }
+      return NextResponse.json({
+        period,
+        totals: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 },
+        byProvider: {},
+        byModel: {},
+        monthlyUsage,
+        tokenLimit: FALLBACK_SUBSCRIPTION.tokensLimit,
+        usagePercent: 0,
+        plan: FALLBACK_SUBSCRIPTION.plan,
+        records: [],
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || 'default';
     const period = searchParams.get('period') || new Date().toISOString().slice(0, 7); // "2024-01"
+
+    const { db } = await import('@/lib/db');
 
     // Get subscription to find token limit
     let subscription = await db.subscription.findUnique({ where: { userId } });
@@ -92,9 +120,25 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Usage GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to retrieve usage stats' },
-      { status: 500 }
-    );
+    const period = new Date().toISOString().slice(0, 7);
+    const monthlyUsage = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - i);
+      const p = d.toISOString().slice(0, 7);
+      monthlyUsage.push({ period: p, totalTokens: 0, cost: 0 });
+    }
+    return NextResponse.json({
+      period,
+      totals: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0 },
+      byProvider: {},
+      byModel: {},
+      monthlyUsage,
+      tokenLimit: FALLBACK_SUBSCRIPTION.tokensLimit,
+      usagePercent: 0,
+      plan: FALLBACK_SUBSCRIPTION.plan,
+      records: [],
+    });
   }
 }
