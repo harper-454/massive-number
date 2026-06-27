@@ -460,7 +460,7 @@ export default function Home() {
   const [activeView, setActiveView] = useState<PanelView>('chat');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — only when NOT typing in an input/textarea
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -469,12 +469,16 @@ export default function Home() {
         return;
       }
 
-      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+      // Don't trigger panel shortcuts when the user is typing in an input, textarea, or contentEditable element
+      const target = e.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      if (!isTyping && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const numKey = parseInt(e.key);
         if (numKey >= 1 && numKey <= ALL_ITEMS.filter(i => i.shortcut).length) {
           const shortcutItems = ALL_ITEMS.filter(i => i.shortcut);
-          const target = shortcutItems[numKey - 1];
-          if (target) setActiveView(target.id);
+          const targetItem = shortcutItems[numKey - 1];
+          if (targetItem) setActiveView(targetItem.id);
         }
       }
 

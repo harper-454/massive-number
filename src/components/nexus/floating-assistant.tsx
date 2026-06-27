@@ -101,7 +101,6 @@ function generateResponse(input: string): { content: string; actions?: Assistant
       actions: [
         { label: 'Open Chat', view: 'chat' },
         { label: 'View Surfaces', view: 'dev-surfaces' },
-        { label: 'Open Agent', view: 'agent' },
       ],
     };
   }
